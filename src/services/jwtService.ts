@@ -5,12 +5,12 @@ import config from '../config';
 
 @injectable()
 export class JwtService implements IJwtService {
-  private readonly accessTokenOptions: SignOptions = {
+  private readonly _accessTokenOptions: SignOptions = {
     expiresIn: config.jwt.expiresIn as jwt.SignOptions['expiresIn'],
     algorithm: 'HS256',
   };
 
-  private readonly refreshTokenOptions: SignOptions = {
+  private readonly _refreshTokenOptions: SignOptions = {
     expiresIn: config.jwt.refreshExpiresIn as jwt.SignOptions['expiresIn'],
     algorithm: 'HS256',
   };
@@ -19,14 +19,14 @@ export class JwtService implements IJwtService {
     const payload: Omit<ITokenPayload, 'iat' | 'exp'> = { id: userId };
     if (role) payload.role = role;
 
-    return jwt.sign(payload, config.jwt.secret as Secret, this.accessTokenOptions);
+    return jwt.sign(payload, config.jwt.secret as Secret, this._accessTokenOptions);
   }
 
   generateRefreshToken(userId: string, role?: string): string {
     const payload: Omit<ITokenPayload, 'iat' | 'exp'> = { id: userId };
     if (role) payload.role = role;
 
-    return jwt.sign(payload, config.jwt.refreshSecret as Secret, this.refreshTokenOptions);
+    return jwt.sign(payload, config.jwt.refreshSecret as Secret, this._refreshTokenOptions);
   }
 
   verifyAccessToken(token: string): ITokenPayload {

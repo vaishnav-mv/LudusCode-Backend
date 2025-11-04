@@ -4,8 +4,12 @@ import { GroupStatus } from '../constants';
 
 const GroupSchema: Schema<IGroup> = new Schema({
   name: { type: String, required: true, trim: true },
+  description: { type: String, default: '' },
+  topics: [{ type: String }],
   leader: { type: Schema.Types.ObjectId, required: true, ref: 'User' },
+  members: [{ type: Schema.Types.ObjectId, ref: 'User' }],
   status: { type: String, enum: Object.values(GroupStatus), default: GroupStatus.Pending },
+  rejectionReason: { type: String, default: '' },
   createdAt: { type: Date, default: Date.now },
 });
 

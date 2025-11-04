@@ -6,7 +6,16 @@ import { Role } from '../constants';
 
 const UserSchema: Schema<IUser> = new Schema({
   username: { type: String, required: true, unique: true },
+  name: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true },
+  avatarUrl: { type: String, default: '' },
+  rank: { type: String, default: 'Beginner' },
+  elo: { type: Number, default: 1200 },
+  duelsWon: { type: Number, default: 0 },
+  duelsLost: { type: Number, default: 0 },
+  isAdmin: { type: Boolean, default: false },
+  isBanned: { type: Boolean, default: false },
+  isPremium: { type: Boolean, default: false },
   password: { type: String, required: true, select: false },
   role: { type: String, enum: Object.values(Role), default: Role.User },
   isVerified: { type: Boolean, default: false },

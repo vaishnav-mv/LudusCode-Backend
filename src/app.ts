@@ -3,8 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import 'reflect-metadata';
-import './di'; // Initialize dependency injection container
-import config from './config';
+import './di'; 
 import { HttpStatus } from './constants';
 import authRoutes from './routes/auth.routes';
 import adminRoutes from './routes/admin.routes';

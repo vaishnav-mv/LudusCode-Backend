@@ -15,10 +15,16 @@ export class DTOMapper {
   public static toUserResponseDTO(user: IUser): UserResponseDTO {
     return {
       id: user._id.toString(),
-      username: user.username,
+      name: user.name,
       email: user.email,
-      role: user.role,
-      createdAt: user.createdAt.toISOString(),
+      avatarUrl: user.avatarUrl || '',
+      rank: user.rank,
+      elo: user.elo,
+      duelsWon: user.duelsWon,
+      duelsLost: user.duelsLost,
+      isAdmin: user.isAdmin,
+      isBanned: user.isBanned,
+      isPremium: user.isPremium,
     };
   }
 
@@ -33,11 +39,19 @@ export class DTOMapper {
         ? DTOMapper.toUserResponseDTO(group.leader as unknown as IUser)
         : null;
 
+    const membersDTO = group.members
+      ? group.members.map(member => DTOMapper.toUserResponseDTO(member as unknown as IUser))
+      : [];
+
     return {
       id: group._id.toString(),
       name: group.name,
+      description: group.description || '',
+      topics: group.topics || [],
       leader: leaderDTO,
+      members: membersDTO,
       status: group.status,
+      rejectionReason: group.rejectionReason || undefined,
       createdAt: group.createdAt.toISOString(),
     };
   }

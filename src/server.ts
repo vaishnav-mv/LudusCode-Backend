@@ -14,6 +14,7 @@ const seedAdminUser = async (): Promise<void> => {
     if (!adminExists) {
       const admin = new User({
         username: 'admin',
+        name: 'Admin',
         email: 'admin@ludus.code',
         password: 'adminpassword', 
         role: Role.Admin,

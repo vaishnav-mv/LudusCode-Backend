@@ -6,7 +6,6 @@ import { DTOMapper } from '../utils/dtoMapper';
 import { HttpStatus } from '../constants';
 import AppError from '../utils/AppError';
 import logger from '../utils/logger';
-import { IUser } from '../types/models';
 
 /**
  * Controller responsible for handling every authentication HTTP request.
@@ -90,12 +89,21 @@ export class AuthController {
   public verifyUserOTP = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email, otp } = req.body;
-      const {  message,accessToken, refreshToken, user } = await this._authService.verifyUserOTP(email, otp);
+      const { message, tokens, user } = await this._authService.verifyUserOTP(email, otp);
 
-      this.setAuthCookies(res, accessToken, refreshToken);
+      this.setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
-      const userDTO = DTOMapper.toUserResponseDTO(user as unknown as IUser);
-      ApiResponse.success(res, { user: userDTO }, message ?? 'OTP verification successful', HttpStatus.OK);
+      ApiResponse.success(res, { user }, message ?? 'OTP verification successful', HttpStatus.OK);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  public resendVerificationOtp = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { email } = req.body;
+      const result = await this._authService.resendVerificationOtp(email);
+      ApiResponse.success(res, result, 'OTP resent successfully', HttpStatus.OK);
     } catch (error) {
       next(error);
     }
@@ -111,12 +119,11 @@ export class AuthController {
   public loginUser = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { email, password } = req.body;
-      const { accessToken, refreshToken, user } = await this._authService.loginUser(email, password);
+      const { tokens, user } = await this._authService.loginUser(email, password);
 
-      this.setAuthCookies(res, accessToken, refreshToken);
+      this.setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
-      const userDTO = DTOMapper.toUserResponseDTO(user as unknown as IUser);
-      ApiResponse.success(res, { user: userDTO }, 'Login successful', HttpStatus.OK);
+      ApiResponse.success(res, { user }, 'Login successful', HttpStatus.OK);
     } catch (error) {
       next(error);
     }
@@ -136,12 +143,11 @@ export class AuthController {
         throw new AppError('Refresh token missing', HttpStatus.UNAUTHORIZED);
       }
 
-      const { accessToken, user } = await this._authService.refreshToken(refreshToken);
+      const { tokens, user } = await this._authService.refreshToken(refreshToken);
 
-      this.setAuthCookies(res, accessToken, refreshToken);
+      this.setAuthCookies(res, tokens.accessToken, tokens.refreshToken);
 
-      const userDTO = DTOMapper.toUserResponseDTO(user as unknown as IUser);
-      ApiResponse.success(res, { user: userDTO }, 'Token refreshed successfully', HttpStatus.OK);
+      ApiResponse.success(res, { user }, 'Token refreshed successfully', HttpStatus.OK);
     } catch (error) {
       next(error);
     }

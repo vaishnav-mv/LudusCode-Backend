@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from 'express';
 import { container } from 'tsyringe';
 import { IAdminService } from '../interfaces/services/IAdminService';
 import { ApiResponse } from '../utils/responseHelper';
-import { DTOMapper } from '../utils/dtoMapper';
 
 /**
  * Controller to handle all admin-related requests.
@@ -14,9 +13,7 @@ export class AdminController {
     this._adminService = container.resolve<IAdminService>('IAdminService');
   }
 
-  /**
-   * Handles request to get all users.
-   */
+ 
   /**
    * Gets all users for admin with optional pagination.
    * @param req - Express Request object with optional query params: page, limit.
@@ -30,35 +27,13 @@ export class AdminController {
       const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : undefined;
 
       const result = await this._adminService.getAllUsers(page, limit);
-
-      // Check if result is paginated or just an array
-      if (Array.isArray(result)) {
-        const userDTOs = result.map(DTOMapper.toUserResponseDTO);
-        ApiResponse.success(res, userDTOs, 'Users fetched successfully');
-      } else {
-        const userDTOs = result.data.map(DTOMapper.toUserResponseDTO);
-        ApiResponse.success(
-          res,
-          {
-            users: userDTOs,
-            pagination: {
-              page: result.page,
-              limit: result.limit,
-              total: result.total,
-              totalPages: result.totalPages,
-            },
-          },
-          'Users fetched successfully'
-        );
-      }
+      ApiResponse.success(res, result, 'Users fetched successfully');
     } catch (error) {
       next(error);
     }
   }
 
-  /**
-   * Handles request to get pending groups.
-   */
+
   /**
    * Retrieves pending groups awaiting approval.
    * @param req - Express Request object.
@@ -69,16 +44,29 @@ export class AdminController {
   public async getPendingGroups(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const groups = await this._adminService.getPendingGroups();
-      const groupDTOs = groups.map(DTOMapper.toGroupResponseDTO);
-      ApiResponse.success(res, groupDTOs, 'Pending groups fetched successfully');
+      ApiResponse.success(res, groups, 'Pending groups fetched successfully');
     } catch (error) {
       next(error);
     }
   }
 
   /**
-   * Handles request to approve a group.
+   * Retrieves the total count of pending groups.
+   * @param _req - Express Request object.
+   * @param res - Express Response to return the pending group count.
+   * @param next - Express NextFunction for error forwarding.
+   * @returns Promise<void>
    */
+  public async getPendingGroupCount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const count = await this._adminService.getPendingGroupCount();
+      ApiResponse.success(res, { count }, 'Pending group count fetched successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+
   /**
    * Approves a group by ID.
    * @param req - Express Request with group `id` in `params`.
@@ -90,16 +78,13 @@ export class AdminController {
     try {
       const { id } = req.params;
       const updatedGroup = await this._adminService.approveGroup(id);
-      const groupDTO = DTOMapper.toGroupResponseDTO(updatedGroup);
-      ApiResponse.success(res, groupDTO, 'Group approved successfully');
+      ApiResponse.success(res, updatedGroup, 'Group approved successfully');
     } catch (error) {
       next(error);
     }
   }
 
-  /**
-   * Handles request to reject a group.
-   */
+ 
   /**
    * Rejects a group by ID.
    * @param req - Express Request with group `id` in `params`.
@@ -110,9 +95,9 @@ export class AdminController {
   public async rejectGroup(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      const updatedGroup = await this._adminService.rejectGroup(id);
-      const groupDTO = DTOMapper.toGroupResponseDTO(updatedGroup);
-      ApiResponse.success(res, groupDTO, 'Group rejected successfully');
+      const { reason } = req.body;
+      const updatedGroup = await this._adminService.rejectGroup(id, reason);
+      ApiResponse.success(res, updatedGroup, 'Group rejected successfully');
     } catch (error) {
       next(error);
     }

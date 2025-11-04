@@ -1,6 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { IUser } from '../types/models';
 import { IAuthService } from '../interfaces/services/IAuthService';
+import { AuthenticatedUserDTO } from '../dto/response/AuthResponseDTO';
 import { IUserRepository } from '../interfaces/repositories/IUserRepository';
 import { IOtpService } from '../interfaces/services/IOtpService';
 import { IEmailService } from '../interfaces/services/IEmailService';
@@ -8,14 +9,15 @@ import { IJwtService } from '../interfaces/services/IJwtService';
 import { HttpStatus } from '../constants';
 import AppError from '../utils/AppError';
 import logger from '../utils/logger';
+import { DTOMapper } from '../utils/dtoMapper';
 
 @injectable()
 export class AuthService implements IAuthService {
   constructor(
-    @inject('IUserRepository') private userRepository: IUserRepository,
-    @inject('IOtpService') private otpService: IOtpService,
-    @inject('IEmailService') private emailService: IEmailService,
-    @inject('IJwtService') private jwtService: IJwtService
+    @inject('IUserRepository') private _userRepository: IUserRepository,
+    @inject('IOtpService') private _otpService: IOtpService,
+    @inject('IEmailService') private _emailService: IEmailService,
+    @inject('IJwtService') private _jwtService: IJwtService
   ) {}
 
   /**
@@ -24,33 +26,32 @@ export class AuthService implements IAuthService {
    * @returns Promise with success message
    */
   async registerUser(
-    userData: Pick<IUser, 'username' | 'email' | 'password'>
+    userData: Pick<IUser, 'username' | 'email' | 'password'> & Partial<Pick<IUser, 'name'>>
   ): Promise<{ message: string }> {
     const { username, email, password } = userData;
 
-    // Input validation
     if (!username || !email || !password) {
-      throw new AppError('Please provide all required fields', HttpStatus.BAD_REQUEST);
+      throw new AppError('Please provide username, email, and password', HttpStatus.BAD_REQUEST);
     }
 
     // Check if user already exists
-    const existingUser = await this.userRepository.findByEmail(email);
+    const existingUser = await this._userRepository.findByEmail(email);
     if (existingUser) {
       throw new AppError('Email already registered', HttpStatus.CONFLICT);
     }
 
-    const existingUsername = await this.userRepository.findOne({ username });
+    const existingUsername = await this._userRepository.findOne({ username });
     if (existingUsername) {
       throw new AppError('Username is already taken', HttpStatus.CONFLICT);
     }
 
     // Generate and send OTP
-    const otp = await this.otpService.generateOtp(email, 'verification');
+    const otp = await this._otpService.generateOtp(email, 'verification');
     
     try {
-      await this.emailService.sendOtpEmail(email, otp, 'verification');
+      await this._emailService.sendOtpEmail(email, otp, 'verification');
     } catch (error) {
-      await this.otpService.invalidateOtp(email, 'verification');
+      await this._otpService.invalidateOtp(email, 'verification');
       logger.error(`Failed to send verification email to ${email}:`, error);
       throw new AppError(
         'Failed to send verification email. Please try again later.',
@@ -59,7 +60,12 @@ export class AuthService implements IAuthService {
     }
 
     // Create user after successful email sending
-    await this.userRepository.create({ username, email, password });
+    await this._userRepository.create({
+      username,
+      name: userData.name || username,
+      email,
+      password,
+    });
     logger.info(`User registered and verification email sent to ${email}`);
 
     return { message: 'Registration successful. Please check your email for an OTP.' };
@@ -74,24 +80,19 @@ export class AuthService implements IAuthService {
   async verifyUserOTP(
     email: string, 
     otp: string
-  ): Promise<{
-    message: string;
-    accessToken: string;
-    refreshToken: string;
-    user: Pick<IUser, '_id' | 'email' | 'username' | 'role' | 'isVerified'| 'createdAt'>;
-  }> {
+  ): Promise<{ message: string } & AuthenticatedUserDTO> {
     if (!email || !otp) {
       throw new AppError('Please provide email and OTP', HttpStatus.BAD_REQUEST);
     }
 
     // Verify OTP
-    const isValid = await this.otpService.verifyOtp(email, otp, 'verification');
+    const isValid = await this._otpService.verifyOtp(email, otp, 'verification');
     if (!isValid) {
       throw new AppError('Invalid or expired OTP', HttpStatus.BAD_REQUEST);
     }
 
     // Get and verify user
-    const user = await this.userRepository.findByEmail(email);
+    const user = await this._userRepository.findByEmail(email);
     if (!user) {
       throw new AppError('User not found', HttpStatus.NOT_FOUND);
     }
@@ -101,28 +102,55 @@ export class AuthService implements IAuthService {
     await user.save();
 
     // Generate tokens
-    const accessToken = this.jwtService.generateAccessToken(
+    const accessToken = this._jwtService.generateAccessToken(
       user._id.toString(), 
       user.role
     );
-    const refreshToken = this.jwtService.generateRefreshToken(
+    const refreshToken = this._jwtService.generateRefreshToken(
       user._id.toString(), 
       user.role
     );
 
+    const userDTO = DTOMapper.toUserResponseDTO(user);
+
     return {
       message: 'Account verified successfully',
-      accessToken,
-      refreshToken,
-      user: {
-        _id: user._id,
-        email: user.email,
-        username: user.username,
-        role: user.role,
-        isVerified: user.isVerified,
-        createdAt: user.createdAt,
-      }
+      tokens: {
+        accessToken,
+        refreshToken,
+      },
+      user: userDTO,
     };
+  }
+
+  async resendVerificationOtp(email: string): Promise<{ message: string }> {
+    if (!email) {
+      throw new AppError('Please provide an email address', HttpStatus.BAD_REQUEST);
+    }
+
+    const user = await this._userRepository.findByEmail(email);
+    if (!user) {
+      throw new AppError('User not found', HttpStatus.NOT_FOUND);
+    }
+
+    if (user.isVerified) {
+      throw new AppError('User is already verified', HttpStatus.BAD_REQUEST);
+    }
+
+    const otp = await this._otpService.generateOtp(email, 'verification');
+
+    try {
+      await this._emailService.sendOtpEmail(email, otp, 'verification');
+    } catch (error) {
+      await this._otpService.invalidateOtp(email, 'verification');
+      logger.error(`Failed to resend verification email to ${email}:`, error);
+      throw new AppError(
+        'Failed to resend verification email. Please try again later.',
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+
+    return { message: 'OTP resent successfully. Please check your email.' };
   }
 
   /**
@@ -134,17 +162,13 @@ export class AuthService implements IAuthService {
   async loginUser(
     email: string, 
     password: string
-  ): Promise<{
-    user: Omit<IUser, 'password'>;
-    accessToken: string;
-    refreshToken: string;
-  }> {
+  ): Promise<AuthenticatedUserDTO> {
     if (!email || !password) {
       throw new AppError('Please provide email and password', HttpStatus.BAD_REQUEST);
     }
 
     // Find user with password
-    const user = await this.userRepository.findByEmail(email, '+password');
+    const user = await this._userRepository.findByEmail(email, '+password');
     if (!user || !(await user.comparePassword(password))) {
       throw new AppError('Invalid credentials', HttpStatus.UNAUTHORIZED);
     }
@@ -154,22 +178,23 @@ export class AuthService implements IAuthService {
     }
 
     // Generate tokens
-    const accessToken = this.jwtService.generateAccessToken(
+    const accessToken = this._jwtService.generateAccessToken(
       user._id.toString(), 
       user.role
     );
-    const refreshToken = this.jwtService.generateRefreshToken(
+    const refreshToken = this._jwtService.generateRefreshToken(
       user._id.toString(), 
       user.role
     );
 
-    // Remove password from user object
-    const { password: _, ...userWithoutPassword } = user.toObject();
+    const userDTO = DTOMapper.toUserResponseDTO(user);
 
     return {
-      user: userWithoutPassword,
-      accessToken,
-      refreshToken
+      tokens: {
+        accessToken,
+        refreshToken,
+      },
+      user: userDTO,
     };
   }
 
@@ -180,35 +205,32 @@ export class AuthService implements IAuthService {
    */
   async refreshToken(
     refreshToken: string
-  ): Promise<{
-    accessToken: string;
-    user: Pick<IUser, '_id' | 'email' | 'username' | 'role'>;
-  }> {
+  ): Promise<AuthenticatedUserDTO> {
     if (!refreshToken) {
       throw new AppError('Refresh token is required', HttpStatus.BAD_REQUEST);
     }
 
     try {
-      const payload = this.jwtService.verifyRefreshToken(refreshToken);
-      const user = await this.userRepository.findById(payload.id);
+      const payload = this._jwtService.verifyRefreshToken(refreshToken);
+      const user = await this._userRepository.findById(payload.id);
       
       if (!user) {
         throw new AppError('User not found', HttpStatus.NOT_FOUND);
       }
 
-      const newAccessToken = this.jwtService.generateAccessToken(
+      const newAccessToken = this._jwtService.generateAccessToken(
         user._id.toString(), 
         user.role
       );
 
+      const userDTO = DTOMapper.toUserResponseDTO(user);
+
       return {
-        accessToken: newAccessToken,
-        user: {
-          _id: user._id,
-          email: user.email,
-          username: user.username,
-          role: user.role
-        }
+        tokens: {
+          accessToken: newAccessToken,
+          refreshToken,
+        },
+        user: userDTO,
       };
     } catch (error) {
       throw new AppError('Invalid or expired refresh token', HttpStatus.UNAUTHORIZED);
@@ -225,7 +247,7 @@ export class AuthService implements IAuthService {
       throw new AppError('Please provide an email address', HttpStatus.BAD_REQUEST);
     }
 
-    const user = await this.userRepository.findByEmail(email);
+    const user = await this._userRepository.findByEmail(email);
     if (!user) {
       // Don't reveal if user exists for security
       return { 
@@ -233,15 +255,15 @@ export class AuthService implements IAuthService {
       };
     }
 
-    const otp = await this.otpService.generateOtp(email, 'password-reset');
+    const otp = await this._otpService.generateOtp(email, 'password-reset');
     
     try {
-      await this.emailService.sendOtpEmail(email, otp, 'password-reset');
+      await this._emailService.sendOtpEmail(email, otp, 'password-reset');
       return { 
         message: 'Password reset OTP sent to your email' 
       };
     } catch (error) {
-      await this.otpService.invalidateOtp(email, 'password-reset');
+      await this._otpService.invalidateOtp(email, 'password-reset');
       logger.error(`Failed to send password reset email to ${email}:`, error);
       throw new AppError(
         'Failed to send password reset email. Please try again later.',
@@ -269,12 +291,12 @@ export class AuthService implements IAuthService {
       );
     }
 
-    const isValid = await this.otpService.verifyOtp(email, otp, 'password-reset');
+    const isValid = await this._otpService.verifyOtp(email, otp, 'password-reset');
     if (!isValid) {
       throw new AppError('Invalid or expired OTP', HttpStatus.BAD_REQUEST);
     }
 
-    const user = await this.userRepository.findByEmail(email);
+    const user = await this._userRepository.findByEmail(email);
     if (!user) {
       throw new AppError('User not found', HttpStatus.NOT_FOUND);
     }
@@ -284,7 +306,7 @@ export class AuthService implements IAuthService {
     await user.save();
 
     // Invalidate the used OTP
-    await this.otpService.invalidateOtp(email, 'password-reset');
+    await this._otpService.invalidateOtp(email, 'password-reset');
 
     return { message: 'Password reset successful' };
   }

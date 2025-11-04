@@ -3,7 +3,8 @@ import { Role, GroupStatus, HttpStatus } from '../constants';
 import AppError from '../utils/AppError';
 import { IUserRepository } from '../interfaces/repositories/IUserRepository';
 import { IGroupRepository } from '../interfaces/repositories/IGroupRepository';
-import { IAdminService } from '../interfaces/services/IAdminService';
+import { IAdminService, PaginatedUsersDTO } from '../interfaces/services/IAdminService';
+import { DTOMapper } from '../utils/dtoMapper';
 
 @injectable()
 export class AdminService implements IAdminService {
@@ -12,15 +13,30 @@ export class AdminService implements IAdminService {
     @inject('IGroupRepository') private _groupRepository: IGroupRepository
   ) {}
 
-  async getAllUsers(page?: number, limit?: number) {
+  async getAllUsers(page?: number, limit?: number): Promise<PaginatedUsersDTO> {
     if (page && limit) {
-      return await this._userRepository.findAllPaginated(page, limit);
+      const result = await this._userRepository.findAllPaginated(page, limit);
+      return {
+        users: result.data.map(DTOMapper.toUserResponseDTO),
+        pagination: {
+          page: result.page,
+          limit: result.limit,
+          total: result.total,
+          totalPages: result.totalPages,
+        },
+      };
     }
-    return await this._userRepository.findAll();
+    const users = await this._userRepository.findAll();
+    return { users: users.map(DTOMapper.toUserResponseDTO) };
   }
 
   async getPendingGroups() {
-    return await this._groupRepository.findPending();
+    const groups = await this._groupRepository.findPending();
+    return groups.map(DTOMapper.toGroupResponseDTO);
+  }
+
+  async getPendingGroupCount() {
+    return await this._groupRepository.countPending();
   }
 
   async approveGroup(groupId: string) {
@@ -31,23 +47,30 @@ export class AdminService implements IAdminService {
 
     // Update group status
     group.status = GroupStatus.Approved;
+    group.rejectionReason = '';
     await group.save();
 
     // Promote the user to Leader
     await this._userRepository.updateById(group.leader.toString(), { role: Role.Leader });
 
-    return group;
+    return DTOMapper.toGroupResponseDTO(group);
   }
 
-  async rejectGroup(groupId: string) {
+  async rejectGroup(groupId: string, reason: string) {
     const group = await this._groupRepository.findById(groupId);
     if (!group) {
       throw new AppError('Group not found', HttpStatus.NOT_FOUND);
     }
 
+    const trimmedReason = reason?.trim();
+    if (!trimmedReason) {
+      throw new AppError('Rejection reason is required', HttpStatus.BAD_REQUEST);
+    }
+
     group.status = GroupStatus.Rejected;
+    group.rejectionReason = trimmedReason;
     await group.save();
 
-    return group;
+    return DTOMapper.toGroupResponseDTO(group);
   }
 }

@@ -8,10 +8,10 @@ import { IEmailService } from '../interfaces/services/IEmailService';
 
 @injectable()
 export class EmailService implements IEmailService {
-  private transporter: nodemailer.Transporter;
+  private _transporter: nodemailer.Transporter;
 
   constructor() {
-    this.transporter = nodemailer.createTransport({
+    this._transporter = nodemailer.createTransport({
       host: config.emailHost,
       port: config.emailPort,
       secure: config.emailSecure,
@@ -22,7 +22,7 @@ export class EmailService implements IEmailService {
     });
 
     // Verify connection configuration
-    this.transporter.verify((error) => {
+    this._transporter.verify((error) => {
       if (error) {
         logger.error('Email service error:', error);
       } else {
@@ -58,7 +58,7 @@ export class EmailService implements IEmailService {
         `,
       };
 
-      await this.transporter.sendMail(mailOptions);
+      await this._transporter.sendMail(mailOptions);
       logger.info(`OTP email sent to ${email} for ${purpose}`);
       return true;
     } catch (error) {

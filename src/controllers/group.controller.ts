@@ -3,7 +3,6 @@ import { container } from 'tsyringe';
 import { IGroupService } from '../interfaces/services/IGroupService';
 import AppError from '../utils/AppError';
 import { ApiResponse } from '../utils/responseHelper';
-import { DTOMapper } from '../utils/dtoMapper';
 import { HttpStatus } from '../constants';
 
 /**
@@ -16,9 +15,6 @@ export class GroupController {
     this._groupService = container.resolve<IGroupService>('IGroupService');
   }
 
-  /**
-   * Handles the creation of a new group.
-   */
   /**
    * Creates a new group for the authenticated user.
    * @param req - Express Request with group payload in `body` and `user`.
@@ -33,9 +29,25 @@ export class GroupController {
         throw new AppError('Authentication error: User not found', HttpStatus.UNAUTHORIZED);
       }
 
-      const group = await this._groupService.createGroup(req.body.name, leaderId);
-      const groupDTO = DTOMapper.toGroupResponseDTO(group);
-      ApiResponse.success(res, groupDTO, 'Group created successfully and awaiting approval', HttpStatus.CREATED);
+      const { name, description, topics } = req.body;
+      const group = await this._groupService.createGroup(name, description || '', topics || [], leaderId);
+      ApiResponse.success(res, group, 'Group created successfully and awaiting approval', HttpStatus.CREATED);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Gets all groups.
+   * @param req - Express Request.
+   * @param res - Express Response used to return groups list.
+   * @param next - Express NextFunction for error forwarding.
+   * @returns Promise<void>
+   */
+  public async getAllGroups(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const groups = await this._groupService.getAllGroups();
+      ApiResponse.success(res, groups, 'Groups fetched successfully');
     } catch (error) {
       next(error);
     }
@@ -58,8 +70,89 @@ export class GroupController {
         throw new AppError('Authentication error: User not found', HttpStatus.UNAUTHORIZED);
       }
       const groups = await this._groupService.getMyGroups(leaderId);
-      const groupDTOs = groups.map(DTOMapper.toGroupResponseDTO);
-      ApiResponse.success(res, groupDTOs, 'User groups fetched successfully');
+      ApiResponse.success(res, groups, 'User groups fetched successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Gets a specific group by ID.
+   * @param req - Express Request with groupId in params.
+   * @param res - Express Response used to return the group.
+   * @param next - Express NextFunction for error forwarding.
+   * @returns Promise<void>
+   */
+  public async getGroupById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { groupId } = req.params;
+      if (!groupId) {
+        throw new AppError('Group ID is required', HttpStatus.BAD_REQUEST);
+      }
+      const group = await this._groupService.getGroupById(groupId);
+      ApiResponse.success(res, group, 'Group fetched successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Checks if a user is a member of a specific group.
+   * @param req - Express Request with groupId and userId in params.
+   * @param res - Express Response used to return membership status.
+   * @param next - Express NextFunction for error forwarding.
+   * @returns Promise<void>
+   */
+  public async isUserInGroup(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { groupId, userId } = req.params;
+      if (!groupId || !userId) {
+        throw new AppError('Group ID and User ID are required', HttpStatus.BAD_REQUEST);
+      }
+      const isMember = await this._groupService.isUserInGroup(groupId, userId);
+      ApiResponse.success(res, { isMember }, 'Group membership checked successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Allows a user to join a group.
+   * @param req - Express Request with groupId in params and authenticated user.
+   * @param res - Express Response confirming the join action.
+   * @param next - Express NextFunction for error forwarding.
+   * @returns Promise<void>
+   */
+  public async joinGroup(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { groupId } = req.params;
+      const userId = req.user?._id;
+      if (!groupId || !userId) {
+        throw new AppError('Group ID is required', HttpStatus.BAD_REQUEST);
+      }
+      await this._groupService.joinGroup(groupId, userId.toString());
+      ApiResponse.success(res, null, 'Successfully joined the group');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Allows a user to leave a group.
+   * @param req - Express Request with groupId in params and authenticated user.
+   * @param res - Express Response confirming the leave action.
+   * @param next - Express NextFunction for error forwarding.
+   * @returns Promise<void>
+   */
+  public async leaveGroup(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { groupId } = req.params;
+      const userId = req.user?._id;
+      if (!groupId || !userId) {
+        throw new AppError('Group ID is required', HttpStatus.BAD_REQUEST);
+      }
+      await this._groupService.leaveGroup(groupId, userId.toString());
+      ApiResponse.success(res, null, 'Successfully left the group');
     } catch (error) {
       next(error);
     }
