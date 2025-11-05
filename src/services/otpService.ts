@@ -57,8 +57,7 @@ export class OtpService implements IOtpService {
       const key = this._createKey(email, purpose);
       await redisClient.setEx(key, this._otpExpirationSeconds, otp);
       
-      logger.info(`OTP generated for ${email} (${purpose}). Requests: ${newCount}/${this._maxOtpRequests}`);
-      console.log(`[OTP DEBUG] ${purpose} OTP for ${email}: ${otp}`);
+      logger.info(`[OTP] ${purpose} OTP for ${email}: ${otp} (Requests ${newCount}/${this._maxOtpRequests})`);
       return otp;
     } catch (error) {
       if (error instanceof AppError) throw error;

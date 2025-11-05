@@ -1,29 +1,47 @@
 import winston from 'winston';
-import path from 'path';
+import DailyRotateFile from 'winston-daily-rotate-file';
 
+const logFormat = winston.format.combine(
+  winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+  winston.format.errors({ stack: true }),
+  winston.format.splat(),
+  winston.format.json()
+);
 
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.errors({ stack: true }),
-    winston.format.splat(),
-    winston.format.json()
-  ),
-  defaultMeta: { service: 'luduscode-api' },
-  transports: [
-    new winston.transports.File({ filename: path.join('logs', 'error.log'), level: 'error' }),
-    new winston.transports.File({ filename: path.join('logs', 'combined.log') }),
-  ],
-});
-
+const transports: winston.transport[] = [
+  new DailyRotateFile({
+    filename: 'logs/error-%DATE%.log',
+    datePattern: 'YYYY-MM-DD',
+    level: 'error',
+    maxSize: '20m',
+    maxFiles: '14d',
+    zippedArchive: true,
+  }),
+  new DailyRotateFile({
+    filename: 'logs/combined-%DATE%.log',
+    datePattern: 'YYYY-MM-DD',
+    maxSize: '20m',
+    maxFiles: '14d',
+    zippedArchive: true,
+  }),
+];
 
 if (process.env.NODE_ENV !== 'production') {
-  logger.add(
+  transports.push(
     new winston.transports.Console({
-      format: winston.format.combine(winston.format.colorize(), winston.format.simple()),
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.printf(({ level, message, timestamp }) => `${timestamp} [${level}]: ${message}`)
+      ),
     })
   );
 }
+
+const logger = winston.createLogger({
+  level: 'info',
+  format: logFormat,
+  defaultMeta: { service: 'luduscode-api' },
+  transports,
+});
 
 export default logger;

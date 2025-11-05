@@ -9,6 +9,7 @@ const router = express.Router();
 router.route('/').get(groupController.getAllGroups.bind(groupController)).post(protect, validateRequest(createGroupSchema), groupController.createGroup.bind(groupController));
 
 router.route('/my-groups').get(protect, groupController.getMyGroups.bind(groupController));
+router.route('/my-groups/pending').get(protect, groupController.getMyPendingGroups.bind(groupController));
 
 router.route('/:groupId').get(groupController.getGroupById.bind(groupController));
 

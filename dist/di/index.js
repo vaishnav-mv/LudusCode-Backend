@@ -9,6 +9,7 @@ const adminService_1 = require("../services/adminService");
 const groupService_1 = require("../services/groupService");
 const otpService_1 = require("../services/otpService");
 const emailService_1 = require("../services/emailService");
+const jwtService_1 = require("../services/jwtService");
 // Register repositories
 tsyringe_1.container.register('IUserRepository', { useClass: userRepository_1.UserRepository });
 tsyringe_1.container.register('IGroupRepository', { useClass: groupRepository_1.GroupRepository });
@@ -18,4 +19,5 @@ tsyringe_1.container.register('IAdminService', { useClass: adminService_1.AdminS
 tsyringe_1.container.register('IGroupService', { useClass: groupService_1.GroupService });
 tsyringe_1.container.register('IOtpService', { useClass: otpService_1.OtpService });
 tsyringe_1.container.register('IEmailService', { useClass: emailService_1.EmailService });
+tsyringe_1.container.register('IJwtService', { useClass: jwtService_1.JwtService });
 exports.default = tsyringe_1.container;

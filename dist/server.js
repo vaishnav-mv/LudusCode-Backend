@@ -10,19 +10,16 @@ const User_1 = __importDefault(require("./models/User"));
 const constants_1 = require("./constants");
 const logger_1 = __importDefault(require("./utils/logger"));
 const redis_1 = __importDefault(require("./config/redis"));
-const PORT = config_1.default.port || 5000;
-/**
- * Seeds the database with a default admin user if one doesn't exist.
- * This is useful for the initial setup of the application.
- */
+const PORT = process.env.PORT || 5000;
 const seedAdminUser = async () => {
     try {
         const adminExists = await User_1.default.findOne({ role: constants_1.Role.Admin });
         if (!adminExists) {
             const admin = new User_1.default({
                 username: 'admin',
+                name: 'Admin',
                 email: 'admin@ludus.code',
-                password: 'adminpassword', // This will be hashed by the pre-save hook
+                password: 'adminpassword',
                 role: constants_1.Role.Admin,
                 isVerified: true,
             });

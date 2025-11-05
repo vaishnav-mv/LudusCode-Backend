@@ -39,8 +39,6 @@ UserSchema.methods.comparePassword = async function (enteredPassword: string): P
 };
 
 // Add indexes for frequently queried fields
-UserSchema.index({ email: 1 });
-UserSchema.index({ username: 1 });
 UserSchema.index({ role: 1 });
 UserSchema.index({ createdAt: -1 });
 

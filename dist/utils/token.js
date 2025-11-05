@@ -7,7 +7,6 @@ exports.generateToken = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const config_1 = __importDefault(require("../config"));
 const generateToken = (id) => {
-    // FIX: Explicitly type the options to prevent incorrect overload resolution.
     const options = {
         expiresIn: config_1.default.jwt.expiresIn,
     };

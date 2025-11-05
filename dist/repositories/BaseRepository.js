@@ -108,6 +108,36 @@ class BaseRepository {
         }
     }
     /**
+     * Finds documents with pagination support.
+     * @param query - The query to match (defaults to empty object for all documents).
+     * @param page - Page number (1-indexed).
+     * @param limit - Number of documents per page.
+     * @param projection - Optional fields to select or exclude.
+     * @param options - Additional query options like sort.
+     * @returns Paginated result with documents and metadata.
+     * @throws AppError if query fails
+     */
+    async findPaginated(query = {}, page = 1, limit = 20, projection, options) {
+        try {
+            const skip = (page - 1) * limit;
+            const [data, total] = await Promise.all([
+                this.find(query, projection, { ...options, skip, limit }),
+                this.count(query),
+            ]);
+            return {
+                data,
+                page,
+                limit,
+                total,
+                totalPages: Math.ceil(total / limit),
+            };
+        }
+        catch (error) {
+            logger_1.default.error(`Error finding paginated documents: ${error instanceof Error ? error.message : String(error)}`);
+            throw new AppError_1.default(`Failed to find paginated documents: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
+        }
+    }
+    /**
      * Updates a document by its ID.
      * @param id - The ID of the document to update.
      * @param update - The update data.

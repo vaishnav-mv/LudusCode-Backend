@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApiResponse = void 0;
+const constants_1 = require("../constants");
 /**
  * A helper class to create and send standardized API responses.
  */
@@ -12,7 +13,7 @@ class ApiResponse {
      * @param message - A descriptive message.
      * @param statusCode - The HTTP status code.
      */
-    static success(res, data, message = 'Success', statusCode = 200) {
+    static success(res, data, message = 'Success', statusCode = constants_1.HttpStatus.OK) {
         const response = {
             success: true,
             message,
@@ -27,7 +28,7 @@ class ApiResponse {
      * @param message - The error message.
      * @param statusCode - The HTTP status code.
      */
-    static error(res, message = 'An error occurred', statusCode = 500) {
+    static error(res, message = 'An error occurred', statusCode = constants_1.HttpStatus.INTERNAL_SERVER_ERROR) {
         const response = {
             success: false,
             message,

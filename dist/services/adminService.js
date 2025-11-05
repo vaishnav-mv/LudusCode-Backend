@@ -19,45 +19,61 @@ exports.AdminService = void 0;
 const tsyringe_1 = require("tsyringe");
 const constants_1 = require("../constants");
 const AppError_1 = __importDefault(require("../utils/AppError"));
-const redis_1 = __importDefault(require("../config/redis"));
+const dtoMapper_1 = require("../utils/dtoMapper");
 let AdminService = class AdminService {
     constructor(_userRepository, _groupRepository) {
         this._userRepository = _userRepository;
         this._groupRepository = _groupRepository;
     }
-    async getAllUsers() {
-        return await this._userRepository.findAll();
+    async getAllUsers(page, limit) {
+        if (page && limit) {
+            const result = await this._userRepository.findAllPaginated(page, limit);
+            return {
+                users: result.data.map(dtoMapper_1.DTOMapper.toUserResponseDTO),
+                pagination: {
+                    page: result.page,
+                    limit: result.limit,
+                    total: result.total,
+                    totalPages: result.totalPages,
+                },
+            };
+        }
+        const users = await this._userRepository.findAll();
+        return { users: users.map(dtoMapper_1.DTOMapper.toUserResponseDTO) };
     }
     async getPendingGroups() {
-        return await this._groupRepository.findPending();
+        const groups = await this._groupRepository.findPending();
+        return groups.map(dtoMapper_1.DTOMapper.toGroupResponseDTO);
+    }
+    async getPendingGroupCount() {
+        return await this._groupRepository.countPending();
     }
     async approveGroup(groupId) {
         const group = await this._groupRepository.findById(groupId);
         if (!group) {
-            throw new AppError_1.default('Group not found', 404);
+            throw new AppError_1.default('Group not found', constants_1.HttpStatus.NOT_FOUND);
         }
         // Update group status
         group.status = constants_1.GroupStatus.Approved;
+        group.rejectionReason = '';
         await group.save();
         // Promote the user to Leader
         await this._userRepository.updateById(group.leader.toString(), { role: constants_1.Role.Leader });
-        // Invalidate admin users cache to reflect new role
-        try {
-            await redis_1.default.del('__express__/api/admin/users');
-        }
-        catch {
-            // Swallow cache errors to avoid blocking approval
-        }
-        return group;
+        return dtoMapper_1.DTOMapper.toGroupResponseDTO(group);
     }
-    async rejectGroup(groupId) {
+    async rejectGroup(groupId, reason) {
         const group = await this._groupRepository.findById(groupId);
         if (!group) {
-            throw new AppError_1.default('Group not found', 404);
+            throw new AppError_1.default('Group not found', constants_1.HttpStatus.NOT_FOUND);
+        }
+        const trimmedReason = reason?.trim();
+        if (!trimmedReason) {
+            throw new AppError_1.default('Rejection reason is required', constants_1.HttpStatus.BAD_REQUEST);
         }
         group.status = constants_1.GroupStatus.Rejected;
+        group.rejectionReason = trimmedReason;
         await group.save();
-        return group;
+        return dtoMapper_1.DTOMapper.toGroupResponseDTO(group);
     }
 };
 exports.AdminService = AdminService;

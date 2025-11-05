@@ -1,7 +1,7 @@
 import { injectable, inject } from 'tsyringe';
 import { Schema } from 'mongoose';
 import AppError from '../utils/AppError';
-import { HttpStatus } from '../constants';
+import { GroupStatus, HttpStatus } from '../constants';
 import { IGroupRepository } from '../interfaces/repositories/IGroupRepository';
 import { IGroupService } from '../interfaces/services/IGroupService';
 import { DTOMapper } from '../utils/dtoMapper';
@@ -24,14 +24,21 @@ export class GroupService implements IGroupService {
     return DTOMapper.toGroupResponseDTO(group);
   }
 
-  async getAllGroups() {
-    const groups = await this._groupRepository.findAll(undefined, { sort: { createdAt: -1 } });
+  async getApprovedGroups() {
+    const groups = await this._groupRepository.findApproved();
     return groups.map(DTOMapper.toGroupResponseDTO);
   }
 
   async getMyGroups(leaderId: Schema.Types.ObjectId) {
     const groups = await this._groupRepository.findByLeader(leaderId);
     return groups.map(DTOMapper.toGroupResponseDTO);
+  }
+
+  async getMyPendingGroups(leaderId: Schema.Types.ObjectId) {
+    const groups = await this._groupRepository.findByLeader(leaderId);
+    return groups
+      .map(DTOMapper.toGroupResponseDTO)
+      .filter((group) => group.status !== GroupStatus.Approved);
   }
 
   async getGroupById(id: string) {
@@ -47,6 +54,15 @@ export class GroupService implements IGroupService {
   }
 
   async joinGroup(groupId: string, userId: string) {
+    const group = await this._groupRepository.findById(groupId);
+    if (!group) {
+      throw new AppError('Group not found', HttpStatus.NOT_FOUND);
+    }
+
+    if (group.status !== GroupStatus.Approved) {
+      throw new AppError('Group is not yet approved', HttpStatus.FORBIDDEN);
+    }
+
     await this._groupRepository.addMember(groupId, userId);
   }
 

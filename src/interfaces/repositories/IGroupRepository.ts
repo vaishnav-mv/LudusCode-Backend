@@ -4,6 +4,7 @@ import { Schema, QueryOptions } from 'mongoose';
 export interface IGroupRepository {
   findById(id: string): Promise<IGroup | null>;
   findAll(projection?: any, options?: QueryOptions): Promise<IGroup[]>;
+  findApproved(): Promise<IGroup[]>;
   findPending(): Promise<IGroup[]>;
   countPending(): Promise<number>;
   findByLeader(leaderId: Schema.Types.ObjectId): Promise<IGroup[]>;

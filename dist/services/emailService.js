@@ -16,11 +16,12 @@ exports.EmailService = void 0;
 const tsyringe_1 = require("tsyringe");
 const nodemailer_1 = __importDefault(require("nodemailer"));
 const config_1 = __importDefault(require("../config"));
+const constants_1 = require("../constants");
 const logger_1 = __importDefault(require("../utils/logger"));
 const AppError_1 = __importDefault(require("../utils/AppError"));
 let EmailService = class EmailService {
     constructor() {
-        this.transporter = nodemailer_1.default.createTransport({
+        this._transporter = nodemailer_1.default.createTransport({
             host: config_1.default.emailHost,
             port: config_1.default.emailPort,
             secure: config_1.default.emailSecure,
@@ -30,7 +31,7 @@ let EmailService = class EmailService {
             },
         });
         // Verify connection configuration
-        this.transporter.verify((error) => {
+        this._transporter.verify((error) => {
             if (error) {
                 logger_1.default.error('Email service error:', error);
             }
@@ -64,13 +65,13 @@ let EmailService = class EmailService {
           </div>
         `,
             };
-            await this.transporter.sendMail(mailOptions);
+            await this._transporter.sendMail(mailOptions);
             logger_1.default.info(`OTP email sent to ${email} for ${purpose}`);
             return true;
         }
         catch (error) {
             logger_1.default.error('Error sending OTP email:', error);
-            throw new AppError_1.default('Failed to send verification email', 500);
+            throw new AppError_1.default('Failed to send verification email', constants_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 };

@@ -46,7 +46,7 @@ export class GroupController {
    */
   public async getAllGroups(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const groups = await this._groupService.getAllGroups();
+      const groups = await this._groupService.getApprovedGroups();
       ApiResponse.success(res, groups, 'Groups fetched successfully');
     } catch (error) {
       next(error);
@@ -71,6 +71,20 @@ export class GroupController {
       }
       const groups = await this._groupService.getMyGroups(leaderId);
       ApiResponse.success(res, groups, 'User groups fetched successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  public async getMyPendingGroups(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const leaderId = req.user?._id;
+      if (!leaderId) {
+        throw new AppError('Authentication error: User not found', HttpStatus.UNAUTHORIZED);
+      }
+
+      const groups = await this._groupService.getMyPendingGroups(leaderId);
+      ApiResponse.success(res, groups, 'Pending group requests fetched successfully');
     } catch (error) {
       next(error);
     }

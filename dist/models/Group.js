@@ -37,9 +37,18 @@ const mongoose_1 = __importStar(require("mongoose"));
 const constants_1 = require("../constants");
 const GroupSchema = new mongoose_1.Schema({
     name: { type: String, required: true, trim: true },
+    description: { type: String, default: '' },
+    topics: [{ type: String }],
     leader: { type: mongoose_1.Schema.Types.ObjectId, required: true, ref: 'User' },
+    members: [{ type: mongoose_1.Schema.Types.ObjectId, ref: 'User' }],
     status: { type: String, enum: Object.values(constants_1.GroupStatus), default: constants_1.GroupStatus.Pending },
+    rejectionReason: { type: String, default: '' },
     createdAt: { type: Date, default: Date.now },
 });
+// Add indexes for frequently queried fields
+GroupSchema.index({ leader: 1 });
+GroupSchema.index({ status: 1 });
+GroupSchema.index({ leader: 1, status: 1 }); // Compound index for common query
+GroupSchema.index({ createdAt: -1 });
 const Group = mongoose_1.default.model('Group', GroupSchema);
 exports.default = Group;

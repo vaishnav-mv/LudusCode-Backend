@@ -22,6 +22,7 @@ export class DTOMapper {
       elo: user.elo,
       duelsWon: user.duelsWon,
       duelsLost: user.duelsLost,
+      role: user.role,
       isAdmin: user.isAdmin,
       isBanned: user.isBanned,
       isPremium: user.isPremium,

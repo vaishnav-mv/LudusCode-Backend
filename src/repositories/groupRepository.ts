@@ -14,6 +14,24 @@ export class GroupRepository extends BaseRepository<IGroup> implements IGroupRep
     super(Group);
   }
 
+  async findApproved(): Promise<IGroup[]> {
+    try {
+      return await this._model
+        .find({ status: GroupStatus.Approved })
+        .populate('leader', 'username email role createdAt')
+        .populate('members', 'username email role createdAt')
+        .sort({ createdAt: -1 });
+    } catch (error) {
+      logger.error(
+        `GroupRepository.findApproved error: ${error instanceof Error ? error.message : String(error)}`
+      );
+      throw new AppError(
+        `Failed to find approved groups: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
   async findById(id: string): Promise<IGroup | null> {
     try {
       return await this._model.findById(id).populate('leader', 'username email role createdAt').populate('members', 'username email role createdAt');

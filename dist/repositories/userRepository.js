@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UserRepository = void 0;
 const tsyringe_1 = require("tsyringe");
 const User_1 = __importDefault(require("../models/User"));
+const constants_1 = require("../constants");
 const BaseRepository_1 = require("./BaseRepository");
 const logger_1 = __importDefault(require("../utils/logger"));
 const AppError_1 = __importDefault(require("../utils/AppError"));
@@ -28,7 +29,7 @@ let UserRepository = class UserRepository extends BaseRepository_1.BaseRepositor
         }
         catch (error) {
             logger_1.default.error(`UserRepository.findById error: ${error instanceof Error ? error.message : String(error)}`);
-            throw new AppError_1.default(`Failed to find user by ID: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
+            throw new AppError_1.default(`Failed to find user by ID: ${error instanceof Error ? error.message : 'Unknown error'}`, constants_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     async findByEmail(email, select) {
@@ -37,7 +38,7 @@ let UserRepository = class UserRepository extends BaseRepository_1.BaseRepositor
         }
         catch (error) {
             logger_1.default.error(`UserRepository.findByEmail error for ${email}: ${error instanceof Error ? error.message : String(error)}`);
-            throw new AppError_1.default(`Failed to find user by email: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
+            throw new AppError_1.default(`Failed to find user by email: ${error instanceof Error ? error.message : 'Unknown error'}`, constants_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     async findOne(query, select) {
@@ -46,7 +47,7 @@ let UserRepository = class UserRepository extends BaseRepository_1.BaseRepositor
         }
         catch (error) {
             logger_1.default.error(`UserRepository.findOne error: ${error instanceof Error ? error.message : String(error)}`);
-            throw new AppError_1.default(`Failed to find user: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
+            throw new AppError_1.default(`Failed to find user: ${error instanceof Error ? error.message : 'Unknown error'}`, constants_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     async findAll() {
@@ -55,7 +56,16 @@ let UserRepository = class UserRepository extends BaseRepository_1.BaseRepositor
         }
         catch (error) {
             logger_1.default.error(`UserRepository.findAll error: ${error instanceof Error ? error.message : String(error)}`);
-            throw new AppError_1.default(`Failed to find all users: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
+            throw new AppError_1.default(`Failed to find all users: ${error instanceof Error ? error.message : 'Unknown error'}`, constants_1.HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+    async findAllPaginated(page = 1, limit = 20) {
+        try {
+            return await super.findPaginated({}, page, limit, undefined, { sort: { createdAt: -1 } });
+        }
+        catch (error) {
+            logger_1.default.error(`UserRepository.findAllPaginated error: ${error instanceof Error ? error.message : String(error)}`);
+            throw new AppError_1.default(`Failed to find paginated users: ${error instanceof Error ? error.message : 'Unknown error'}`, constants_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     async create(userData) {
@@ -64,7 +74,7 @@ let UserRepository = class UserRepository extends BaseRepository_1.BaseRepositor
         }
         catch (error) {
             logger_1.default.error(`UserRepository.create error: ${error instanceof Error ? error.message : String(error)}`);
-            throw new AppError_1.default(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
+            throw new AppError_1.default(`Failed to create user: ${error instanceof Error ? error.message : 'Unknown error'}`, constants_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     async updateById(id, updateData) {
@@ -73,7 +83,7 @@ let UserRepository = class UserRepository extends BaseRepository_1.BaseRepositor
         }
         catch (error) {
             logger_1.default.error(`UserRepository.updateById error for ID ${id}: ${error instanceof Error ? error.message : String(error)}`);
-            throw new AppError_1.default(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`, 500);
+            throw new AppError_1.default(`Failed to update user: ${error instanceof Error ? error.message : 'Unknown error'}`, constants_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 };

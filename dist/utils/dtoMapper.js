@@ -14,10 +14,17 @@ class DTOMapper {
     static toUserResponseDTO(user) {
         return {
             id: user._id.toString(),
-            username: user.username,
+            name: user.name,
             email: user.email,
+            avatarUrl: user.avatarUrl || '',
+            rank: user.rank,
+            elo: user.elo,
+            duelsWon: user.duelsWon,
+            duelsLost: user.duelsLost,
             role: user.role,
-            createdAt: user.createdAt.toISOString(),
+            isAdmin: user.isAdmin,
+            isBanned: user.isBanned,
+            isPremium: user.isPremium,
         };
     }
     /**
@@ -26,17 +33,21 @@ class DTOMapper {
      * @returns A DTO safe to send to the client.
      */
     static toGroupResponseDTO(group) {
-        // Check if leader is populated
-        // FIX: Safely cast populated leader field to IUser to create the DTO
         const leaderDTO = group.leader && group.leader.username
             ? DTOMapper.toUserResponseDTO(group.leader)
             : null;
+        const membersDTO = group.members
+            ? group.members.map(member => DTOMapper.toUserResponseDTO(member))
+            : [];
         return {
             id: group._id.toString(),
             name: group.name,
-            //// @ts-expect-error allow nullable leader until population ensured
+            description: group.description || '',
+            topics: group.topics || [],
             leader: leaderDTO,
+            members: membersDTO,
             status: group.status,
+            rejectionReason: group.rejectionReason || undefined,
             createdAt: group.createdAt.toISOString(),
         };
     }

@@ -9,6 +9,7 @@ export interface UserResponseDTO {
   elo: number;
   duelsWon: number;
   duelsLost: number;
+  role: Role;
   isAdmin?: boolean;
   isBanned?: boolean;
   isPremium?: boolean;
