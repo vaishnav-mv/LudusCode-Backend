@@ -1,0 +1,270 @@
+import { Request, Response } from 'express'
+import { singleton, inject } from 'tsyringe'
+import { DuelStatus } from '../types'
+import { IAdminService, IDuelService } from '../interfaces/services'
+import { IDuelRepository, IWalletRepository } from '../interfaces/repositories'
+import { ForceDuelResultDTO } from '../dto/request/admin.request.dto'
+
+@singleton()
+export class AdminController {
+  constructor(
+    @inject("IAdminService") private _service: IAdminService,
+    @inject("IDuelService") private _duelService: IDuelService,
+    @inject("IDuelRepository") private _duelRepo: IDuelRepository,
+    @inject("IWalletRepository") private _walletRepo: IWalletRepository
+  ) { }
+
+  /**
+   * @desc    Get dashboard stats
+   * @route   GET /api/admin/dashboard-stats
+   * @req     -
+   * @res     { totalUsers, activeDuels, totalProblems, totalRevenue }
+   */
+  dashboardStats = async (req: Request, res: Response) => {
+    const r = await this._service.dashboardStats()
+    res.json(r)
+  }
+
+  /**
+   * @desc    Get financial data
+   * @route   GET /api/admin/financials
+   * @req     -
+   * @res     { totalRevenue, commissionsByDay }
+   */
+  financials = async (req: Request, res: Response) => {
+    const r = await this._service.financials()
+    res.json(r)
+  }
+
+  /**
+   * @desc    Get subscription data
+   * @route   GET /api/admin/subscriptions
+   * @req     -
+   * @res     { plans, logs }
+   */
+  subscriptionData = async (req: Request, res: Response) => {
+    const r = await this._service.subscriptionData()
+    res.json(r)
+  }
+
+  /**
+   * @desc    Create a subscription plan
+   * @route   POST /api/admin/subscriptions/plans
+   * @req     body: { name, price, period, features }
+   * @res     { plan }
+   */
+  createPlan = async (req: Request, res: Response) => {
+    const r = await (this._service as any).createPlan(req.body)
+    res.json(r)
+  }
+
+  /**
+   * @desc    Update a subscription plan
+   * @route   PUT /api/admin/subscriptions/plans/:id
+   * @req     params: { id }, body: { name, price, period, features }
+   * @res     { plan }
+   */
+  updatePlan = async (req: Request, res: Response) => {
+    const r = await (this._service as any).updatePlan(req.params.id, req.body)
+    res.json(r)
+  }
+
+  /**
+   * @desc    Delete a subscription plan
+   * @route   DELETE /api/admin/subscriptions/plans/:id
+   * @req     params: { id }
+   * @res     { ok: boolean }
+   */
+  deletePlan = async (req: Request, res: Response) => {
+    const r = await (this._service as any).deletePlan(req.params.id)
+    res.json({ ok: r })
+  }
+
+  /**
+   * @desc    Grant subscription to a user
+   * @route   POST /api/admin/subscriptions/grant
+   * @req     body: { username, planId }
+   * @res     { ok: boolean }
+   */
+  grantSubscription = async (req: Request, res: Response) => {
+    const { username, planId } = req.body
+    const r = await (this._service as any).grantSubscription(username, planId)
+    res.json({ ok: r })
+  }
+
+  /**
+   * @desc    Cancel a user's subscription
+   * @route   POST /api/admin/subscriptions/cancel/:userId
+   * @req     params: { userId }
+   * @res     { ok: boolean }
+   */
+  cancelSubscription = async (req: Request, res: Response) => {
+    const r = await (this._service as any).cancelSubscription(req.params.userId)
+    res.json({ ok: r })
+  }
+
+  /**
+   * @desc    Get pending problems
+   * @route   GET /api/admin/problems/pending
+   * @req     -
+   * @res     [Problem]
+   */
+  pendingProblems = async (req: Request, res: Response) => {
+    const r = await this._service.pendingProblems()
+    res.json(r)
+  }
+
+  /**
+   * @desc    Approve a problem
+   * @route   POST /api/admin/problems/:id/approve
+   * @req     params: { id }
+   * @res     { ok: boolean }
+   */
+  approveProblem = async (req: Request, res: Response) => {
+    const ok = await this._service.approveProblem(req.params.id)
+    res.json({ ok })
+  }
+
+  /**
+   * @desc    Reject a problem
+   * @route   POST /api/admin/problems/:id/reject
+   * @req     params: { id }
+   * @res     { ok: boolean }
+   */
+  rejectProblem = async (req: Request, res: Response) => {
+    const ok = await this._service.rejectProblem(req.params.id)
+    res.json({ ok })
+  }
+
+  /**
+   * @desc    Get all problems (paginated)
+   * @route   GET /api/admin/problems
+   * @req     query: { page, limit }
+   * @res     { problems, total, page, totalPages }
+   */
+  allProblems = async (req: Request, res: Response) => {
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 50
+    const r = await this._service.allProblems(page, limit)
+    res.json(r)
+  }
+
+  /**
+   * @desc    Get all users (paginated)
+   * @route   GET /api/admin/users
+   * @req     query: { page, limit }
+   * @res     { users, total, page, totalPages }
+   */
+  allUsers = async (req: Request, res: Response) => {
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 50
+    const r = await this._service.allUsers(page, limit)
+    res.json(r)
+  }
+
+  /**
+   * @desc    Ban a user
+   * @route   POST /api/admin/users/:id/ban
+   * @req     params: { id }
+   * @res     { ok: boolean }
+   */
+  banUser = async (req: Request, res: Response) => {
+    const ok = await this._service.banUser(req.params.id)
+    res.json({ ok })
+  }
+
+  /**
+   * @desc    Unban a user
+   * @route   POST /api/admin/users/:id/unban
+   * @req     params: { id }
+   * @res     { ok: boolean }
+   */
+  unbanUser = async (req: Request, res: Response) => {
+    const ok = await this._service.unbanUser(req.params.id)
+    res.json({ ok })
+  }
+
+  /**
+   * @desc    Search for users
+   * @route   GET /api/admin/users/search
+   * @req     query: { q }
+   * @res     [User]
+   */
+  searchUsers = async (req: Request, res: Response) => {
+    const q = req.query.q as string
+    if (!q) {
+      return res.json([])
+    }
+    const users = await (this._service as any).searchUsers(q)
+    res.json(users)
+  }
+
+  /**
+   * @desc    Get flagged activities
+   * @route   GET /api/admin/anti-cheat/flagged
+   * @req     -
+   * @res     [FlaggedUser]
+   */
+  flaggedActivities = async (req: Request, res: Response) => {
+    const r = await this._service.flaggedActivities()
+    res.json(r)
+  }
+
+  /**
+   * @desc    Clear flags for a user
+   * @route   POST /api/admin/anti-cheat/users/:id/clear-flags
+   * @req     params: { id }
+   * @res     { ok: boolean }
+   */
+  clearFlags = async (req: Request, res: Response) => {
+    const ok = await this._service.clearFlags(req.params.id)
+    res.json({ ok })
+  }
+
+  /**
+   * @desc    Get monitored duels
+   * @route   GET /api/admin/duels
+   * @req     -
+   * @res     [Duel]
+   */
+  monitoredDuels = async (req: Request, res: Response) => {
+    const r = await this._service.monitoredDuels()
+    res.json(r)
+  }
+
+  /**
+   * @desc    Cancel a duel (Admin override)
+   * @route   POST /api/admin/duels/:id/cancel
+   * @req     params: { id }
+   * @res     { ok: boolean }
+   */
+  cancelDuel = async (req: Request, res: Response) => {
+    const d = await this._duelRepo.getById(req.params.id)
+    if (!d) return res.json({ ok: false })
+    const wager = (d as any).wager || 0
+    if (wager > 0) {
+      const p1 = (d as any).player1?.user?.id || (d as any).player1?.user?._id?.toString?.()
+      const p2 = (d as any).player2?.user?.id || (d as any).player2?.user?._id?.toString?.()
+      if (p1) await this._walletRepo.add(p1, wager, 'Duel cancel refund')
+      if (p2) await this._walletRepo.add(p2, wager, 'Duel cancel refund')
+    }
+    await this._duelRepo.update(req.params.id, { status: DuelStatus.Finished, winner: null })
+    res.json({ ok: true })
+  }
+
+  /**
+   * @desc    Force a duel result
+   * @route   POST /api/admin/duels/:id/force-result
+   * @req     params: { id }, body: { winnerId }
+   * @res     { ok: boolean }
+   */
+  forceDuelResult = async (req: Request, res: Response) => {
+    try {
+      const body = req.body as ForceDuelResultDTO
+      await this._duelService.finish(req.params.id, body.winnerId)
+      res.json({ ok: true })
+    } catch {
+      res.json({ ok: false })
+    }
+  }
+}
