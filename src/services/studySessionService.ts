@@ -1,7 +1,6 @@
 import { singleton, inject } from 'tsyringe'
 import { IStudySessionRepository, IUserRepository, IGroupRepository } from '../interfaces/repositories'
 import { StudySessionMode, StudySessionStatus, StudySession, Group, User } from '../types'
-import { resolveUserId } from '../utils/idResolver'
 import { broadcastSession } from '../realtime/ws'
 
 @singleton()
@@ -13,7 +12,7 @@ export class StudySessionService {
     ) { }
 
     async create(data: { groupId: string, userId: string, title: string, description: string, mode: string, startTime: string, durationMinutes: number, problems: string[] }) {
-        const userId = await resolveUserId(data.userId);
+        const userId = data.userId;
         const group = await this._groups.getById(data.groupId);
         if (!group) throw new Error("Group not found");
 
@@ -42,7 +41,7 @@ export class StudySessionService {
     }
 
     async update(sessionId: string, userId: string, data: Partial<StudySession>) {
-        const resolvedUserId = await resolveUserId(userId);
+        const resolvedUserId = userId;
         const session = await this._sessions.getById(sessionId);
         if (!session) throw new Error("Session not found");
 
@@ -66,7 +65,7 @@ export class StudySessionService {
     }
 
     async join(sessionId: string, userId: string) {
-        const resolvedUserId = await resolveUserId(userId);
+        const resolvedUserId = userId;
         const session = await this._sessions.getById(sessionId);
         if (!session) throw new Error("Session not found");
 
@@ -110,7 +109,7 @@ export class StudySessionService {
     }
 
     async leave(sessionId: string, userId: string) {
-        const resolvedUserId = await resolveUserId(userId);
+        const resolvedUserId = userId;
         const session = await this._sessions.getById(sessionId);
         if (!session) return null;
 
@@ -132,7 +131,7 @@ export class StudySessionService {
     }
 
     async passTurn(sessionId: string, userId: string) {
-        const resolvedUserId = await resolveUserId(userId);
+        const resolvedUserId = userId;
         const session = await this._sessions.getById(sessionId);
         if (!session) throw new Error("Session not found");
 
@@ -178,23 +177,23 @@ export class StudySessionService {
         const sessions = await this._sessions.findActiveRoundRobin();
         const now = Date.now();
 
-        for (const s of sessions) {
+        for (const session of sessions) {
             // Default turn duration 5 minutes if not set
-            const turnDurationMs = (s.turnDurationSeconds || 300) * 1000;
+            const turnDurationMs = (session.turnDurationSeconds || 300) * 1000;
 
-            if (!s.turnStartedAt) {
+            if (!session.turnStartedAt) {
                 // Initialize turn start if missing
-                await this._sessions.update(s._id!, { turnStartedAt: new Date() });
+                await this._sessions.update(session._id!, { turnStartedAt: new Date() });
                 continue;
             }
 
-            const elapsed = now - new Date(s.turnStartedAt).getTime();
+            const elapsed = now - new Date(session.turnStartedAt).getTime();
             if (elapsed >= turnDurationMs) {
                 // Time's up -> Pass Turn
                 try {
-                    await this.passTurn(s._id!, (s.currentTurnUserId || '').toString());
+                    await this.passTurn(session._id!, (session.currentTurnUserId || '').toString());
                 } catch (e) {
-                    console.error(`Failed to auto-pass turn for session ${s._id}`, e);
+                    console.error(`Failed to auto-pass turn for session ${session._id}`, e);
                 }
             }
         }
@@ -206,23 +205,23 @@ export class StudySessionService {
 
         // Update statuses dynamically
         const now = Date.now();
-        const updatedSessions = await Promise.all(sessions.map(async (s: StudySession) => {
-            const start = new Date(s.startTime).getTime();
-            const end = start + s.durationMinutes * 60 * 1000;
+        const updatedSessions = await Promise.all(sessions.map(async (session: StudySession) => {
+            const start = new Date(session.startTime).getTime();
+            const end = start + session.durationMinutes * 60 * 1000;
             let statusChanged = false;
 
-            if (s.status !== StudySessionStatus.Completed && now > end) {
-                s.status = StudySessionStatus.Completed;
+            if (session.status !== StudySessionStatus.Completed && now > end) {
+                session.status = StudySessionStatus.Completed;
                 statusChanged = true;
-            } else if (s.status === StudySessionStatus.Upcoming && now >= start && now <= end) {
-                s.status = StudySessionStatus.Active;
+            } else if (session.status === StudySessionStatus.Upcoming && now >= start && now <= end) {
+                session.status = StudySessionStatus.Active;
                 statusChanged = true;
             }
 
             if (statusChanged) {
-                await this._sessions.update(s._id!, { status: s.status });
+                await this._sessions.update(session._id!, { status: session.status });
             }
-            return s;
+            return session;
         }));
 
         return updatedSessions;
@@ -233,7 +232,7 @@ export class StudySessionService {
     }
 
     async getByIdSecure(id: string, userId: string) {
-        const resolvedUserId = await resolveUserId(userId);
+        const resolvedUserId = userId;
         const session = await this._sessions.getById(id);
         if (!session) return null;
 

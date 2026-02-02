@@ -21,7 +21,7 @@ export class GroupRepository extends BaseRepository<Group> implements IGroupRepo
       .populate('owner')
       .lean()
 
-    return list.map((g: any) => this.mapDoc(g)!)
+    return list.map((group: any) => this.mapDoc(group)!)
   }
 
   // Count inherited

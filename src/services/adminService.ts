@@ -137,7 +137,7 @@ export class AdminService implements IAdminService {
       }
 
       // Handle ownership transfer or group deletion for groups owned by banned user
-      const ownedGroups = allGroups.filter((g: any) => (g.owner?._id?.toString?.() || g.owner?.toString?.()) === id)
+      const ownedGroups = allGroups.filter((group: any) => (group.owner?._id?.toString?.() || group.owner?.toString?.()) === id)
       for (const group of ownedGroups) {
         // Members have already been updated by loop above (user removed)
         // Fetch fresh group data to be sure or use modified local reference if trusted

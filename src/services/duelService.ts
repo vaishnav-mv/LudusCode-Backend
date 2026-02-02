@@ -2,7 +2,6 @@ import { singleton, inject } from 'tsyringe'
 import { IDuelRepository, IProblemRepository, IUserRepository, IWalletRepository } from '../interfaces/repositories'
 import { IDuelService } from '../interfaces/services'
 import { Duel, DuelStatus, Difficulty, SubmissionStatus } from '../types'
-import { resolveUserId } from '../utils/idResolver'
 import { createHash } from 'crypto'
 
 import { ResponseMessages } from '../constants'
@@ -21,8 +20,8 @@ export class DuelService implements IDuelService {
     const candidates = allProblems.filter(problem => problem.difficulty === difficulty);
     const problem = candidates[0] || allProblems[0];
 
-    const player1UserId = await resolveUserId(player1Id);
-    const player2UserId = await resolveUserId(player2Id);
+    const player1UserId = player1Id;
+    const player2UserId = player2Id;
 
     const player1User = await this._users.getById(player1UserId);
     const player2User = await this._users.getById(player2UserId);
@@ -59,7 +58,7 @@ export class DuelService implements IDuelService {
 
     let winner = duel.winner;
     if (winnerId) {
-      const resolvedWinnerId = await resolveUserId(winnerId);
+      const resolvedWinnerId = winnerId;
       const user = await this._users.getById(resolvedWinnerId);
       winner = user || null;
 
@@ -77,7 +76,7 @@ export class DuelService implements IDuelService {
   }
   async listActive(playerId: string) {
     const all = await this._duels.all();
-    const resolvedId = await resolveUserId(playerId);
+    const resolvedId = playerId;
     console.log('[DuelService.listActive] Checking for:', resolvedId);
     return all.filter(duel => {
       const player1 = (duel.player1.user as any);
@@ -101,7 +100,7 @@ export class DuelService implements IDuelService {
       throw new Error(ResponseMessages.NO_PROBLEMS_AVAILABLE)
     }
 
-    const player1UserId = await resolveUserId(playerId)
+    const player1UserId = playerId
     const player1User = await this._users.getById(player1UserId)
     if (!player1User) throw new Error(ResponseMessages.USER_NOT_FOUND)
     if (wager > 0) await this._wallets.add(player1UserId, -wager, 'Duel wager')
@@ -123,7 +122,7 @@ export class DuelService implements IDuelService {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
     if (duel.status !== DuelStatus.Waiting) throw new Error(ResponseMessages.ALREADY_STARTED)
-    const player2UserId = await resolveUserId(playerId)
+    const player2UserId = playerId
 
     // Prevent self-join
     const player1Id = (duel.player1.user as any)._id?.toString() || (duel.player1.user as any).id || duel.player1.user;
@@ -175,7 +174,7 @@ export class DuelService implements IDuelService {
   async submitResult(id: string, playerId: string, result: { overallStatus: SubmissionStatus; executionTime: number; memoryUsage?: number; attempts?: number }, userCode: string) {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
-    const userId = await resolveUserId(playerId)
+    const userId = playerId
     const submissions = (duel as any).submissions || []
     const cleanedSubmissions = submissions.filter((submission: any) => (submission.user?._id?.toString?.() || submission.userId) !== userId)
     const pWarnings = ((duel as any).player1?.user?._id?.toString?.() || (duel as any).player1?.user?.id) === userId
@@ -227,7 +226,7 @@ export class DuelService implements IDuelService {
 
     // Auth check: Is user creator?
     const player1Id = (duel.player1.user as any)._id?.toString() || (duel.player1.user as any).id || duel.player1.user;
-    const requestUserId = await resolveUserId(playerId)
+    const requestUserId = playerId;
 
     console.log('[DuelService.cancel] Debug:', {
       duelId: id,

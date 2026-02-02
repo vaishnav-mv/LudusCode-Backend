@@ -81,6 +81,6 @@ export class UserService implements IUserService {
 
   async search(query: string): Promise<User[]> {
     const users = await this._userRepo.search(query);
-    return users.map(u => mapUser(u)).filter(u => u !== null && u !== undefined) as User[];
+    return users.map(user => mapUser(user)).filter(user => user !== null && user !== undefined) as User[];
   }
 }

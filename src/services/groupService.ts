@@ -2,7 +2,7 @@ import { singleton, inject } from 'tsyringe'
 import { IGroupRepository, IUserRepository } from '../interfaces/repositories'
 import { IGroupService } from '../interfaces/services'
 import { mapGroup } from '../utils/mapper'
-import { resolveUserId } from '../utils/idResolver'
+
 import { ResponseMessages } from '../constants'
 
 @singleton()
@@ -20,7 +20,7 @@ export class GroupService implements IGroupService {
         let baseFilter: any = { isPrivate: { $ne: true } };
 
         if (userId) {
-            const resolvedId = await resolveUserId(userId);
+            const resolvedId = userId;
             // If user logged in: Public OR Member OR Owner
             baseFilter = {
                 $or: [
@@ -74,7 +74,7 @@ export class GroupService implements IGroupService {
     }
 
     async create(name: string, description: string, topics: string[], creatorId: string, isPrivate: boolean = false) {
-        const userId = await resolveUserId(creatorId);
+        const userId = creatorId;
         const creator = await this._users.getById(userId);
         if (!creator) throw new Error(ResponseMessages.USER_NOT_FOUND);
 
@@ -92,7 +92,7 @@ export class GroupService implements IGroupService {
         if (!group) return null;
 
         const ownerId = (group as any).owner?._id?.toString?.() || (group as any).owner?.toString?.();
-        const resolvedUserId = await resolveUserId(userId);
+        const resolvedUserId = userId;
 
         if (ownerId !== resolvedUserId) {
             throw new Error(ResponseMessages.FORBIDDEN_EDIT_GROUP);
@@ -108,7 +108,7 @@ export class GroupService implements IGroupService {
 
     async join(groupId: string, userId: string) {
         const resolvedGroupId = groupId;
-        const resolvedUserId = await resolveUserId(userId);
+        const resolvedUserId = userId;
         const group = await this._groups.getById(resolvedGroupId);
         const user = await this._users.getById(resolvedUserId);
         if (!group || !user) return false;
@@ -134,7 +134,7 @@ export class GroupService implements IGroupService {
     async approveJoin(groupId: string, userId: string, requesterId: string) {
         console.log(`[GroupService] approveJoin: groupId=${groupId}, userId=${userId}, requesterId=${requesterId}`);
         const resolvedGroupId = groupId;
-        const resolvedUserId = await resolveUserId(userId); // User to approve
+        const resolvedUserId = userId; // User to approve
         console.log(`[GroupService] Resolved IDs: group=${resolvedGroupId}, user=${resolvedUserId}`);
 
         const group = await this._groups.getById(resolvedGroupId);
@@ -177,7 +177,7 @@ export class GroupService implements IGroupService {
     async rejectJoin(groupId: string, userId: string, requesterId: string) {
         console.log(`[GroupService] rejectJoin: groupId=${groupId}, userId=${userId}`);
         const resolvedGroupId = groupId;
-        const resolvedUserId = await resolveUserId(userId);
+        const resolvedUserId = userId;
 
         const group = await this._groups.getById(resolvedGroupId);
         if (!group) return false;
@@ -197,7 +197,7 @@ export class GroupService implements IGroupService {
 
     async leave(groupId: string, userId: string) {
         const resolvedGroupId = groupId;
-        const resolvedUserId = await resolveUserId(userId);
+        const resolvedUserId = userId;
         const group = await this._groups.getById(resolvedGroupId);
         if (!group) return false;
         group.members = group.members.filter((member: any) => {
@@ -217,8 +217,8 @@ export class GroupService implements IGroupService {
 
     async blockMember(groupId: string, userId: string, requesterId: string) {
         const resolvedGroupId = groupId;
-        const resolvedUserId = await resolveUserId(userId);
-        const resolvedRequesterId = await resolveUserId(requesterId);
+        const resolvedUserId = userId;
+        const resolvedRequesterId = requesterId;
 
         const group = await this._groups.getById(resolvedGroupId);
         const user = await this._users.getById(resolvedUserId);
@@ -262,7 +262,7 @@ export class GroupService implements IGroupService {
         if (!group) return false;
 
         const ownerId = (group as any).owner?._id?.toString?.() || (group as any).owner?.toString?.();
-        const resolvedRequesterId = await resolveUserId(requesterId);
+        const resolvedRequesterId = requesterId;
 
         if (ownerId !== resolvedRequesterId) {
             throw new Error(ResponseMessages.FORBIDDEN_EDIT_GROUP);
@@ -278,13 +278,13 @@ export class GroupService implements IGroupService {
         if (!group) return false;
 
         const ownerId = (group as any).owner?._id?.toString?.() || (group as any).owner?.toString?.();
-        const resolvedRequesterId = await resolveUserId(requesterId);
+        const resolvedRequesterId = requesterId;
 
         if (ownerId !== resolvedRequesterId) {
             throw new Error(ResponseMessages.FORBIDDEN_EDIT_GROUP);
         }
 
-        const resolvedTargetUserId = await resolveUserId(targetUserId);
+        const resolvedTargetUserId = targetUserId;
         const userToAdd = await this._users.getById(resolvedTargetUserId);
 
         if (!userToAdd) throw new Error(ResponseMessages.USER_NOT_FOUND);
@@ -298,7 +298,7 @@ export class GroupService implements IGroupService {
 
         // Also remove from pending if they were there
         if (group.pendingMembers) {
-            group.pendingMembers = group.pendingMembers.filter((m: any) => this.getId(m) !== resolvedTargetUserId);
+            group.pendingMembers = group.pendingMembers.filter((member: any) => this.getId(member) !== resolvedTargetUserId);
         }
 
         const memberIds = group.members.map((member: any) => this.getId(member)).filter(Boolean);

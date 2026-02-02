@@ -79,7 +79,6 @@ export interface User {
     isVerified?: boolean;
     currentPlanId?: string;
     subscriptionExpiry?: Date | string;
-    legacyId?: string;
     passwordHash?: string; // in sample
     createdAt?: Date | string;
     updatedAt?: Date | string;
@@ -147,7 +146,6 @@ export interface Problem {
     starterCode?: string;
     functionName?: string;
     status: 'Pending' | 'Approved' | 'Custom';
-    legacyId?: string;
     createdAt?: Date | string;
     updatedAt?: Date | string;
     id?: string;
@@ -254,7 +252,6 @@ export interface Group {
     pendingMembers?: (User | string)[];
     blockedMembers?: (User | string)[]; // from DTO
     owner: User | string;
-    legacyId?: string;
     createdAt?: Date | string;
     updatedAt?: Date | string;
     id?: string;

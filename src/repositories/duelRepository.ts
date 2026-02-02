@@ -20,26 +20,26 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
       .populate('player2.user')
       .populate('winner')
       .lean();
-    return list.map((d: any) => this.mapDoc(d)!);
+    return list.map((duelDoc: any) => this.mapDoc(duelDoc)!);
   }
 
   // Count is inherited
 
   // Override to include population
   async getById(id: string) {
-    const d = await this.model.findById(id)
+    const duelDoc = await this.model.findById(id)
       .populate('problem')
       .populate('player1.user')
       .populate('player2.user')
       .populate('winner')
       .lean();
-    return this.mapDoc(d);
+    return this.mapDoc(duelDoc);
   }
 
   async create(item: any) {
-    const m = await this.model.create(item);
+    const createdDuel = await this.model.create(item);
     // Return populated
-    return (await this.getById(m._id.toString())) as any;
+    return (await this.getById(createdDuel._id.toString())) as any;
   }
 
   async update(id: string, partial: any) {
