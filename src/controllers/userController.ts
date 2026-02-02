@@ -1,6 +1,6 @@
 import { singleton, inject } from 'tsyringe'
 import { Request, Response } from 'express'
-import { resolveUserId } from '../utils/idResolver'
+
 import { HttpStatus, ResponseMessages } from '../constants'
 import { IUserService, ICloudinaryService } from '../interfaces/services'
 import { UpdateProfileRequestDTO, ChangePasswordRequestDTO } from '../dto/request/user.request.dto'
@@ -19,7 +19,7 @@ export class UserController {
      * @res     { user, recentDuels, joinedGroups, submissionStats }
      */
     profile = async (req: Request, res: Response) => {
-        const userId = await resolveUserId(req.params.id);
+        const userId = req.params.id;
         const userProfile = await this._service.profile(userId);
         if (!userProfile) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
         res.json(userProfile);
@@ -36,7 +36,7 @@ export class UserController {
         if (!currentUser || !currentUser.isAdmin) {
             return res.status(HttpStatus.FORBIDDEN).json({ message: ResponseMessages.FORBIDDEN });
         }
-        const userId = await resolveUserId(req.params.id);
+        const userId = req.params.id;
         const updatedUser = await this._service.setPremium(userId);
         if (!updatedUser) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
         res.json(updatedUser);
@@ -60,7 +60,7 @@ export class UserController {
      * @res     { user }
      */
     updateProfile = async (req: Request, res: Response) => {
-        const userId = await resolveUserId(req.params.id);
+        const userId = req.params.id;
         const currentUser = (req as any).user;
         if (!currentUser || (!currentUser.isAdmin && currentUser.sub !== userId)) return res.status(HttpStatus.FORBIDDEN).json({ message: ResponseMessages.FORBIDDEN });
 

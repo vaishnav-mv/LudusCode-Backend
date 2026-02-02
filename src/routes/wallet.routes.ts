@@ -4,6 +4,8 @@ import { WalletController } from '../controllers/walletController'
 import { ValidationMiddleware } from '../middleware/validate'
 const validate = ValidationMiddleware.getInstance().validate
 import { DepositSchema, WithdrawSchema, WagerSchema, WinSchema } from '../dto/request/wallet.request.dto'
+import { AuthMiddleware } from '../middleware/auth'
+const auth = AuthMiddleware.getInstance().auth
 
 export class WalletRoutes {
     public router: Router;
@@ -16,11 +18,11 @@ export class WalletRoutes {
     }
 
     private setupRoutes() {
-        this.router.get('/:userId', (req, res, next) => this._controller.getWallet(req, res).catch(next))
-        this.router.post('/deposit', validate(DepositSchema), (req, res, next) => this._controller.deposit(req, res).catch(next))
-        this.router.post('/withdraw', validate(WithdrawSchema), (req, res, next) => this._controller.withdraw(req, res).catch(next))
-        this.router.post('/wager', validate(WagerSchema), (req, res, next) => this._controller.wager(req, res).catch(next))
-        this.router.post('/win', validate(WinSchema), (req, res, next) => this._controller.win(req, res).catch(next))
+        this.router.get('/:userId', auth, (req, res, next) => this._controller.getWallet(req, res).catch(next))
+        this.router.post('/deposit', auth, validate(DepositSchema), (req, res, next) => this._controller.deposit(req, res).catch(next))
+        this.router.post('/withdraw', auth, validate(WithdrawSchema), (req, res, next) => this._controller.withdraw(req, res).catch(next))
+        this.router.post('/wager', auth, validate(WagerSchema), (req, res, next) => this._controller.wager(req, res).catch(next))
+        this.router.post('/win', auth, validate(WinSchema), (req, res, next) => this._controller.win(req, res).catch(next))
     }
 }
 

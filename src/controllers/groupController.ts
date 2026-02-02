@@ -93,8 +93,10 @@ export class GroupController {
    */
   joinGroup = async (req: Request, res: Response) => {
     try {
+      const currentUser = (req as any).user
+      if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
       const body = req.body as GroupMemberActionDTO
-      const ok = await this._service.join(req.params.id, body.userId)
+      const ok = await this._service.join(req.params.id, currentUser.sub)
       res.json({ ok })
     } catch (e: any) {
       res.status(HttpStatus.BAD_REQUEST).json({ message: e.message || ResponseMessages.FAILED_JOIN })
@@ -108,8 +110,10 @@ export class GroupController {
    * @res     { ok: boolean }
    */
   leaveGroup = async (req: Request, res: Response) => {
+    const currentUser = (req as any).user
+    if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const body = req.body as GroupMemberActionDTO
-    const ok = await this._service.leave(req.params.id, body.userId)
+    const ok = await this._service.leave(req.params.id, currentUser.sub)
     res.json({ ok })
   }
 

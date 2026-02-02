@@ -4,6 +4,8 @@ import { JudgeController } from '../controllers/judgeController'
 import { ValidationMiddleware } from '../middleware/validate'
 const validate = ValidationMiddleware.getInstance().validate
 import { ExecuteSchema } from '../dto/request/judge.request.dto'
+import { AuthMiddleware } from '../middleware/auth'
+const auth = AuthMiddleware.getInstance().auth
 
 export class JudgeRoutes {
     public router: Router;
@@ -16,7 +18,7 @@ export class JudgeRoutes {
     }
 
     private setupRoutes() {
-        this.router.post('/execute', validate(ExecuteSchema), (req, res, next) => this._controller.execute(req, res).catch(next))
+        this.router.post('/execute', auth, validate(ExecuteSchema), (req, res, next) => this._controller.execute(req, res).catch(next))
     }
 }
 

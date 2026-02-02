@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
-import { resolveUserId } from '../utils/idResolver'
+
 import { HttpStatus, ResponseMessages } from '../constants'
 import { IWalletService } from '../interfaces/services'
 import { DepositDTO, WithdrawDTO, WagerDTO, WinDTO } from '../dto/request/wallet.request.dto'
@@ -17,7 +17,7 @@ export class WalletController {
    * @res     { wallet }
    */
   getWallet = async (req: Request, res: Response) => {
-    const userId = await resolveUserId(req.params.userId)
+    const userId = req.params.userId
     console.log(`[WalletController] Get wallet for userId: ${userId} (param: ${req.params.userId})`);
     const wallet = await this._service.get(userId)
     res.json(wallet ? mapWallet(wallet) : null)
@@ -31,7 +31,7 @@ export class WalletController {
    */
   deposit = async (req: Request, res: Response) => {
     const body = req.body as DepositDTO
-    const userId = await resolveUserId(body.userId)
+    const userId = body.userId
     await this._service.deposit(userId, body.amount)
     res.json({ ok: true })
   }
@@ -44,7 +44,7 @@ export class WalletController {
    */
   withdraw = async (req: Request, res: Response) => {
     const body = req.body as WithdrawDTO
-    const userId = await resolveUserId(body.userId)
+    const userId = body.userId
     const ok = await this._service.withdraw(userId, body.amount)
     if (!ok) {
       return res.status(HttpStatus.BAD_REQUEST).json({ message: ResponseMessages.INSUFFICIENT_FUNDS })
@@ -60,7 +60,7 @@ export class WalletController {
    */
   wager = async (req: Request, res: Response) => {
     const body = req.body as WagerDTO
-    const userId = await resolveUserId(body.userId)
+    const userId = body.userId
     await this._service.wager(userId, body.amount, body.description)
     res.json({ ok: true })
   }
@@ -73,7 +73,7 @@ export class WalletController {
    */
   win = async (req: Request, res: Response) => {
     const body = req.body as WinDTO
-    const userId = await resolveUserId(body.userId)
+    const userId = body.userId
     await this._service.win(userId, body.amount, body.description)
     res.json({ ok: true })
   }

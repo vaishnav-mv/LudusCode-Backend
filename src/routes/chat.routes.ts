@@ -4,6 +4,8 @@ import { ChatController } from '../controllers/chatController'
 import { ValidationMiddleware } from '../middleware/validate'
 const validate = ValidationMiddleware.getInstance().validate
 import { SendMessageSchema } from '../dto/request/chat.request.dto'
+import { AuthMiddleware } from '../middleware/auth'
+const auth = AuthMiddleware.getInstance().auth
 
 export class ChatRoutes {
     public router: Router;
@@ -16,7 +18,7 @@ export class ChatRoutes {
     }
 
     private setupRoutes() {
-        this.router.get('/:groupId/messages', (req, res, next) => this._controller.getMessages(req, res).catch(next))
-        this.router.post('/:groupId/messages', validate(SendMessageSchema), (req, res, next) => this._controller.sendMessage(req, res).catch(next))
+        this.router.get('/:groupId/messages', auth, (req, res, next) => this._controller.getMessages(req, res).catch(next))
+        this.router.post('/:groupId/messages', auth, validate(SendMessageSchema), (req, res, next) => this._controller.sendMessage(req, res).catch(next))
     }
 }

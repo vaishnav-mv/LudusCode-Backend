@@ -2,7 +2,7 @@ import { singleton, inject } from 'tsyringe'
 import { Request, Response } from 'express'
 import { HttpStatus } from '../constants'
 import { ISubmissionService } from '../interfaces/services'
-import { resolveUserId } from '../utils/idResolver'
+
 
 @singleton()
 export class SubmissionController {
@@ -38,7 +38,7 @@ export class SubmissionController {
      */
     getUserSubmissions = async (req: Request, res: Response) => {
         try {
-            const userId = await resolveUserId(req.params.userId || (req as any).user.sub);
+            const userId = req.params.userId || (req as any).user.sub;
             const submissions = await this._service.getUserSubmissions(userId);
             res.json(submissions);
         } catch (error: any) {
@@ -54,7 +54,7 @@ export class SubmissionController {
      */
     getSolvedProblems = async (req: Request, res: Response) => {
         try {
-            const userId = await resolveUserId(req.params.userId || (req as any).user.sub);
+            const userId = req.params.userId || (req as any).user.sub;
             const solvedIds = await this._service.getSolvedProblemIds(userId);
             res.json(solvedIds);
         } catch (error: any) {
