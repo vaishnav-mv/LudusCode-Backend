@@ -1,6 +1,5 @@
 import mongoose, { Schema } from 'mongoose'
 const GroupSchema = new Schema({
-  legacyId: { type: String },
   name: { type: String, required: true, unique: true },
   description: { type: String },
   isPrivate: { type: Boolean, default: false },

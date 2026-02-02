@@ -1,6 +1,5 @@
 import mongoose, { Schema } from 'mongoose'
 const UserSchema = new Schema({
-  legacyId: { type: String },
   username: { type: String, required: true, unique: true },
   email: { type: String, required: true, unique: true },
   passwordHash: { type: String },

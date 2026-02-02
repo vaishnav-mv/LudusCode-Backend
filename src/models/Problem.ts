@@ -12,7 +12,6 @@ const SolutionSchema = new Schema({
 })
 
 const ProblemSchema = new Schema({
-  legacyId: { type: String },
   title: { type: String, required: true },
   description: { type: String },
   difficulty: {
