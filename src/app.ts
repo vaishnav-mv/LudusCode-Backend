@@ -23,9 +23,9 @@ import { SubscriptionRoutes } from './routes/subscription.routes'
 import { HealthRoutes } from './routes/health.routes'
 import { AuthMiddleware } from './middleware/auth'
 const auth = AuthMiddleware.getInstance().auth
-import { AdminMiddleware } from './middleware/isAdmin'
-const requireAdmin = AdminMiddleware.getInstance().requireAdmin
-const requirePremium = AdminMiddleware.getInstance().requirePremium
+import { PermissionsMiddleware } from './middleware/permissions'
+const requireAdmin = AuthMiddleware.getInstance().roleGuard('admin')
+const requirePremium = PermissionsMiddleware.getInstance().requirePremium
 const app = express()
 app.use(express.json())
 app.use(cookieParser())

@@ -6,8 +6,7 @@ const validate = ValidationMiddleware.getInstance().validate
 import { ForceDuelResultSchema, AdminNoBodySchema } from '../dto/request/admin.request.dto'
 import { AuthMiddleware } from '../middleware/auth'
 const auth = AuthMiddleware.getInstance().auth
-import { AdminMiddleware } from '../middleware/isAdmin'
-const requireAdmin = AdminMiddleware.getInstance().requireAdmin
+const requireAdmin = AuthMiddleware.getInstance().roleGuard('admin')
 
 export class AdminRoutes {
     public router: Router;

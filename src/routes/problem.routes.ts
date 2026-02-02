@@ -5,8 +5,7 @@ import { ValidationMiddleware } from '../middleware/validate'
 const validate = ValidationMiddleware.getInstance().validate
 import { AuthMiddleware } from '../middleware/auth'
 const auth = AuthMiddleware.getInstance().auth
-import { AdminMiddleware } from '../middleware/isAdmin'
-const requireAdmin = AdminMiddleware.getInstance().requireAdmin
+const requireAdmin = AuthMiddleware.getInstance().roleGuard('admin')
 import { GenerateProblemSchema } from '../dto/request/problem.request.dto'
 
 export class ProblemRoutes {
