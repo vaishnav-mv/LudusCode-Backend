@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { container } from 'tsyringe'
 import { StudySessionController } from '../controllers/studySessionController'
 import { AuthMiddleware } from '../middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
+const auth = container.resolve(AuthMiddleware).auth
 
 export class StudySessionRoutes {
     public router: Router;

@@ -1,16 +1,9 @@
 import { Request, Response, NextFunction } from 'express'
+import { singleton } from 'tsyringe'
 
+@singleton()
 export class ErrorMiddleware {
-  private static instance: ErrorMiddleware;
-
-  private constructor() { }
-
-  public static getInstance(): ErrorMiddleware {
-    if (!ErrorMiddleware.instance) {
-      ErrorMiddleware.instance = new ErrorMiddleware();
-    }
-    return ErrorMiddleware.instance;
-  }
+  constructor() { }
 
   public handle = (err: any, req: Request, res: Response, next: NextFunction) => {
     const status = err.status || 500

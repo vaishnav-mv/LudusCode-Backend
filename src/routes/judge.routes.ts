@@ -2,10 +2,10 @@ import { Router } from 'express'
 import { container } from 'tsyringe'
 import { JudgeController } from '../controllers/judgeController'
 import { ValidationMiddleware } from '../middleware/validate'
-const validate = ValidationMiddleware.getInstance().validate
+const validate = container.resolve(ValidationMiddleware).validate
 import { ExecuteSchema } from '../dto/request/judge.request.dto'
 import { AuthMiddleware } from '../middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
+const auth = container.resolve(AuthMiddleware).auth
 
 export class JudgeRoutes {
     public router: Router;

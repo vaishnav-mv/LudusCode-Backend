@@ -2,9 +2,9 @@ import { Router } from 'express'
 import { container } from 'tsyringe'
 import { UserController } from '../controllers/userController'
 import { AuthMiddleware } from '../middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
+const auth = container.resolve(AuthMiddleware).auth
 import { ValidationMiddleware } from '../middleware/validate'
-const validate = ValidationMiddleware.getInstance().validate
+const validate = container.resolve(ValidationMiddleware).validate
 import { UpdateProfileSchema } from '../dto/request/user.request.dto'
 import multer from 'multer'
 

@@ -21,11 +21,12 @@ import { AiRoutes } from './routes/ai.routes'
 import { SubmissionRoutes } from './routes/submission.routes'
 import { SubscriptionRoutes } from './routes/subscription.routes'
 import { HealthRoutes } from './routes/health.routes'
+import { container } from 'tsyringe'
 import { AuthMiddleware } from './middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
+const auth = container.resolve(AuthMiddleware).auth
 import { PermissionsMiddleware } from './middleware/permissions'
-const requireAdmin = AuthMiddleware.getInstance().roleGuard('admin')
-const requirePremium = PermissionsMiddleware.getInstance().requirePremium
+const requireAdmin = container.resolve(AuthMiddleware).roleGuard('admin')
+const requirePremium = container.resolve(PermissionsMiddleware).requirePremium
 const app = express()
 app.use(express.json())
 app.use(cookieParser())
@@ -70,6 +71,6 @@ app.use('/api/subscriptions', apiLimiter, csrfProtection, new SubscriptionRoutes
 app.use('/api/health', new HealthRoutes().router)
 app.use((req, res) => res.status(404).json({ message: 'Not found' }))
 import { ErrorMiddleware } from './middleware/errorHandler'
-const errorHandler = ErrorMiddleware.getInstance().handle
+const errorHandler = container.resolve(ErrorMiddleware).handle
 app.use(errorHandler)
 export default app

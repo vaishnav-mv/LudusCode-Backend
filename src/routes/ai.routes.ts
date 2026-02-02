@@ -2,10 +2,10 @@ import { Router } from 'express'
 import { container } from 'tsyringe'
 import { AiController } from '../controllers/aiController'
 import { ValidationMiddleware } from '../middleware/validate'
-const validate = ValidationMiddleware.getInstance().validate
+const validate = container.resolve(ValidationMiddleware).validate
 import { HintSchema, CodeReviewSchema, PerformanceSchema } from '../dto/request/ai.request.dto'
 import { AuthMiddleware } from '../middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
+const auth = container.resolve(AuthMiddleware).auth
 
 export class AiRoutes {
     public router: Router;

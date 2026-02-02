@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { container } from 'tsyringe'
 import { SubmissionController } from '../controllers/submissionController'
 import { AuthMiddleware } from '../middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
+const auth = container.resolve(AuthMiddleware).auth
 
 export class SubmissionRoutes {
     public router: Router;

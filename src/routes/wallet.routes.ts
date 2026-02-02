@@ -2,10 +2,10 @@ import { Router } from 'express'
 import { container } from 'tsyringe'
 import { WalletController } from '../controllers/walletController'
 import { ValidationMiddleware } from '../middleware/validate'
-const validate = ValidationMiddleware.getInstance().validate
+const validate = container.resolve(ValidationMiddleware).validate
 import { DepositSchema, WithdrawSchema, WagerSchema, WinSchema } from '../dto/request/wallet.request.dto'
 import { AuthMiddleware } from '../middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
+const auth = container.resolve(AuthMiddleware).auth
 
 export class WalletRoutes {
     public router: Router;

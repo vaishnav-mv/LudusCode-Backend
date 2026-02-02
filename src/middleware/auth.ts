@@ -1,24 +1,14 @@
 import { Request, Response, NextFunction } from 'express'
-import { container } from 'tsyringe'
+import { container, singleton, inject } from 'tsyringe'
 import { IJwtService } from '../interfaces/services'
 import { IUserRepository } from '../interfaces/repositories'
 
+@singleton()
 export class AuthMiddleware {
-  private static instance: AuthMiddleware;
-  private _jwt: IJwtService;
-  private _userRepo: IUserRepository;
-
-  private constructor() {
-    this._jwt = container.resolve<IJwtService>("IJwtService");
-    this._userRepo = container.resolve<IUserRepository>("IUserRepository");
-  }
-
-  public static getInstance(): AuthMiddleware {
-    if (!AuthMiddleware.instance) {
-      AuthMiddleware.instance = new AuthMiddleware();
-    }
-    return AuthMiddleware.instance;
-  }
+  constructor(
+    @inject("IJwtService") private _jwt: IJwtService,
+    @inject("IUserRepository") private _userRepo: IUserRepository
+  ) { }
 
   public auth = async (req: Request, res: Response, next: NextFunction) => {
     const cookieToken = (req as any).cookies?.['access_token']

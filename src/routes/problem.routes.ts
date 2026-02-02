@@ -2,10 +2,10 @@ import { Router } from 'express'
 import { container } from 'tsyringe'
 import { ProblemController } from '../controllers/problemController'
 import { ValidationMiddleware } from '../middleware/validate'
-const validate = ValidationMiddleware.getInstance().validate
+const validate = container.resolve(ValidationMiddleware).validate
 import { AuthMiddleware } from '../middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
-const requireAdmin = AuthMiddleware.getInstance().roleGuard('admin')
+const auth = container.resolve(AuthMiddleware).auth
+const requireAdmin = container.resolve(AuthMiddleware).roleGuard('admin')
 import { GenerateProblemSchema } from '../dto/request/problem.request.dto'
 
 export class ProblemRoutes {

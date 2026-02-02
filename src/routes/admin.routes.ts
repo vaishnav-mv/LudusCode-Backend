@@ -2,11 +2,11 @@ import { Router } from 'express'
 import { container } from 'tsyringe'
 import { AdminController } from '../controllers/adminController'
 import { ValidationMiddleware } from '../middleware/validate'
-const validate = ValidationMiddleware.getInstance().validate
+const validate = container.resolve(ValidationMiddleware).validate
 import { ForceDuelResultSchema, AdminNoBodySchema } from '../dto/request/admin.request.dto'
 import { AuthMiddleware } from '../middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
-const requireAdmin = AuthMiddleware.getInstance().roleGuard('admin')
+const auth = container.resolve(AuthMiddleware).auth
+const requireAdmin = container.resolve(AuthMiddleware).roleGuard('admin')
 
 export class AdminRoutes {
     public router: Router;

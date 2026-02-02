@@ -2,10 +2,10 @@ import { Router } from 'express'
 import { container } from 'tsyringe'
 import { DuelController } from '../controllers/duelController'
 import { ValidationMiddleware } from '../middleware/validate'
-const validate = ValidationMiddleware.getInstance().validate
+const validate = container.resolve(ValidationMiddleware).validate
 import { CreateDuelSchema, UpdateDuelStateSchema, CreateOpenChallengeSchema, SetSummarySchema, FinishDuelSchema, SubmitDuelResultSchema, DuelPlayerActionSchema } from '../dto/request/duel.request.dto'
 import { AuthMiddleware } from '../middleware/auth'
-const auth = AuthMiddleware.getInstance().auth
+const auth = container.resolve(AuthMiddleware).auth
 
 export class DuelRoutes {
     public router: Router;
