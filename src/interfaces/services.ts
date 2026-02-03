@@ -82,7 +82,7 @@ export interface IAdminService {
   approveProblem(id: string): Promise<boolean>
   rejectProblem(id: string): Promise<boolean>
   allProblems(page?: number, limit?: number): Promise<{ problems: Problem[], total: number, page: number, totalPages: number }>
-  allUsers(page?: number, limit?: number): Promise<{ users: User[], total: number, page: number, totalPages: number }>
+  allUsers(page?: number, limit?: number, query?: string): Promise<{ users: User[], total: number, page: number, totalPages: number }>
   banUser(id: string): Promise<boolean>
   unbanUser(id: string): Promise<boolean>
   flaggedActivities(): Promise<any[]>

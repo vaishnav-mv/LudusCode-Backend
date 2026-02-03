@@ -158,7 +158,8 @@ export class AdminController {
   allUsers = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 50
-    const result = await this._service.allUsers(page, limit)
+    const query = req.query.q as string
+    const result = await this._service.allUsers(page, limit, query)
     res.json(result)
   }
 

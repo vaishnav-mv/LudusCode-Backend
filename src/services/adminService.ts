@@ -95,9 +95,17 @@ export class AdminService implements IAdminService {
     }
   }
 
-  async allUsers(page: number = 1, limit: number = 50) {
+  async allUsers(page: number = 1, limit: number = 50, query?: string) {
     const skip = (page - 1) * limit
-    const filter = { isAdmin: { $ne: true } }
+    const filter: any = { isAdmin: { $ne: true } }
+
+    if (query) {
+      const regex = new RegExp(query, 'i')
+      filter.$or = [
+        { username: regex },
+        { email: regex }
+      ]
+    }
 
     const users = await this._users.all(skip, limit, filter)
     const total = await this._users.count(filter)
