@@ -6,8 +6,8 @@ export class PermissionsMiddleware {
   constructor() { }
 
   public requirePremium = (req: Request, res: Response, next: NextFunction) => {
-    const u = (req as any).user
-    if (!u || !u.isPremium) return res.status(403).json({ message: 'Forbidden' })
+    const user = (req as any).user
+    if (!user || !user.isPremium) return res.status(403).json({ message: 'Forbidden' })
     next()
   }
 }

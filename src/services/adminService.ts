@@ -140,18 +140,11 @@ export class AdminService implements IAdminService {
       const ownedGroups = allGroups.filter((group: any) => (group.owner?._id?.toString?.() || group.owner?.toString?.()) === id)
       for (const group of ownedGroups) {
         // Members have already been updated by loop above (user removed)
-        // Fetch fresh group data to be sure or use modified local reference if trusted
-        // But we modified 'group' object in memory above? Yes, we spliced members.
 
         const remainingMembers = group.members as any[]
         if (remainingMembers.length > 0) {
           const newOwner = remainingMembers[0]
-          const newOwnerId = newOwner._id?.toString?.() || newOwner.toString() // depending on if it's populated or ID
-
-          // We need to be careful. group.members might be array of IDs or Objects depending on repo.all()
-          // Repo.all usually populates? Let's assume it might not for safety or check.
-          // AdminService.dashboardStats uses allUsers[]. 
-          // Let's rely on standard ID behavior.
+          const newOwnerId = newOwner._id?.toString?.() || newOwner.toString()
 
           await this._groups.update(group._id as string, { owner: newOwnerId })
         } else {

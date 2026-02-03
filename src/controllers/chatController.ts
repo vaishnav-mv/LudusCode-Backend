@@ -16,9 +16,9 @@ export class ChatController {
      * @res     [Message]
      */
     getMessages = async (req: Request, res: Response) => {
-        const gid = req.params.groupId;
-        const r = await this._service.getMessages(gid);
-        res.json(r);
+        const groupId = req.params.groupId;
+        const messages = await this._service.getMessages(groupId);
+        res.json(messages);
     }
 
     /**
@@ -28,12 +28,12 @@ export class ChatController {
      * @res     { message }
      */
     sendMessage = async (req: Request, res: Response) => {
-        const gid = req.params.groupId;
+        const groupId = req.params.groupId;
         const body = req.body as SendMessageDTO
-        const uid = body.userId;
-        const r = await this._service.sendMessage(gid, uid, body.text);
-        broadcastChat(gid, r);
+        const userId = body.userId;
+        const sentMessage = await this._service.sendMessage(groupId, userId, body.text);
+        broadcastChat(groupId, sentMessage);
 
-        res.json(r);
+        res.json(sentMessage);
     }
 }

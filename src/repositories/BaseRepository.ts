@@ -25,13 +25,13 @@ export abstract class BaseRepository<T> implements IBaseRepository<T> {
   }
 
   async create(item: T): Promise<T> {
-    const m = await this.model.create(item);
-    return this.mapDoc(m.toObject()) as T;
+    const createdDoc = await this.model.create(item);
+    return this.mapDoc(createdDoc.toObject()) as T;
   }
 
   async update(id: string, partial: Partial<T>): Promise<T | undefined> {
-    const m = await this.model.findByIdAndUpdate(id, partial, { new: true }).lean();
-    return this.mapDoc(m);
+    const updatedDoc = await this.model.findByIdAndUpdate(id, partial, { new: true }).lean();
+    return this.mapDoc(updatedDoc);
   }
 
   async delete(id: string): Promise<boolean> {

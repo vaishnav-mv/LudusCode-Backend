@@ -17,10 +17,9 @@ export class StudySessionService {
         if (!group) throw new Error("Group not found");
 
         // Verify membership (or ownership)
-        // Verify membership (or ownership)
-        const isMember = group.members.some(m => {
-            const mId = typeof m === 'string' ? m : (m._id || (m as any).id).toString();
-            return mId === userId;
+        const isMember = group.members.some(member => {
+            const memberId = typeof member === 'string' ? member : (member._id || (member as any).id).toString();
+            return memberId === userId;
         }) || (typeof group.owner === 'string' ? group.owner : (group.owner._id || (group.owner as any).id).toString()) === userId;
         if (!isMember) throw new Error("Must be a group member to create a session");
 
@@ -47,16 +46,10 @@ export class StudySessionService {
 
         // Check ownership
         if (session.createdBy.toString() !== resolvedUserId) {
-            // Check if user is a participant. If so, only allow problematic updates? 
-            // Or just allow participants to update session metadata like problems?
-            // "Collaborative" session implies collaboration.
-            // Let's verify membership at least.
-            const isParticipant = session.participants.some((p: any) => p.user._id.toString() === resolvedUserId);
+            const isParticipant = session.participants.some((participant: any) => participant.user._id.toString() === resolvedUserId);
             if (!isParticipant) {
                 throw new Error("You must be a participant to update this session");
             }
-            // NOTE: Ideally we refine this to only allow 'problems' update for participants, 
-            // and full update for owner. But for now, fixing the blocker.
         }
 
         const updated = await this._sessions.update(sessionId, data);
@@ -73,18 +66,18 @@ export class StudySessionService {
         const group = await this._groups.getById(session.groupId.toString());
         if (!group) throw new Error("Group not found");
 
-        const isMember = (group as any).members.find((m: any) => {
-            const mid = m._id ? m._id.toString() : m.toString();
-            return mid === resolvedUserId;
+        const isMember = (group as any).members.find((member: any) => {
+            const memberId = member._id ? member._id.toString() : member.toString();
+            return memberId === resolvedUserId;
         }) || (group as any).owner?._id?.toString() === resolvedUserId || (group as any).owner?.toString() === resolvedUserId;
 
         if (!isMember) {
             throw new Error("You must be a member of the group to join this session");
         }
 
-        const exists = session.participants.find((p: any) => {
-            const pid = p.user._id ? p.user._id.toString() : p.user.toString();
-            return pid === resolvedUserId;
+        const exists = session.participants.find((participant: any) => {
+            const participantId = participant.user._id ? participant.user._id.toString() : participant.user.toString();
+            return participantId === resolvedUserId;
         });
 
         if (exists) {
@@ -92,9 +85,9 @@ export class StudySessionService {
         }
 
         // Prepare new list, normalizing existing populated users back to IDs
-        const newParticipants = session.participants.map((p: any) => ({
-            ...p,
-            user: p.user._id ? p.user._id.toString() : p.user.toString()
+        const newParticipants = session.participants.map((participant: any) => ({
+            ...participant,
+            user: participant.user._id ? participant.user._id.toString() : participant.user.toString()
         }));
 
         newParticipants.push({
@@ -114,15 +107,15 @@ export class StudySessionService {
         if (!session) return null;
 
         // Filter out the user, handling both populated and unpopulated states
-        const filteredParticipants = session.participants.filter((p: any) => {
-            const pid = p.user._id ? p.user._id.toString() : p.user.toString();
-            return pid !== resolvedUserId;
+        const filteredParticipants = session.participants.filter((participant: any) => {
+            const participantId = participant.user._id ? participant.user._id.toString() : participant.user.toString();
+            return participantId !== resolvedUserId;
         });
 
         // Normalize for save
-        const saveParticipants = filteredParticipants.map((p: any) => ({
-            ...p,
-            user: p.user._id ? p.user._id.toString() : p.user.toString()
+        const saveParticipants = filteredParticipants.map((participant: any) => ({
+            ...participant,
+            user: participant.user._id ? participant.user._id.toString() : participant.user.toString()
         }));
 
         const updated = await this._sessions.update(sessionId, { participants: saveParticipants });
@@ -137,7 +130,7 @@ export class StudySessionService {
 
         if (session.mode !== 'round_robin') throw new Error("Pass Turn is only available in Round Robin mode");
 
-        const participants = session.participants.map((p: any) => p.user._id.toString());
+        const participants = session.participants.map((participant: any) => participant.user._id.toString());
         if (participants.length === 0) return session;
 
         let currentIndex = -1;
@@ -147,12 +140,7 @@ export class StudySessionService {
             // Default to next should be 0 (first user)
             currentIndex = -1; // so next will be 0
         } else {
-            // Verify it is the user's turn (or allow forcing if they are admin/creator? Let's stay strict for now)
-            // However, to "Set" the turn initially, we allow anyone to trigger it if it's unset?
-            // Or if key doesn't match, we might want to allow "Steal"? No, let's enforce turn.
-
             if (session.currentTurnUserId.toString() !== resolvedUserId) {
-                // But wait, if turn is not set, we allow the user to "Start" the rotation?
                 if (session.currentTurnUserId) throw new Error("It is not your turn");
             }
             currentIndex = participants.indexOf(resolvedUserId);
@@ -170,10 +158,6 @@ export class StudySessionService {
     }
 
     async checkRoundRobinTimers() {
-        // @ts-ignore - findActiveRoundRobin added to repository but TS might not know if interface not updated
-        // However, we are injecting the concrete class StudySessionRepository, so it should be fine at runtime.
-        // If TS complains, we might need to cast or update interface. 
-        // For "Real Code" without mocks, runtime JS handles it.
         const sessions = await this._sessions.findActiveRoundRobin();
         const now = Date.now();
 
@@ -240,9 +224,9 @@ export class StudySessionService {
         const group = await this._groups.getById(session.groupId.toString());
         if (!group) return null; // Or throw error
 
-        const isMember = group.members.some(m => {
-            const mId = typeof m === 'string' ? m : (m._id || (m as any).id).toString();
-            return mId === resolvedUserId;
+        const isMember = group.members.some(member => {
+            const memberId = typeof member === 'string' ? member : (member._id || (member as any).id).toString();
+            return memberId === resolvedUserId;
         }) || (typeof group.owner === 'string' ? group.owner : (group.owner._id || (group.owner as any).id).toString()) === resolvedUserId;
 
         if (!isMember) {

@@ -21,8 +21,8 @@ export class AdminController {
    * @res     { totalUsers, activeDuels, totalProblems, totalRevenue }
    */
   dashboardStats = async (req: Request, res: Response) => {
-    const r = await this._service.dashboardStats()
-    res.json(r)
+    const stats = await this._service.dashboardStats()
+    res.json(stats)
   }
 
   /**
@@ -32,8 +32,8 @@ export class AdminController {
    * @res     { totalRevenue, commissionsByDay }
    */
   financials = async (req: Request, res: Response) => {
-    const r = await this._service.financials()
-    res.json(r)
+    const financialData = await this._service.financials()
+    res.json(financialData)
   }
 
   /**
@@ -43,8 +43,8 @@ export class AdminController {
    * @res     { plans, logs }
    */
   subscriptionData = async (req: Request, res: Response) => {
-    const r = await this._service.subscriptionData()
-    res.json(r)
+    const subscriptionData = await this._service.subscriptionData()
+    res.json(subscriptionData)
   }
 
   /**
@@ -54,8 +54,8 @@ export class AdminController {
    * @res     { plan }
    */
   createPlan = async (req: Request, res: Response) => {
-    const r = await (this._service as any).createPlan(req.body)
-    res.json(r)
+    const plan = await (this._service as any).createPlan(req.body)
+    res.json(plan)
   }
 
   /**
@@ -65,8 +65,8 @@ export class AdminController {
    * @res     { plan }
    */
   updatePlan = async (req: Request, res: Response) => {
-    const r = await (this._service as any).updatePlan(req.params.id, req.body)
-    res.json(r)
+    const updatedPlan = await (this._service as any).updatePlan(req.params.id, req.body)
+    res.json(updatedPlan)
   }
 
   /**
@@ -76,8 +76,8 @@ export class AdminController {
    * @res     { ok: boolean }
    */
   deletePlan = async (req: Request, res: Response) => {
-    const r = await (this._service as any).deletePlan(req.params.id)
-    res.json({ ok: r })
+    const success = await (this._service as any).deletePlan(req.params.id)
+    res.json({ ok: success })
   }
 
   /**
@@ -88,8 +88,8 @@ export class AdminController {
    */
   grantSubscription = async (req: Request, res: Response) => {
     const { username, planId } = req.body
-    const r = await (this._service as any).grantSubscription(username, planId)
-    res.json({ ok: r })
+    const success = await (this._service as any).grantSubscription(username, planId)
+    res.json({ ok: success })
   }
 
   /**
@@ -99,8 +99,8 @@ export class AdminController {
    * @res     { ok: boolean }
    */
   cancelSubscription = async (req: Request, res: Response) => {
-    const r = await (this._service as any).cancelSubscription(req.params.userId)
-    res.json({ ok: r })
+    const success = await (this._service as any).cancelSubscription(req.params.userId)
+    res.json({ ok: success })
   }
 
   /**
@@ -110,8 +110,8 @@ export class AdminController {
    * @res     [Problem]
    */
   pendingProblems = async (req: Request, res: Response) => {
-    const r = await this._service.pendingProblems()
-    res.json(r)
+    const pending = await this._service.pendingProblems()
+    res.json(pending)
   }
 
   /**
@@ -145,8 +145,8 @@ export class AdminController {
   allProblems = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 50
-    const r = await this._service.allProblems(page, limit)
-    res.json(r)
+    const result = await this._service.allProblems(page, limit)
+    res.json(result)
   }
 
   /**
@@ -158,8 +158,8 @@ export class AdminController {
   allUsers = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 50
-    const r = await this._service.allUsers(page, limit)
-    res.json(r)
+    const result = await this._service.allUsers(page, limit)
+    res.json(result)
   }
 
   /**
@@ -191,11 +191,11 @@ export class AdminController {
    * @res     [User]
    */
   searchUsers = async (req: Request, res: Response) => {
-    const q = req.query.q as string
-    if (!q) {
+    const query = req.query.q as string
+    if (!query) {
       return res.json([])
     }
-    const users = await (this._service as any).searchUsers(q)
+    const users = await (this._service as any).searchUsers(query)
     res.json(users)
   }
 
@@ -206,8 +206,8 @@ export class AdminController {
    * @res     [FlaggedUser]
    */
   flaggedActivities = async (req: Request, res: Response) => {
-    const r = await this._service.flaggedActivities()
-    res.json(r)
+    const flagged = await this._service.flaggedActivities()
+    res.json(flagged)
   }
 
   /**
@@ -228,8 +228,8 @@ export class AdminController {
    * @res     [Duel]
    */
   monitoredDuels = async (req: Request, res: Response) => {
-    const r = await this._service.monitoredDuels()
-    res.json(r)
+    const duels = await this._service.monitoredDuels()
+    res.json(duels)
   }
 
   /**
@@ -239,14 +239,14 @@ export class AdminController {
    * @res     { ok: boolean }
    */
   cancelDuel = async (req: Request, res: Response) => {
-    const d = await this._duelRepo.getById(req.params.id)
-    if (!d) return res.json({ ok: false })
-    const wager = (d as any).wager || 0
+    const duel = await this._duelRepo.getById(req.params.id)
+    if (!duel) return res.json({ ok: false })
+    const wager = (duel as any).wager || 0
     if (wager > 0) {
-      const p1 = (d as any).player1?.user?.id || (d as any).player1?.user?._id?.toString?.()
-      const p2 = (d as any).player2?.user?.id || (d as any).player2?.user?._id?.toString?.()
-      if (p1) await this._walletRepo.add(p1, wager, 'Duel cancel refund')
-      if (p2) await this._walletRepo.add(p2, wager, 'Duel cancel refund')
+      const player1Id = (duel as any).player1?.user?.id || (duel as any).player1?.user?._id?.toString?.()
+      const player2Id = (duel as any).player2?.user?.id || (duel as any).player2?.user?._id?.toString?.()
+      if (player1Id) await this._walletRepo.add(player1Id, wager, 'Duel cancel refund')
+      if (player2Id) await this._walletRepo.add(player2Id, wager, 'Duel cancel refund')
     }
     await this._duelRepo.update(req.params.id, { status: DuelStatus.Finished, winner: null })
     res.json({ ok: true })

@@ -72,10 +72,10 @@ export class UserService implements IUserService {
     const user = await this._userRepo.getById(id);
     if (!user) throw new Error(ResponseMessages.USER_NOT_FOUND);
     if (user.passwordHash) {
-      const match = await import('bcryptjs').then(b => b.compare(oldPass, user.passwordHash || ''));
+      const match = await import('bcryptjs').then(bcrypt => bcrypt.compare(oldPass, user.passwordHash || ''));
       if (!match) throw new Error(ResponseMessages.INCORRECT_PASSWORD);
     }
-    const hash = await import('bcryptjs').then(b => b.hash(newPass, 10));
+    const hash = await import('bcryptjs').then(bcrypt => bcrypt.hash(newPass, 10));
     await this._userRepo.update(id, { passwordHash: hash });
   }
 

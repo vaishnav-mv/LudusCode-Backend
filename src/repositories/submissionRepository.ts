@@ -13,19 +13,19 @@ export class SubmissionRepository extends BaseRepository<Submission> implements 
     async create(data: any) {
         let submission = await this.model.create(data);
         submission = await submission.populate('problemId');
-        const s = submission.toObject();
+        const submissionObj = submission.toObject();
 
         return {
-            id: s._id.toString(),
-            problem: { ...s.problemId, id: s.problemId?._id.toString() },
-            userCode: s.code,
+            id: submissionObj._id.toString(),
+            problem: { ...submissionObj.problemId, id: submissionObj.problemId?._id.toString() },
+            userCode: submissionObj.code,
             result: {
-                overallStatus: s.status,
-                results: s.testCaseResults,
-                executionTime: s.executionTime,
-                memoryUsage: s.memoryUsage
+                overallStatus: submissionObj.status,
+                results: submissionObj.testCaseResults,
+                executionTime: submissionObj.executionTime,
+                memoryUsage: submissionObj.memoryUsage
             },
-            submittedAt: s.createdAt
+            submittedAt: submissionObj.createdAt
         } as any;
     }
 
@@ -36,17 +36,17 @@ export class SubmissionRepository extends BaseRepository<Submission> implements 
             .populate('problemId')
             .lean();
 
-        return submissions.map((s: any) => ({
-            id: s._id.toString(),
-            problem: { ...s.problemId, id: s.problemId?._id.toString() },
-            userCode: s.code,
+        return submissions.map((submission: any) => ({
+            id: submission._id.toString(),
+            problem: { ...submission.problemId, id: submission.problemId?._id.toString() },
+            userCode: submission.code,
             result: {
-                overallStatus: s.status,
-                results: s.testCaseResults,
-                executionTime: s.executionTime,
-                memoryUsage: s.memoryUsage
+                overallStatus: submission.status,
+                results: submission.testCaseResults,
+                executionTime: submission.executionTime,
+                memoryUsage: submission.memoryUsage
             },
-            submittedAt: s.createdAt
+            submittedAt: submission.createdAt
         }));
     }
 
