@@ -28,50 +28,7 @@ export class AiService implements IAiService {
     return (response.text || '').trim();
   }
 
-  async judge(code: string, language: string, problem: any, testCases: any[]) {
-    if (!ai) throw new Error(ResponseMessages.AI_UNAVAILABLE);
-    const prompt = `
-    You are a code judge. Evaluate the following ${language} code for the problem "${problem.title}".
-    
-    Problem Description:
-    ${problem.description}
 
-    User Code:
-    \`\`\`${language}
-    ${code}
-    \`\`\`
-
-    Test Cases:
-    ${JSON.stringify(testCases)}
-
-    For each test case, determine if the code produces the correct output.
-    Return a JSON object with the following structure:
-    {
-      "overallStatus": "Accepted" | "Wrong Answer" | "Runtime Error" | "Time Limit Exceeded",
-      "results": [
-        {
-          "testCase": (the test case object),
-          "status": "Accepted" | "Wrong Answer" | "Runtime Error",
-          "userOutput": (the output produced by the code, or error message)
-        }
-      ]
-    }
-    Do not include any markdown formatting or explanations, just the raw JSON.
-    `;
-
-    try {
-      const response = await (ai as any).models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: prompt,
-        config: { responseMimeType: 'application/json', temperature: 0.1 }
-      });
-      const text = (response.text || '').trim();
-      return JSON.parse(text);
-    } catch (error) {
-      console.error('AI Judge failed:', error);
-      return { overallStatus: 'Runtime Error', results: [] };
-    }
-  }
 
   async generateProblem(difficulty: string, topic: string) {
     if (!ai) throw new Error(ResponseMessages.AI_UNAVAILABLE);

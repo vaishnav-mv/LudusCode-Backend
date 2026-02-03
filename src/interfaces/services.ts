@@ -115,7 +115,7 @@ export interface IAiService {
   hint(problem: any, userCode: string): Promise<string>
   codeReview(problem: any, userCode: string): Promise<string>
   performance(profile: any): Promise<string>
-  judge(code: string, language: string, problem: any, testCases: any[]): Promise<any>
+
   explainConcept(concept: string): Promise<string>
   summarizeDiscussion(messages: string[]): Promise<string>
   generateProblem(difficulty: string, topic: string): Promise<any>

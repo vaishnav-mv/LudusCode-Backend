@@ -1,14 +1,14 @@
 import { singleton, inject } from 'tsyringe'
 
 import { SubmissionResult, SubmissionStatus, TestCase } from '../types'
-import { IJudgeService, IAiService } from '../interfaces/services'
+import { IJudgeService } from '../interfaces/services'
 import vm from 'vm'
 
 const createResult = (overallStatus: SubmissionStatus, results: any[]): SubmissionResult => ({ overallStatus, results, executionTime: Math.floor(Math.random() * 500) + 50, memoryUsage: Math.round((Math.random() * 100 + 10) * 10) / 10 })
 
 @singleton()
 export class JudgeService implements IJudgeService {
-  constructor(@inject("IAiService") private _aiService: IAiService) { }
+  constructor() { }
 
   async execute(userCode: string, solutionCode: string, testCases: TestCase[], problem?: any, language: string = 'javascript'): Promise<SubmissionResult> {
     const isJs = language.toLowerCase() === 'javascript' || language.toLowerCase() === 'js'
@@ -33,7 +33,7 @@ export class JudgeService implements IJudgeService {
             result: undefined,
             console: {
               log: (...args: any[]) => {
-                consoleOutput.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+                consoleOutput.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
               }
             }
           }
@@ -128,9 +128,6 @@ export class JudgeService implements IJudgeService {
 
       for (const testCase of testCases) {
         try {
-          // Determine function name if provided, else rely on simple input/output
-          // For Python, we'll wrap the user code to read input and print output if it's a script
-          // OR adapt it if it's a function.
           // Simplified approach: Expect a complete script or function named 'solution'
 
           let runnerCode = userCode;
@@ -205,19 +202,7 @@ except Exception as e:\n    print(str(e), file=sys.stderr)`;
       }
 
     } else {
-      // Use AI for other languages
-      if (!this._aiService || !problem) {
-        return createResult(SubmissionStatus.RuntimeError, [])
-      }
-
-      const aiResult = await this._aiService.judge(userCode, language, problem, testCases);
-
-      return {
-        overallStatus: aiResult.overallStatus as SubmissionStatus,
-        results: aiResult.results,
-        executionTime: 100, // Placeholder
-        memoryUsage: 0
-      }
+      return createResult(SubmissionStatus.RuntimeError, [{ testCase: {} as TestCase, status: SubmissionStatus.RuntimeError, userOutput: "Language not supported" }])
     }
   }
   async executeScratchpad(userCode: string, language: string): Promise<SubmissionResult> {
@@ -230,7 +215,7 @@ except Exception as e:\n    print(str(e), file=sys.stderr)`;
         const sandbox = {
           console: {
             log: (...args: any[]) => {
-              consoleOutput.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
+              consoleOutput.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
             }
           }
         };
