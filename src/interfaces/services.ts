@@ -72,7 +72,7 @@ export interface IWalletService {
   createDepositOrder(userId: string, amount: number): Promise<any>
   verifyDeposit(userId: string, orderId: string, paymentId: string, signature: string): Promise<boolean>
   deposit(userId: string, amount: number): Promise<void>
-  withdraw(userId: string, amount: number, vpa?: string, name?: string, email?: string, phone?: string): Promise<boolean>
+  withdraw(userId: string, amount: number, vpa: string, name?: string, email?: string, phone?: string): Promise<boolean>
   wager(userId: string, amount: number, description: string): Promise<void>
   win(userId: string, amount: number, description: string): Promise<void>
 }

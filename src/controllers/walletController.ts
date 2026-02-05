@@ -79,11 +79,16 @@ export class WalletController {
     const userId = body.userId
     // In a real app, fetch name/email/phone from User Auth context/Database
     // using defaults for demo/test mode as requested
-    const ok = await this._service.withdraw(userId, body.amount, body.vpa, "Test User", "test@ludus.com", "9000090000")
-    if (!ok) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ message: "Withdrawal failed or insufficient funds" })
+    try {
+      const ok = await this._service.withdraw(userId, body.amount, body.vpa, "Test User", "test@ludus.com", "9000090000")
+      if (!ok) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ message: "Insufficient funds" })
+      }
+      res.json({ ok: true })
+    } catch (err: any) {
+      console.error("Withdrawal Controller Error:", err.message);
+      return res.status(HttpStatus.BAD_REQUEST).json({ message: err.message })
     }
-    res.json({ ok: true })
   }
 
   /**

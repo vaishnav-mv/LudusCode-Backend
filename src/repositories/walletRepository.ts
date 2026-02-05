@@ -59,6 +59,7 @@ export class WalletRepository implements IWalletRepository {
       { $inc: { balance: -amount } },
       { new: true }
     );
+    console.log(`[WalletRepository] Withdraw for ${userId} amount ${amount}. Result:`, wallet ? 'Success' : 'Failed/Insufficient Found');
 
     if (!wallet) {
       return false; // Insufficient funds
