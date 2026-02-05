@@ -24,16 +24,48 @@ export class WalletController {
   }
 
   /**
-   * @desc    Deposit funds (Mock)
+   * @desc    Create Razorpay Order
    * @route   POST /api/wallet/deposit
    * @req     body: { userId, amount }
-   * @res     { ok: boolean }
+   * @res     { order }
    */
   deposit = async (req: Request, res: Response) => {
     const body = req.body as DepositDTO
     const userId = body.userId
-    await this._service.deposit(userId, body.amount)
-    res.json({ ok: true })
+
+    // Validate amount (e.g. min deposit)
+    if (body.amount < 1) {
+      return res.status(HttpStatus.BAD_REQUEST).json({ message: "Minimum deposit is ₹1" })
+    }
+
+    try {
+      const order = await this._service.createDepositOrder(userId, body.amount)
+      res.json(order)
+    } catch (err: any) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: err.message })
+    }
+  }
+
+  /**
+   * @desc    Verify Razorpay Payment
+   * @route   POST /api/wallet/verify
+   * @req     body: { userId, razorpay_order_id, razorpay_payment_id, razorpay_signature }
+   * @res     { ok: boolean }
+   */
+  verify = async (req: Request, res: Response) => {
+    const { userId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+    try {
+      const isValid = await this._service.verifyDeposit(userId, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      if (isValid) {
+        res.json({ ok: true, message: "Payment verified successfully" });
+      } else {
+        res.status(HttpStatus.BAD_REQUEST).json({ message: "Invalid signature" });
+      }
+    } catch (err: any) {
+      console.error("Verification Error:", err);
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: "Verification failed" });
+    }
   }
 
   /**
@@ -45,9 +77,11 @@ export class WalletController {
   withdraw = async (req: Request, res: Response) => {
     const body = req.body as WithdrawDTO
     const userId = body.userId
-    const ok = await this._service.withdraw(userId, body.amount)
+    // In a real app, fetch name/email/phone from User Auth context/Database
+    // using defaults for demo/test mode as requested
+    const ok = await this._service.withdraw(userId, body.amount, body.vpa, "Test User", "test@ludus.com", "9000090000")
     if (!ok) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ message: ResponseMessages.INSUFFICIENT_FUNDS })
+      return res.status(HttpStatus.BAD_REQUEST).json({ message: "Withdrawal failed or insufficient funds" })
     }
     res.json({ ok: true })
   }

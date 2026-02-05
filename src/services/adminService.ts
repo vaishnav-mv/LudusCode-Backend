@@ -95,7 +95,7 @@ export class AdminService implements IAdminService {
     }
   }
 
-  async allUsers(page: number = 1, limit: number = 50, query?: string) {
+  async allUsers(page: number = 1, limit: number = 5, query?: string) {
     const skip = (page - 1) * limit
     const filter: any = { isAdmin: { $ne: true } }
 

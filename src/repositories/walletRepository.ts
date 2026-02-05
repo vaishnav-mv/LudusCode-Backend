@@ -1,111 +1,106 @@
 import { singleton } from 'tsyringe'
 import { IWalletRepository } from '../interfaces/repositories'
 import { WalletModel } from '../models/Wallet'
+import { TransactionModel } from '../models/Transaction'
 import { TransactionType } from '../types'
 
 @singleton()
 export class WalletRepository implements IWalletRepository {
   async get(userId: string) {
-    const wallet = await WalletModel.findOne({ userId }).lean()
+    let wallet = await WalletModel.findOne({ userId }).lean()
 
-    if (wallet) {
-      return {
-        ...wallet,
-        userId: (wallet.userId as any).toString(),
+    if (!wallet) {
+      wallet = await WalletModel.create({
+        userId,
+        balance: 0,
         currency: 'INR'
-      } as any
+      })
     }
 
+    // Fetch recent transactions
+    const transactions = await TransactionModel.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
     return {
-      userId,
-      balance: 0,
-      currency: 'INR',
-      transactions: []
+      ...wallet,
+      userId: (wallet.userId as any).toString(),
+      transactions: transactions.map(t => ({
+        ...t,
+        id: (t as any)._id.toString(),
+        timestamp: t.createdAt
+      }))
     } as any
   }
 
+  // Used for DIRECT deposits (e.g. bonus), not Razorpay flow
   async deposit(userId: string, amount: number, description: string) {
-    const wallet = await WalletModel.findOne({ userId })
+    const wallet = await WalletModel.findOneAndUpdate(
+      { userId },
+      { $inc: { balance: amount }, $setOnInsert: { currency: 'INR' } },
+      { new: true, upsert: true }
+    );
 
-    if (!wallet) {
-      await WalletModel.create({
-        userId,
-        balance: amount,
-        currency: 'INR',
-        transactions: [{
-          id: `tx-${Date.now()}`,
-          type: TransactionType.Deposit,
-          status: 'Completed',
-          amount,
-          description,
-          timestamp: new Date().toISOString()
-        }]
-      })
-      return
-    }
-
-    (wallet as any).balance += amount
-    wallet.transactions.unshift({
-      id: `tx-${Date.now()}`,
+    await TransactionModel.create({
+      walletId: wallet._id,
+      userId,
+      amount,
       type: TransactionType.Deposit,
       status: 'Completed',
-      amount,
-      description,
-      timestamp: new Date().toISOString()
-    })
-    await wallet.save()
+      description
+    });
   }
 
   async withdraw(userId: string, amount: number, description: string) {
-    const wallet = await WalletModel.findOne({ userId })
+    // Atomic check and deduct
+    const wallet = await WalletModel.findOneAndUpdate(
+      { userId, balance: { $gte: amount } },
+      { $inc: { balance: -amount } },
+      { new: true }
+    );
 
-    if (!wallet || amount > (wallet as any).balance) {
-      return false
+    if (!wallet) {
+      return false; // Insufficient funds
     }
 
-    (wallet as any).balance -= amount
-    wallet.transactions.unshift({
-      id: `tx-${Date.now()}`,
-      type: TransactionType.Withdrawal,
-      status: 'Pending',
+    await TransactionModel.create({
+      walletId: wallet._id,
+      userId,
       amount: -amount,
-      description,
-      timestamp: new Date().toISOString()
-    })
-    await wallet.save()
-    return true
+      type: TransactionType.Withdrawal,
+      status: 'Pending', // pending admin approval or payout
+      description
+    });
+
+    return true;
   }
 
   async add(userId: string, amount: number, description: string) {
-    const wallet = await WalletModel.findOne({ userId })
-    const transactionType = amount >= 0 ? TransactionType.DuelWin : TransactionType.DuelWager
+    const transactionType = amount >= 0 ? TransactionType.DuelWin : TransactionType.DuelWager;
 
-    if (!wallet) {
-      await WalletModel.create({
-        userId,
-        balance: amount,
-        currency: 'INR',
-        transactions: [{
-          id: `tx-${Date.now()}`,
-          type: transactionType,
-          status: 'Completed',
-          amount,
-          description,
-          timestamp: new Date().toISOString()
-        }]
-      })
-      return
+    // For wagers (negative amount), ensure balance exists
+    const query = amount < 0 ? { userId, balance: { $gte: Math.abs(amount) } } : { userId };
+
+    const wallet = await WalletModel.findOneAndUpdate(
+      query,
+      { $inc: { balance: amount }, $setOnInsert: { currency: 'INR' } },
+      { new: true, upsert: amount >= 0 } // upsert only for wins (positive)
+    );
+
+    if (!wallet && amount < 0) {
+      throw new Error("Insufficient funds for wager");
     }
 
-    (wallet as any).balance += amount
-    wallet.transactions.unshift({
-      id: `tx-${Date.now()}`,
-      type: transactionType,
-      status: 'Completed',
-      amount,
-      description,
-      timestamp: new Date().toISOString()
-    })
-    await wallet.save()
+    if (wallet) {
+      await TransactionModel.create({
+        walletId: wallet._id,
+        userId,
+        amount,
+        type: transactionType,
+        status: 'Completed',
+        description
+      });
+    }
   }
 }
