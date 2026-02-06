@@ -55,9 +55,9 @@ export class UserService implements IUserService {
     return updated !== undefined ? updated : null;
   }
 
-  async leaderboard(): Promise<any[]> {
-    const list = await this._userRepo.leaderboard();
-    return list.map(mapUser).filter(user => user !== null);
+  async leaderboard(page: number = 1, limit: number = 100): Promise<any[]> {
+    const list = await this._userRepo.leaderboard((page - 1) * limit, limit);
+    return list.map((user, index) => mapUser(user, (page - 1) * limit + index + 1)).filter(user => user !== null);
   }
 
   async updateProfile(id: string, data: { name?: string; avatarUrl?: string }): Promise<User | null> {

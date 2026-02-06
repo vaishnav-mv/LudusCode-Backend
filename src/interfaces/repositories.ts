@@ -12,7 +12,7 @@ export interface IBaseRepository<T> {
 export interface IUserRepository extends IBaseRepository<User> {
     getByEmail(email: string): Promise<User | undefined>;
     getByUsername(username: string): Promise<User | undefined>;
-    leaderboard(): Promise<User[]>;
+    leaderboard(skip?: number, limit?: number): Promise<User[]>;
     search(query: string): Promise<User[]>;
     getRank(elo: number): Promise<number>;
 }

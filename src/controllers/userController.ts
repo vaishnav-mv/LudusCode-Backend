@@ -49,7 +49,9 @@ export class UserController {
      * @res     [User]
      */
     leaderboard = async (req: Request, res: Response) => {
-        const users = await this._service.leaderboard();
+        const page = parseInt(req.query.page as string) || 1;
+        const limit = parseInt(req.query.limit as string) || 100;
+        const users = await this._service.leaderboard(page, limit);
         res.json(users);
     }
 

@@ -21,7 +21,7 @@ export interface ISocialAuthService {
 export interface IUserService {
   profile(id: string): Promise<any>
   setPremium(id: string): Promise<User | null>
-  leaderboard(): Promise<User[]>
+  leaderboard(page?: number, limit?: number): Promise<User[]>
   updateProfile(id: string, data: any): Promise<User | null>
   changePassword(id: string, oldPass: string, newPass: string): Promise<void>
   search(query: string): Promise<User[]>

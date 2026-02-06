@@ -34,8 +34,8 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
     return this.mapDoc(foundUser);
   }
 
-  async leaderboard() {
-    const list = await this.model.find({ isAdmin: false }).sort({ elo: -1 }).lean();
+  async leaderboard(skip: number = 0, limit: number = 100) {
+    const list = await this.model.find({ isAdmin: false }).sort({ elo: -1 }).skip(skip).limit(limit).lean();
     return list.map((userDoc: any) => this.mapDoc(userDoc)!);
   }
 
