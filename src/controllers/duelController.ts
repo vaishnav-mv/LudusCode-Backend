@@ -142,14 +142,34 @@ export class DuelController {
    * @req     params: { id }, body: { playerId, result, userCode }
    * @res     { duel }
    */
-  submitDuelResult = async (req: Request, res: Response) => {
+  async submitDuelResult = async (req: Request, res: Response) => {
     const currentUser = (req as any).user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const body = req.body as SubmitDuelResultDTO
-    const duel = await this._service.submitResult(req.params.id, currentUser.sub, body.result as any, body.userCode)
-    if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
-    broadcastDuel(req.params.id, mapDuel(duel))
-    res.json(mapDuel(duel))
+
+    // Server-side validation: Execute code to get real result
+    // We ignore body.result and compute it ourselves
+    const { userCode } = body;
+    const duelId = req.params.id;
+
+    // We need to fetch the problem to run against test cases
+    const duel = await this._service.detail(duelId);
+    if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
+
+    const problem = (duel as any).problem;
+    // If problem is populated, we can use it. If it's just ID, we might need to fetch it?
+    // Based on schemas, problem is ref 'Problem'. It might be populated by `detail`.
+    // DuelService.detail calls `_duels.getById(id)`. Let's assume repository populates it or we need to check.
+
+    // Actually, `_service.submitResult` logic in original code handles saving.
+    // Ideally, we should move the execution logic INTO `_service.submitResult` or a new service method `submitSolution`.
+    // But for this refactor, I will change `_service.submitResult` to take CODE, not RESULT.
+
+    const updatedDuel = await this._service.submitSolution(duelId, currentUser.sub, userCode);
+    if (!updatedDuel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
+
+    broadcastDuel(req.params.id, mapDuel(updatedDuel))
+    res.json(mapDuel(updatedDuel))
   }
 
   /**

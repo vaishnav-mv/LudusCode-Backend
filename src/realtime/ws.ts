@@ -71,6 +71,11 @@ export const initRealtime = (server: HttpServer) => {
       io.to(to).emit('signal', { from: socket.id, signal });
     });
 
+    socket.on('duel:progress', ({ duelId, progress }) => {
+      // Broadcast to opponent in the same duel room (excluding sender)
+      socket.to(`duel:${duelId}`).emit('duel:progress', { playerId: socket.id, progress });
+    });
+
     socket.on('disconnect', () => {
       // console.log('Client disconnected', socket.id)
     })

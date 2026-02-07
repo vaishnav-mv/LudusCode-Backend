@@ -46,7 +46,7 @@ export const SubmitDuelResultSchema = z.object({
         executionTime: z.number().nonnegative(),
         memoryUsage: z.number().nonnegative().optional(),
         attempts: z.number().int().nonnegative().optional()
-    }),
+    }).optional(),
     userCode: z.string()
 })
 export type SubmitDuelResultDTO = z.infer<typeof SubmitDuelResultSchema>

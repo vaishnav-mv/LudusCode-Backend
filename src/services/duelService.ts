@@ -1,6 +1,6 @@
 import { singleton, inject } from 'tsyringe'
 import { IDuelRepository, IProblemRepository, IUserRepository, IWalletRepository } from '../interfaces/repositories'
-import { IDuelService } from '../interfaces/services'
+import { IDuelService, IJudgeService } from '../interfaces/services'
 import { Duel, DuelStatus, Difficulty, SubmissionStatus } from '../types'
 import { createHash } from 'crypto'
 
@@ -12,7 +12,8 @@ export class DuelService implements IDuelService {
     @inject("IDuelRepository") private _duels: IDuelRepository,
     @inject("IProblemRepository") private _problems: IProblemRepository,
     @inject("IUserRepository") private _users: IUserRepository,
-    @inject("IWalletRepository") private _wallets: IWalletRepository
+    @inject("IWalletRepository") private _wallets: IWalletRepository,
+    @inject("IJudgeService") private _judge: IJudgeService
   ) { }
 
   async create(difficulty: Difficulty, wager: number, player1Id: string, player2Id: string) {
@@ -171,53 +172,74 @@ export class DuelService implements IDuelService {
     } catch { }
     return this._duels.getById(id)
   }
-  async submitResult(id: string, playerId: string, result: { overallStatus: SubmissionStatus; executionTime: number; memoryUsage?: number; attempts?: number }, userCode: string) {
+  async submitSolution(id: string, playerId: string, userCode: string) {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
-    const userId = playerId
+
+    // Server-side Execution
+    const problem = (duel.problem as any); // Assuming problem is populated or we need to fetch it
+    // Note: If problem is not populated, we might need: const problem = await this._problems.getById(duel.problem as string);
+    // Let's assume it is populated for now as per Mongoose patterns in this codebase, but ideally check.
+
+    // We need the solution code for the judge to compare against, OR the judge handles it.
+    // In `judgeService.execute`, it takes (userCode, solutionCode, testCases, problem, language).
+    // We need to pass the official solution code if the judge needs it for generating expected outputs (which the current logic does if test cases don't have outputs).
+    // Or if test cases are already populated with outputs, solutionCode might be optional depending on judge impl.
+    // The current JudgeService logic seems to use Piston and expects test cases with outputs to compare against user output.
+
+    const problemDoc = problem?._id ? problem : await this._problems.getById(problem?.toString() || duel.problem?.toString());
+    if (!problemDoc) throw new Error("Problem not found for duel");
+
+    const solutionCode = problemDoc.solution?.code || '';
+    const testCases = problemDoc.testCases || [];
+    const language = problemDoc.solution?.language || 'javascript'; // Default to problem language
+
+    // Execute!
+    const userId = playerId;
+    console.log('[DuelService] Executing user code against Piston...', { userId, problemId: problemDoc.id, language });
+    let result: any;
+    try {
+      result = await this._judge.execute(userCode, solutionCode, testCases, problemDoc, language);
+      console.log('[DuelService] Execution successful:', result.overallStatus);
+    } catch (e: any) {
+      console.error('[DuelService] Execution failed:', e);
+      throw e;
+    }
+
     const submissions = (duel as any).submissions || []
     const cleanedSubmissions = submissions.filter((submission: any) => (submission.user?._id?.toString?.() || submission.userId) !== userId)
     const pWarnings = ((duel as any).player1?.user?._id?.toString?.() || (duel as any).player1?.user?.id) === userId
       ? ((duel as any).player1?.warnings || 0)
       : ((duel as any).player2?.warnings || 0)
+
+    // Disqualified if warnings exceeded -- though this should be handled before execution ideally, but okay.
+    console.log('[DuelService] Saving submission. Warnings:', pWarnings);
     const finalStatus = pWarnings >= 3 ? SubmissionStatus.Disqualified : result.overallStatus
+
     const codeHash = createHash('sha256').update(userCode || '').digest('hex')
-    cleanedSubmissions.push({ userId: userId, user: (userId as any), status: finalStatus, userCode, executionTime: result.executionTime, memoryUsage: result.memoryUsage || 0, attempts: result.attempts || 1, codeHash, submittedAt: Date.now() })
-    let winner = (duel as any).winner || null
-    let status = (duel as any).status
-    const player1Id = (duel as any).player1?.user?._id?.toString?.() || (duel as any).player1?.user?.id
-    const player2Id = (duel as any).player2?.user?._id?.toString?.() || (duel as any).player2?.user?.id
-    const submission1 = cleanedSubmissions.find((submission: any) => (submission.userId || submission.user?._id?.toString?.()) === player1Id)
-    const submission2 = cleanedSubmissions.find((submission: any) => (submission.userId || submission.user?._id?.toString?.()) === player2Id)
-    if (submission1 && submission2) {
-      const accepted1 = submission1.status === SubmissionStatus.Accepted
-      const accepted2 = submission2.status === SubmissionStatus.Accepted
-      if (accepted1 !== accepted2) {
-        const winnerId = accepted1 ? player1Id : player2Id
-        const user = await this._users.getById(winnerId)
-        winner = user || null
-      } else if (accepted1 && accepted2) {
-        let winnerId = player1Id
-        if ((submission1.executionTime || 0) !== (submission2.executionTime || 0)) {
-          winnerId = (submission1.executionTime || 0) <= (submission2.executionTime || 0) ? player1Id : player2Id
-        } else if ((submission1.memoryUsage || 0) !== (submission2.memoryUsage || 0)) {
-          winnerId = (submission1.memoryUsage || 0) <= (submission2.memoryUsage || 0) ? player1Id : player2Id
-        } else if ((submission1.attempts || 1) !== (submission2.attempts || 1)) {
-          winnerId = (submission1.attempts || 1) <= (submission2.attempts || 1) ? player1Id : player2Id
-        } else {
-          winnerId = (submission1.submittedAt || 0) <= (submission2.submittedAt || 0) ? player1Id : player2Id
-        }
-        const user = await this._users.getById(winnerId)
-        winner = user || null
-      } else {
-        winner = null
-      }
-      status = DuelStatus.Finished
-      if (winner && (duel as any).wager && (duel as any).wager > 0) {
-        await this._wallets.add((winner as any)._id?.toString?.() || (winner as any).id, (duel as any).wager * 2, 'Duel winnings')
-      }
+
+    // Save submission
+    cleanedSubmissions.push({
+      userId: userId,
+      user: (userId as any),
+      status: finalStatus,
+      userCode,
+      executionTime: result.executionTime,
+      memoryUsage: result.memoryUsage || 0,
+      attempts: (result as any).attempts || 1, // Judge helper doesn't track previous attempts count effectively here without db, just default 1 or increment
+      codeHash,
+      submittedAt: Date.now()
+    })
+
+    // Save submission
+    await this._duels.update(id, { submissions: cleanedSubmissions })
+
+    // Win Condition: First to solve wins immediately
+    if (finalStatus === SubmissionStatus.Accepted) {
+      console.log(`[DuelService] User ${userId} solved the problem! Finishing duel.`);
+      return this.finish(id, userId, finalStatus, userCode);
     }
-    await this._duels.update(id, { submissions: cleanedSubmissions, status, winner })
+
     return this._duels.getById(id)
   }
   async cancel(id: string, playerId: string) {

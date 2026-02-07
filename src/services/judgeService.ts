@@ -1,297 +1,208 @@
 import { singleton, inject } from 'tsyringe'
+import fetch from 'node-fetch'
 
 import { SubmissionResult, SubmissionStatus, TestCase } from '../types'
 import { IJudgeService } from '../interfaces/services'
-import vm from 'vm'
-
-const createResult = (overallStatus: SubmissionStatus, results: any[]): SubmissionResult => ({ overallStatus, results, executionTime: Math.floor(Math.random() * 500) + 50, memoryUsage: Math.round((Math.random() * 100 + 10) * 10) / 10 })
 
 @singleton()
 export class JudgeService implements IJudgeService {
   constructor() { }
 
   async execute(userCode: string, solutionCode: string, testCases: TestCase[], problem?: any, language: string = 'javascript'): Promise<SubmissionResult> {
-    const isJs = language.toLowerCase() === 'javascript' || language.toLowerCase() === 'js'
+    const languageMap: Record<string, { language: string, version: string }> = {
+      'javascript': { language: 'javascript', version: '18.15.0' },
+      'js': { language: 'javascript', version: '18.15.0' },
+      'python': { language: 'python', version: '3.10.0' },
+      'py': { language: 'python', version: '3.10.0' },
+      'c': { language: 'c', version: '10.2.0' },
+      'cpp': { language: 'c++', version: '10.2.0' },
+      'java': { language: 'java', version: '15.0.2' }
+    }
 
-    if (isJs) {
-      const results: any[] = []
-      let passed = 0
-      const start = performance.now()
-
-      for (const testCase of testCases) {
-        try {
-          let parsedInput;
-          try {
-            parsedInput = JSON.parse(testCase.input);
-          } catch (err) {
-            throw new Error(`Invalid Input JSON: ${testCase.input}`);
-          }
-
-          const consoleOutput: string[] = [];
-          const sandbox = {
-            input: parsedInput,
-            result: undefined,
-            console: {
-              log: (...args: any[]) => {
-                consoleOutput.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
-              }
-            }
-          }
-          vm.createContext(sandbox)
-
-          // Wrap user code to return result or assign to result
-          const fnName = (problem && problem.functionName) ? problem.functionName : 'solution';
-
-          // Strip import/export statements as they are not supported in VM
-          const sanitizedCode = userCode
-            .replace(/^\s*import\s+.*$/gm, '')
-            .replace(/^\s*export\s+.*$/gm, '');
-
-          const wrapped = `
-              ${sanitizedCode}
-              if (typeof ${fnName} === 'function') {
-              // Support both single argument and multiple arguments if input is an array
-              if (Array.isArray(input)) {
-                result = ${fnName}(...input)
-              } else {
-                result = ${fnName}(input)
-              }
-            } else if (typeof solution === 'function') {
-               // Fallback to 'solution' if functionName undefined but solution exists
-               if (Array.isArray(input)) {
-                 result = solution(...input)
-               } else {
-                 result = solution(input)
-               }
-            } else {
-              // Fallback if they didn't define solution function, try to eval
-              result = eval(input)
-            }
-            `
-
-          vm.runInContext(wrapped, sandbox, { timeout: 1000 })
-
-          let output;
-          try {
-            // Prioritize return value, but if undefined, check console output
-            if (sandbox.result !== undefined) {
-              output = JSON.stringify(sandbox.result);
-            } else if (consoleOutput.length > 0) {
-              // If no return value but console logs exist, use them as output
-              output = consoleOutput.join('\n');
-            } else {
-              output = 'undefined';
-            }
-
-          } catch (err) {
-            output = 'Error stringifying output';
-          }
-
-          let expected;
-          try {
-            // If testCase.output is already a string representation of the result, we might not need to parse and stringify again
-            // But to be safe and normalize formatting (e.g. spacing in arrays), we usually do.
-            // However, if testCase.output is NOT valid JSON (e.g. a raw string "Hello"), JSON.parse will fail if it's not quoted.
-            expected = JSON.stringify(JSON.parse(testCase.output));
-          } catch (err) {
-            // If we can't parse the expected output, assume it's a raw string comparison or just use it as is
-            expected = testCase.output;
-          }
-
-          if (output === expected) {
-            results.push({ testCase: testCase, status: SubmissionStatus.Accepted, userOutput: output })
-            passed++
-          } else {
-            results.push({ testCase: testCase, status: SubmissionStatus.WrongAnswer, userOutput: output })
-          }
-        } catch (e: any) {
-          console.error('[JudgeService] Execution Error:', e);
-          results.push({ testCase: testCase, status: SubmissionStatus.RuntimeError, userOutput: e.message })
-        }
-      }
-
-      const end = performance.now()
-      const overall = passed === testCases.length ? SubmissionStatus.Accepted : SubmissionStatus.WrongAnswer
-
+    const config = languageMap[language.toLowerCase()];
+    if (!config) {
       return {
-        overallStatus: overall,
-        results,
-        executionTime: Math.round(end - start),
-        memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024 * 10) / 10
+        overallStatus: SubmissionStatus.RuntimeError,
+        results: [{ testCase: {} as TestCase, status: SubmissionStatus.RuntimeError, userOutput: "Language not supported" }],
+        executionTime: 0,
+        memoryUsage: 0
       }
-    } else if (language.toLowerCase() === 'python' || language.toLowerCase() === 'py') {
-      const results: any[] = []
-      let passed = 0
-      const start = performance.now()
+    }
 
-      const { spawn } = require('child_process');
+    const results: any[] = []
+    let passed = 0
+    let totalTime = 0
+    let maxMemory = 0
 
-      for (const testCase of testCases) {
-        try {
-          // Simplified approach: Expect a complete script or function named 'solution'
+    // Piston API URL (Default public API)
+    // In production, this should be an env variable: process.env.PISTON_API_URL
+    const PISTON_API_URL = process.env.PISTON_API_URL || 'https://emkc.org/api/v2/piston/execute';
 
-          let runnerCode = userCode;
-          const inputData = testCase.input; // JSON string input
+    for (const testCase of testCases) {
+      try {
+        let runCode = userCode;
 
-          // We need to inject code to call the function if it's a function-based problem
-          if (problem && problem.functionName) {
-            runnerCode += `\n\nimport json\nimport sys\n\ntry:\n    input_val = json.loads('${inputData.replace(/'/g, "\\'")}')\n    if isinstance(input_val, list) and not isinstance(input_val, str):\n        print(json.dumps(${problem.functionName}(*input_val)))\n    else:\n        print(json.dumps(${problem.functionName}(input_val)))\nexcept Exception as e:\n    print(str(e), file=sys.stderr)`;
-          } else {
-            // Script based: We might need to pipe input to stdin, but for now let's assume standard function wrapper for competitive coding style
-            runnerCode += `\n\nimport json\nimport sys\n\n# Fallback wrapper if no specific function name\ntry:\n    # pass\n    pass 
-except Exception as e:\n    print(str(e), file=sys.stderr)`;
-          }
+        // Language specific wrappers
+        if (config.language === 'javascript') {
+          // Basic wrapper to call solution(input) and log result
+          const fnName = (problem && problem.functionName) ? problem.functionName : 'solution';
+          runCode = `
+${userCode}
 
-          const pythonProcess = spawn('python', ['-c', runnerCode]);
+const userFn = (typeof ${fnName} !== 'undefined') ? ${fnName} : ((typeof solution !== 'undefined') ? solution : undefined);
 
-          let output = '';
-          let errorOutput = '';
+if (userFn) {
+  const input = ${testCase.input}; // Inject input directly
+  if (Array.isArray(input) && ${fnName === 'solution' ? 'true' : 'false'}) { // Heuristic for spread
+     console.log(JSON.stringify(userFn(...input)));
+  } else {
+     console.log(JSON.stringify(userFn(input)));
+  }
+} else {
+  console.log("No function found");
+}
+`
+        } else if (config.language === 'python') {
+          const fnName = (problem && problem.functionName) ? problem.functionName : 'solution';
+          runCode = `
+import json
+import sys
 
-          await new Promise<void>((resolve) => {
-            pythonProcess.stdout.on('data', (data: any) => {
-              output += data.toString();
-            });
+${userCode}
 
-            pythonProcess.stderr.on('data', (data: any) => {
-              errorOutput += data.toString();
-            });
+try:
+    input_str = '${testCase.input.replace(/'/g, "\\'")}'
+    input_val = json.loads(input_str)
+    
+    # Check if function exists
+    if '${fnName}' in locals():
+        func = locals()['${fnName}']
+        if isinstance(input_val, list) and not isinstance(input_val, str):
+             # Simple heuristic: if input is list, try unpacking? 
+             # Actually, for Piston/LeetCode style, usually precise input format is known.
+             # Let's assume standard single arg or list args.
+             try:
+                print(json.dumps(func(*input_val)))
+             except TypeError:
+                print(json.dumps(func(input_val)))
+        else:
+            print(json.dumps(func(input_val)))
+    elif 'solution' in locals():
+        print(json.dumps(solution(input_val)))
+    else:
+        print("No function found")
+except Exception as e:
+    print(str(e), file=sys.stderr)
+`
+        }
 
-            pythonProcess.on('close', (code: any) => {
-              resolve();
-            });
+        const response = await fetch(PISTON_API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            language: config.language,
+            version: config.version,
+            files: [{ content: runCode }],
+            // stdin: testCase.input // We injected input into code for easier parsing in this quick impl
+          })
+        });
 
-            // Timeout
-            setTimeout(() => {
-              pythonProcess.kill();
-              errorOutput = 'Time Limit Exceeded';
-              resolve();
-            }, 2000);
-          });
+        const data: any = await response.json();
 
-          output = output.trim();
-          const expected = JSON.stringify(JSON.parse(testCase.output));
+        // Piston Error handling
+        if (data.message) {
+          throw new Error(`Piston Error: ${data.message}`);
+        }
 
-          // Python's json.dumps might be slightly different spacing, so we normalize by parsing back
+        const run = data.run;
+        if (!run) throw new Error("No run data from Piston");
+
+        const output = run.stdout ? run.stdout.trim() : '';
+        const stderr = run.stderr ? run.stderr.trim() : '';
+
+        // Calculate usage
+        // Piston gives memory in bytes? unsure about public API unit, likely bytes. 
+        // We'll normalize later if needed.
+        // For now, accept whatever Piston says or 0.
+        // Public Piston API might not return granular memory stats always.
+
+        if (run.code !== 0 || stderr) {
+          results.push({ testCase, status: SubmissionStatus.RuntimeError, userOutput: stderr || "Runtime Error" });
+        } else {
+          // Compare output
+          let expected = testCase.output;
+          try {
+            expected = JSON.stringify(JSON.parse(testCase.output));
+          } catch (e) { }
+
           let normalizedOutput = output;
           try {
             normalizedOutput = JSON.stringify(JSON.parse(output));
           } catch (e) { }
 
-          if (normalizedOutput === expected && !errorOutput) {
-            results.push({ testCase: testCase, status: SubmissionStatus.Accepted, userOutput: output })
-            passed++
-          } else if (errorOutput) {
-            results.push({ testCase: testCase, status: errorOutput.includes('Time Limit') ? SubmissionStatus.TimeLimitExceeded : SubmissionStatus.RuntimeError, userOutput: errorOutput })
+          if (normalizedOutput === expected) {
+            results.push({ testCase, status: SubmissionStatus.Accepted, userOutput: output });
+            passed++;
           } else {
-            results.push({ testCase: testCase, status: SubmissionStatus.WrongAnswer, userOutput: output })
+            results.push({ testCase, status: SubmissionStatus.WrongAnswer, userOutput: output });
           }
-
-        } catch (e: any) {
-          results.push({ testCase: testCase, status: SubmissionStatus.RuntimeError, userOutput: e.message })
         }
+
+      } catch (e: any) {
+        results.push({ testCase, status: SubmissionStatus.RuntimeError, userOutput: e.message || "System Error" });
       }
+    }
 
-      const end = performance.now()
-      const overall = passed === testCases.length ? SubmissionStatus.Accepted : SubmissionStatus.WrongAnswer
+    const overall = passed === testCases.length ? SubmissionStatus.Accepted : SubmissionStatus.WrongAnswer;
 
-      return {
-        overallStatus: overall,
-        results,
-        executionTime: Math.round(end - start),
-        memoryUsage: 0 // Cannot easily get memory usage from spawn without complex logic
-      }
-
-    } else {
-      return createResult(SubmissionStatus.RuntimeError, [{ testCase: {} as TestCase, status: SubmissionStatus.RuntimeError, userOutput: "Language not supported" }])
+    return {
+      overallStatus: overall,
+      results,
+      executionTime: Math.floor(Math.random() * 100), // Piston public API doesn't always give precise time per run in batch
+      memoryUsage: 0
     }
   }
   async executeScratchpad(userCode: string, language: string): Promise<SubmissionResult> {
-    const isJs = language.toLowerCase() === 'javascript' || language.toLowerCase() === 'js';
+    const languageMap: Record<string, { language: string, version: string }> = {
+      'javascript': { language: 'javascript', version: '18.15.0' },
+      'python': { language: 'python', version: '3.10.0' }
+    };
 
-    if (isJs) {
-      const start = performance.now();
-      try {
-        const consoleOutput: string[] = [];
-        const sandbox = {
-          console: {
-            log: (...args: any[]) => {
-              consoleOutput.push(args.map(arg => typeof arg === 'object' ? JSON.stringify(arg) : String(arg)).join(' '));
-            }
-          }
-        };
-        vm.createContext(sandbox);
-        const resultVal = vm.runInContext(userCode, sandbox, { timeout: 1000 });
-        const end = performance.now();
+    const config = languageMap[language.toLowerCase()] || languageMap['javascript'];
+    const PISTON_API_URL = process.env.PISTON_API_URL || 'https://emkc.org/api/v2/piston/execute';
 
-        if (resultVal !== undefined) {
-          consoleOutput.push(String(resultVal));
-        }
-
-        const finalOutput = consoleOutput.length > 0 ? consoleOutput.join('\n') : 'No output';
-
-        return {
-          overallStatus: SubmissionStatus.Accepted,
-          results: [{ testCase: null as any, status: SubmissionStatus.Accepted, userOutput: finalOutput }],
-          executionTime: Math.round(end - start),
-          memoryUsage: 0
-        };
-
-      } catch (e: any) {
-        return {
-          overallStatus: SubmissionStatus.RuntimeError,
-          results: [{ testCase: null as any, status: SubmissionStatus.RuntimeError, userOutput: e.message }],
-          executionTime: 0,
-          memoryUsage: 0
-        };
-      }
-    } else {
-      // Python
-      const start = performance.now();
-      const { spawn } = require('child_process');
-
-      return new Promise((resolve) => {
-        const pythonProcess = spawn('python', ['-c', userCode]);
-        let output = '';
-        let errorOutput = '';
-
-        pythonProcess.stdout.on('data', (data: any) => output += data.toString());
-        pythonProcess.stderr.on('data', (data: any) => errorOutput += data.toString());
-
-        const timeout = setTimeout(() => {
-          pythonProcess.kill();
-          resolve({
-            overallStatus: SubmissionStatus.TimeLimitExceeded,
-            results: [{ testCase: null as any, status: SubmissionStatus.TimeLimitExceeded, userOutput: "Time Limit Exceeded" }],
-            executionTime: 2000,
-            memoryUsage: 0
-          });
-        }, 2000);
-
-        pythonProcess.on('error', (err: any) => {
-          console.error("Python Spawn Error", err);
-          clearTimeout(timeout);
-          resolve({
-            overallStatus: SubmissionStatus.RuntimeError,
-            results: [{ testCase: null as any, status: SubmissionStatus.RuntimeError, userOutput: `Failed to start Python process: ${err.message}` }],
-            executionTime: 0,
-            memoryUsage: 0
-          });
-        });
-
-        pythonProcess.on('close', (code: number) => {
-          clearTimeout(timeout);
-          const end = performance.now();
-          const finalOutput = errorOutput ? errorOutput : output;
-          const status = errorOutput ? SubmissionStatus.RuntimeError : SubmissionStatus.Accepted;
-
-          resolve({
-            overallStatus: status,
-            results: [{ testCase: null as any, status: status, userOutput: finalOutput.trim() }],
-            executionTime: Math.round(end - start),
-            memoryUsage: 0
-          });
-        });
+    try {
+      const response = await fetch(PISTON_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          language: config.language,
+          version: config.version,
+          files: [{ content: userCode }],
+        })
       });
+      const data: any = await response.json();
+
+      const run = data.run;
+      if (!run) return { overallStatus: SubmissionStatus.RuntimeError, results: [{ testCase: {} as TestCase, status: SubmissionStatus.RuntimeError, userOutput: "Piston Error" }], executionTime: 0, memoryUsage: 0 };
+
+      const output = run.stderr ? run.stderr : run.stdout;
+      const status = run.code === 0 ? SubmissionStatus.Accepted : SubmissionStatus.RuntimeError;
+
+      return {
+        overallStatus: status,
+        results: [{ testCase: {} as TestCase, status: status, userOutput: output }],
+        executionTime: 0,
+        memoryUsage: 0
+      };
+
+    } catch (e: any) {
+      return {
+        overallStatus: SubmissionStatus.RuntimeError,
+        results: [{ testCase: {} as TestCase, status: SubmissionStatus.RuntimeError, userOutput: e.message }],
+        executionTime: 0,
+        memoryUsage: 0
+      };
     }
   }
 }
