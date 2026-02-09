@@ -19,7 +19,9 @@ export class DuelService implements IDuelService {
   async create(difficulty: Difficulty, wager: number, player1Id: string, player2Id: string) {
     const allProblems = await this._problems.all();
     const candidates = allProblems.filter(problem => problem.difficulty === difficulty);
-    const problem = candidates[0] || allProblems[0];
+    const problem = candidates.length > 0
+      ? candidates[Math.floor(Math.random() * candidates.length)]
+      : allProblems[Math.floor(Math.random() * allProblems.length)];
 
     const player1UserId = player1Id;
     const player2UserId = player2Id;
@@ -95,7 +97,9 @@ export class DuelService implements IDuelService {
   async createOpen(difficulty: Difficulty, wager: number, playerId: string) {
     const allProblems = await this._problems.all()
     const candidates = allProblems.filter(problem => problem.difficulty === difficulty)
-    const problem = candidates[0] || allProblems[0]
+    const problem = candidates.length > 0
+      ? candidates[Math.floor(Math.random() * candidates.length)]
+      : allProblems[Math.floor(Math.random() * allProblems.length)]
 
     if (!problem) {
       throw new Error(ResponseMessages.NO_PROBLEMS_AVAILABLE)
@@ -135,8 +139,22 @@ export class DuelService implements IDuelService {
     if (!player2User) throw new Error(ResponseMessages.USER_NOT_FOUND)
     const wager = duel.wager || 0
     if (wager > 0) await this._wallets.add(player2UserId, -wager, 'Duel wager')
-    await this._duels.update(id, { player2: { user: player2User, warnings: 0 }, status: DuelStatus.InProgress, startTime: Date.now() })
-    return this._duels.getById(id)
+    // Atomic join
+    const updatedDuel = await this._duels.attemptJoin(id, { user: player2User, warnings: 0 });
+
+    if (!updatedDuel) {
+      // Join failed (likely race condition where status changed to InProgress/Finished/Cancelled)
+      if (wager > 0) {
+        // Refund the wager we just deducted
+        await this._wallets.add(player2UserId, wager, 'Duel Join Failed Refund');
+      }
+      // Determine why
+      const currentDuel = await this._duels.getById(id);
+      if (!currentDuel) throw new Error(ResponseMessages.DUEL_NOT_FOUND);
+      throw new Error(ResponseMessages.ALREADY_STARTED);
+    }
+
+    return updatedDuel
   }
   async setSummary(id: string, finalOverallStatus: string, finalUserCode: string) {
     const duel = await this._duels.getById(id)

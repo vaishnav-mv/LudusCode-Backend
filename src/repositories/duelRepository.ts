@@ -48,5 +48,27 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
   }
 
   // Delete is inherited
+  // Atomic join operation
+  async attemptJoin(id: string, player2Data: any) {
+    const updatedDuel = await this.model.findOneAndUpdate(
+      { _id: id, status: 'Waiting' },
+      {
+        $set: {
+          player2: player2Data,
+          status: 'InProgress', // Or DuelStatus.InProgress if imported, but string is safer if not
+          startTime: Date.now()
+        }
+      },
+      { new: true }
+    )
+      .populate('problem')
+      .populate('player1.user')
+      .populate('player2.user')
+      .populate('winner')
+      .lean();
+
+    const result = updatedDuel ? this.mapDoc(updatedDuel) : null;
+    return result || null;
+  }
 }
 

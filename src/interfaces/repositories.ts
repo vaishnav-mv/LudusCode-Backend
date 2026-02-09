@@ -25,7 +25,9 @@ export interface IProblemRepository extends IBaseRepository<Problem> {
     pending(): Promise<Problem[]>;
 }
 
-export interface IDuelRepository extends IBaseRepository<Duel> { }
+export interface IDuelRepository extends IBaseRepository<Duel> {
+    attemptJoin(id: string, player2Data: any): Promise<Duel | null>;
+}
 
 export interface ICompetitionRepository extends IBaseRepository<Competition> {
     forGroup(groupId: string): Promise<Competition[]>;
