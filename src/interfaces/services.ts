@@ -63,9 +63,8 @@ export interface IDuelService {
   join(id: string, playerId: string): Promise<Duel | undefined>
   setSummary(id: string, finalOverallStatus: string, finalUserCode: string): Promise<Duel | undefined>
   finish(id: string, winnerId?: string, finalOverallStatus?: string, finalUserCode?: string): Promise<Duel | undefined>
-  finish(id: string, winnerId?: string, finalOverallStatus?: string, finalUserCode?: string): Promise<Duel | undefined>
+  finishDraw(id: string): Promise<Duel | undefined>
   submitSolution(id: string, playerId: string, userCode: string): Promise<Duel | undefined>
-  cancel(id: string, playerId: string): Promise<Duel | undefined>
   cancel(id: string, playerId: string): Promise<Duel | undefined>
 }
 

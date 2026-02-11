@@ -1,7 +1,7 @@
 import { singleton } from 'tsyringe'
 import { IDuelRepository } from '../interfaces/repositories'
 import { DuelModel } from '../models/Duel'
-import { Duel } from '../types' // Ensure strict typing
+import { Duel, DuelStatus } from '../types'
 import { BaseRepository } from './BaseRepository'
 
 @singleton()
@@ -51,11 +51,11 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
   // Atomic join operation
   async attemptJoin(id: string, player2Data: any) {
     const updatedDuel = await this.model.findOneAndUpdate(
-      { _id: id, status: 'Waiting' },
+      { _id: id, status: DuelStatus.Waiting },
       {
         $set: {
           player2: player2Data,
-          status: 'InProgress', // Or DuelStatus.InProgress if imported, but string is safer if not
+          status: DuelStatus.InProgress,
           startTime: Date.now()
         }
       },
@@ -66,6 +66,8 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
       .populate('player2.user')
       .populate('winner')
       .lean();
+
+    console.log('[DuelRepository] attemptJoin result:', updatedDuel ? 'Found' : 'Null', (updatedDuel as any)?.player2);
 
     const result = updatedDuel ? this.mapDoc(updatedDuel) : null;
     return result || null;

@@ -80,19 +80,20 @@ export class DuelService implements IDuelService {
   async listActive(playerId: string) {
     const all = await this._duels.all();
     const resolvedId = playerId;
-    console.log('[DuelService.listActive] Checking for:', resolvedId);
-    return all.filter(duel => {
-      const player1 = (duel.player1.user as any);
-      const player2 = (duel.player2.user as any);
-      const isParticipant =
-        player1?.id === resolvedId || player1?._id?.toString() === resolvedId ||
-        player2?.id === resolvedId || player2?._id?.toString() === resolvedId;
 
-      if (duel.status === DuelStatus.InProgress) {
-        console.log('[DuelService.listActive] InProgress Duel:', duel.id, 'P1:', player1?._id || player1?.id, 'P2:', player2?._id || player2?.id, 'IsPart:', isParticipant);
-      }
+    const active = all.filter(duel => {
+      const player1 = (duel.player1?.user as any);
+      const player2 = (duel.player2?.user as any);
+
+      const p1Id = player1?._id?.toString() || player1?.id || (typeof player1 === 'string' ? player1 : null);
+      const p2Id = player2?._id?.toString() || player2?.id || (typeof player2 === 'string' ? player2 : null);
+
+      const isParticipant = p1Id === resolvedId || p2Id === resolvedId;
       return duel.status === DuelStatus.InProgress && isParticipant;
     });
+
+    console.log(`[DuelService.listActive] Found ${active.length} active duels for user ${resolvedId}`);
+    return active;
   }
   async createOpen(difficulty: Difficulty, wager: number, playerId: string) {
     const allProblems = await this._problems.all()
@@ -140,7 +141,10 @@ export class DuelService implements IDuelService {
     const wager = duel.wager || 0
     if (wager > 0) await this._wallets.add(player2UserId, -wager, 'Duel wager')
     // Atomic join
-    const updatedDuel = await this._duels.attemptJoin(id, { user: player2User, warnings: 0 });
+    const updatedDuel = await this._duels.attemptJoin(id, {
+      user: (player2User as any)._id || player2User.id,
+      warnings: 0
+    });
 
     if (!updatedDuel) {
       // Join failed (likely race condition where status changed to InProgress/Finished/Cancelled)
@@ -153,6 +157,10 @@ export class DuelService implements IDuelService {
       if (!currentDuel) throw new Error(ResponseMessages.DUEL_NOT_FOUND);
       throw new Error(ResponseMessages.ALREADY_STARTED);
     }
+
+    // Log the join
+    console.log(`[DuelService.join] Player ${player2UserId} joined duel ${id}. Status: InProgress`);
+    console.log(`[DuelService.join] Player 1: ${(updatedDuel as any).player1?.user?._id || (updatedDuel as any).player1?.user}`);
 
     return updatedDuel
   }
@@ -190,30 +198,78 @@ export class DuelService implements IDuelService {
     } catch { }
     return this._duels.getById(id)
   }
+
+  /**
+   * Finish the duel as a draw (no winner). Refunds both players' wagers.
+   */
+  async finishDraw(id: string) {
+    const duel = await this._duels.getById(id);
+    if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND);
+
+    // Guard: only finish if still in progress
+    if (duel.status === DuelStatus.Finished) {
+      console.log(`[DuelService.finishDraw] Duel ${id} already finished, returning as-is.`);
+      return duel;
+    }
+    if (duel.status !== DuelStatus.InProgress) {
+      throw new Error(ResponseMessages.DUEL_NOT_IN_PROGRESS);
+    }
+
+    // Mark as finished with no winner
+    await this._duels.update(id, { status: DuelStatus.Finished, winner: null });
+
+    // Refund both players' wagers (no one wins, no commission)
+    const wager = duel.wager || 0;
+    if (wager > 0) {
+      const p1Id = (duel.player1?.user as any)?._id?.toString?.() || (duel.player1?.user as any)?.id;
+      const p2Id = (duel.player2?.user as any)?._id?.toString?.() || (duel.player2?.user as any)?.id;
+      if (p1Id) await this._wallets.add(p1Id, wager, 'Duel draw refund');
+      if (p2Id) await this._wallets.add(p2Id, wager, 'Duel draw refund');
+    }
+
+    console.log(`[DuelService.finishDraw] Duel ${id} ended as a draw. Wagers refunded.`);
+    return this._duels.getById(id);
+  }
+
+  // Helper to extract player IDs from a duel
+  private _getPlayerIds(duel: any): { p1Id: string | null, p2Id: string | null } {
+    const p1 = duel.player1?.user;
+    const p2 = duel.player2?.user;
+    const p1Id = p1?._id?.toString?.() || p1?.id || (typeof p1 === 'string' ? p1 : null);
+    const p2Id = p2?._id?.toString?.() || p2?.id || (typeof p2 === 'string' ? p2 : null);
+    return { p1Id, p2Id };
+  }
+
   async submitSolution(id: string, playerId: string, userCode: string) {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
 
+    // --- GUARD: Duel must be in progress ---
+    if (duel.status === DuelStatus.Finished) {
+      console.log(`[DuelService.submitSolution] Duel ${id} already finished. Returning as-is.`);
+      return duel; // Idempotent: return the finished duel
+    }
+    if (duel.status !== DuelStatus.InProgress) {
+      throw new Error(ResponseMessages.DUEL_NOT_IN_PROGRESS);
+    }
+
+    // --- GUARD: Player must be a participant ---
+    const { p1Id, p2Id } = this._getPlayerIds(duel);
+    const userId = playerId;
+    if (userId !== p1Id && userId !== p2Id) {
+      throw new Error(ResponseMessages.NOT_A_PARTICIPANT);
+    }
+
     // Server-side Execution
-    const problem = (duel.problem as any); // Assuming problem is populated or we need to fetch it
-    // Note: If problem is not populated, we might need: const problem = await this._problems.getById(duel.problem as string);
-    // Let's assume it is populated for now as per Mongoose patterns in this codebase, but ideally check.
-
-    // We need the solution code for the judge to compare against, OR the judge handles it.
-    // In `judgeService.execute`, it takes (userCode, solutionCode, testCases, problem, language).
-    // We need to pass the official solution code if the judge needs it for generating expected outputs (which the current logic does if test cases don't have outputs).
-    // Or if test cases are already populated with outputs, solutionCode might be optional depending on judge impl.
-    // The current JudgeService logic seems to use Piston and expects test cases with outputs to compare against user output.
-
+    const problem = (duel.problem as any);
     const problemDoc = problem?._id ? problem : await this._problems.getById(problem?.toString() || duel.problem?.toString());
     if (!problemDoc) throw new Error("Problem not found for duel");
 
     const solutionCode = problemDoc.solution?.code || '';
     const testCases = problemDoc.testCases || [];
-    const language = problemDoc.solution?.language || 'javascript'; // Default to problem language
+    const language = problemDoc.solution?.language || 'javascript';
 
     // Execute!
-    const userId = playerId;
     console.log('[DuelService] Executing user code against Piston...', { userId, problemId: problemDoc.id, language });
     let result: any;
     try {
@@ -226,11 +282,11 @@ export class DuelService implements IDuelService {
 
     const submissions = (duel as any).submissions || []
     const cleanedSubmissions = submissions.filter((submission: any) => (submission.user?._id?.toString?.() || submission.userId) !== userId)
-    const pWarnings = ((duel as any).player1?.user?._id?.toString?.() || (duel as any).player1?.user?.id) === userId
+    const pWarnings = p1Id === userId
       ? ((duel as any).player1?.warnings || 0)
       : ((duel as any).player2?.warnings || 0)
 
-    // Disqualified if warnings exceeded -- though this should be handled before execution ideally, but okay.
+    // Disqualified if warnings exceeded
     console.log('[DuelService] Saving submission. Warnings:', pWarnings);
     const finalStatus = pWarnings >= 3 ? SubmissionStatus.Disqualified : result.overallStatus
 
@@ -244,7 +300,7 @@ export class DuelService implements IDuelService {
       userCode,
       executionTime: result.executionTime,
       memoryUsage: result.memoryUsage || 0,
-      attempts: (result as any).attempts || 1, // Judge helper doesn't track previous attempts count effectively here without db, just default 1 or increment
+      attempts: (result as any).attempts || 1,
       codeHash,
       submittedAt: Date.now()
     })
@@ -254,11 +310,30 @@ export class DuelService implements IDuelService {
 
     // Win Condition: First to solve wins immediately
     if (finalStatus === SubmissionStatus.Accepted) {
+      // --- RACE CONDITION FIX: Re-fetch duel to check if it was already finished ---
+      const freshDuel = await this._duels.getById(id);
+      if (freshDuel && freshDuel.status === DuelStatus.Finished) {
+        console.log(`[DuelService] Duel ${id} was already finished by opponent. Skipping finish.`);
+        return freshDuel;
+      }
+
       console.log(`[DuelService] User ${userId} solved the problem! Finishing duel.`);
       return this.finish(id, userId, finalStatus, userCode);
     }
 
-    return this._duels.getById(id)
+    // Wrong answer / runtime error / TLE — do NOT finish. Return duel with submission result embedded.
+    console.log(`[DuelService] User ${userId} submitted with status: ${finalStatus}. Duel continues.`);
+    const updatedDuel = await this._duels.getById(id);
+    // Attach the submission result to the response so frontend knows what happened
+    if (updatedDuel) {
+      (updatedDuel as any).lastSubmissionResult = {
+        overallStatus: finalStatus,
+        executionTime: result.executionTime,
+        memoryUsage: result.memoryUsage || 0,
+        results: result.results || []
+      };
+    }
+    return updatedDuel;
   }
   async cancel(id: string, playerId: string) {
     const duel = await this._duels.getById(id)

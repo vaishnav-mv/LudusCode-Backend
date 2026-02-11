@@ -91,6 +91,8 @@ export class DuelController {
     // Remove body usage for playerId
     const duel = await this._service.join(req.params.id, currentUser.sub)
     if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
+
+    console.log('[DuelController] Join successful. Broadcasting update:', JSON.stringify(mapDuel(duel), null, 2));
     broadcastDuel(req.params.id, mapDuel(duel))
     res.json(mapDuel(duel))
   }
@@ -137,39 +139,66 @@ export class DuelController {
   }
 
   /**
-   * @desc    Submit result for a duel
+   * @desc    Submit solution for a duel (server-side code execution)
    * @route   POST /api/duels/:id/submit
-   * @req     params: { id }, body: { playerId, result, userCode }
-   * @res     { duel }
+   * @req     params: { id }, body: { playerId, userCode }
+   * @res     { duel, submissionResult }
    */
-  async submitDuelResult = async (req: Request, res: Response) => {
+  submitDuelResult = async (req: Request, res: Response) => {
     const currentUser = (req as any).user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const body = req.body as SubmitDuelResultDTO
 
-    // Server-side validation: Execute code to get real result
-    // We ignore body.result and compute it ourselves
     const { userCode } = body;
     const duelId = req.params.id;
 
-    // We need to fetch the problem to run against test cases
-    const duel = await this._service.detail(duelId);
-    if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
+    try {
+      const updatedDuel = await this._service.submitSolution(duelId, currentUser.sub, userCode);
+      if (!updatedDuel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
 
-    const problem = (duel as any).problem;
-    // If problem is populated, we can use it. If it's just ID, we might need to fetch it?
-    // Based on schemas, problem is ref 'Problem'. It might be populated by `detail`.
-    // DuelService.detail calls `_duels.getById(id)`. Let's assume repository populates it or we need to check.
+      const mapped = mapDuel(updatedDuel);
+      // Attach lastSubmissionResult if present (for wrong answer feedback)
+      const lastSubmissionResult = (updatedDuel as any).lastSubmissionResult || null;
 
-    // Actually, `_service.submitResult` logic in original code handles saving.
-    // Ideally, we should move the execution logic INTO `_service.submitResult` or a new service method `submitSolution`.
-    // But for this refactor, I will change `_service.submitResult` to take CODE, not RESULT.
+      broadcastDuel(req.params.id, mapped)
+      res.json({ ...mapped, submissionResult: lastSubmissionResult })
+    } catch (e: any) {
+      // Map known error messages to HTTP status codes
+      if (e.message === ResponseMessages.DUEL_ALREADY_FINISHED) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ message: e.message });
+      }
+      if (e.message === ResponseMessages.NOT_A_PARTICIPANT) {
+        return res.status(HttpStatus.FORBIDDEN).json({ message: e.message });
+      }
+      if (e.message === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ message: e.message });
+      }
+      throw e; // Re-throw unknown errors for global error handler
+    }
+  }
 
-    const updatedDuel = await this._service.submitSolution(duelId, currentUser.sub, userCode);
-    if (!updatedDuel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
+  /**
+   * @desc    Timeout a duel (timer expired — ends as draw)
+   * @route   POST /api/duels/:id/timeout
+   * @req     params: { id }
+   * @res     { duel }
+   */
+  timeoutDuel = async (req: Request, res: Response) => {
+    const currentUser = (req as any).user
+    if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
 
-    broadcastDuel(req.params.id, mapDuel(updatedDuel))
-    res.json(mapDuel(updatedDuel))
+    try {
+      const duel = await this._service.finishDraw(req.params.id);
+      if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
+
+      broadcastDuel(req.params.id, mapDuel(duel))
+      res.json(mapDuel(duel))
+    } catch (e: any) {
+      if (e.message === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ message: e.message });
+      }
+      throw e;
+    }
   }
 
   /**

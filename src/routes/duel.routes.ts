@@ -29,6 +29,7 @@ export class DuelRoutes {
         this.router.post('/:id/submit', auth, validate(SubmitDuelResultSchema), (req, res, next) => this._controller.submitDuelResult(req, res).catch(next))
         this.router.post('/:id/join', auth, validate(DuelPlayerActionSchema), (req, res, next) => this._controller.joinDuel(req, res).catch(next))
         this.router.post('/:id/cancel', auth, validate(DuelPlayerActionSchema), (req, res, next) => this._controller.cancelDuel(req, res).catch(next))
+        this.router.post('/:id/timeout', auth, (req, res, next) => this._controller.timeoutDuel(req, res).catch(next))
         this.router.patch('/:id/state', auth, validate(UpdateDuelStateSchema), (req, res, next) => this._controller.updateDuelState(req, res).catch(next))
     }
 }
