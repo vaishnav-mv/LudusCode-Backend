@@ -7,7 +7,7 @@ import { TransactionType } from '../types'
 @singleton()
 export class WalletRepository implements IWalletRepository {
   async get(userId: string) {
-    let wallet = await WalletModel.findOne({ userId }).lean()
+    let wallet = await WalletModel.findOne({ userId })
 
     if (!wallet) {
       wallet = await WalletModel.create({
@@ -17,21 +17,31 @@ export class WalletRepository implements IWalletRepository {
       })
     }
 
+    // wallet is definitely defined here
+    const w = wallet!;
+
     // Fetch recent transactions
     const transactions = await TransactionModel.find({ userId })
       .sort({ createdAt: -1 })
       .limit(20)
       .lean();
 
+    // Destructure to avoid returning ObjectId _id
+    const { _id, ...rest } = w.toObject ? w.toObject() : w;
     return {
-      ...wallet,
-      userId: (wallet.userId as any).toString(),
-      transactions: transactions.map(t => ({
-        ...t,
-        id: (t as any)._id.toString(),
-        timestamp: t.createdAt
-      }))
-    } as any
+      ...rest,
+      id: _id.toString(),
+      userId: w.userId.toString(),
+      transactions: transactions.map(t => {
+        const trans = t as any;
+        return {
+          ...trans,
+          _id: trans._id.toString(),
+          id: trans._id.toString(),
+          timestamp: trans.createdAt
+        };
+      })
+    }
   }
 
   // Used for DIRECT deposits (e.g. bonus), not Razorpay flow
