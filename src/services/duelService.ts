@@ -18,7 +18,9 @@ export class DuelService implements IDuelService {
 
   async create(difficulty: Difficulty, wager: number, player1Id: string, player2Id: string) {
     const allProblems = await this._problems.all();
-    const candidates = allProblems.filter(problem => problem.difficulty === difficulty);
+    // Filter out Custom problems (only allow Approved)
+    const approvedProblems = allProblems.filter(p => p.status === 'Approved');
+    const candidates = approvedProblems.filter(problem => problem.difficulty === difficulty);
     const problem = candidates.length > 0
       ? candidates[Math.floor(Math.random() * candidates.length)]
       : allProblems[Math.floor(Math.random() * allProblems.length)];
@@ -97,7 +99,9 @@ export class DuelService implements IDuelService {
   }
   async createOpen(difficulty: Difficulty, wager: number, playerId: string) {
     const allProblems = await this._problems.all()
-    const candidates = allProblems.filter(problem => problem.difficulty === difficulty)
+    // Filter out Custom problems
+    const approvedProblems = allProblems.filter(p => p.status === 'Approved');
+    const candidates = approvedProblems.filter(problem => problem.difficulty === difficulty)
     const problem = candidates.length > 0
       ? candidates[Math.floor(Math.random() * candidates.length)]
       : allProblems[Math.floor(Math.random() * allProblems.length)]
