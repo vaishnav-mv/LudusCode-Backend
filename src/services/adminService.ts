@@ -1,6 +1,10 @@
+
 import { singleton, inject } from 'tsyringe'
-import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository } from '../interfaces/repositories'
-import { IAdminService } from '../interfaces/services'
+import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository, IWalletRepository } from '../interfaces/repositories'
+import { broadcastDuel } from '../realtime/ws'
+import { mapDuel } from '../utils/mapper'
+import { createHash } from 'crypto'
+import { IAdminService, IJudgeService, IDuelService } from '../interfaces/services'
 import { DuelStatus, ProblemStatus, User } from '../types'
 import { SubscriptionPlanModel } from '../models/SubscriptionPlan'
 import { SubscriptionLogModel } from '../models/SubscriptionLog'
@@ -11,7 +15,10 @@ export class AdminService implements IAdminService {
     @inject("IUserRepository") private _users: IUserRepository,
     @inject("IProblemRepository") private _problems: IProblemRepository,
     @inject("IDuelRepository") private _duels: IDuelRepository,
-    @inject("IGroupRepository") private _groups: IGroupRepository
+    @inject("IGroupRepository") private _groups: IGroupRepository,
+    @inject("IJudgeService") private _judge: IJudgeService,
+    @inject("IWalletRepository") private _wallets: IWalletRepository,
+    @inject("IDuelService") private _duelService: IDuelService
   ) { }
 
   async dashboardStats() {
@@ -237,17 +244,38 @@ export class AdminService implements IAdminService {
   }
 
   async monitoredDuels() {
-    const allDuels = await this._duels.all()
-    const active = allDuels.filter(duel => duel.status === DuelStatus.InProgress)
-    return active.sort((a, b) => b.startTime - a.startTime)
+    const recentDuels = await this._duels.all(0, 50)
+    return recentDuels
   }
 
   async cancelDuel(id: string) {
+    const duel = await this._duels.getById(id)
+    if (!duel) return false
+    const wager = (duel as any).wager || 0
+    if (wager > 0) {
+      const player1Id = (duel as any).player1?.user?.id || (duel as any).player1?.user?._id?.toString?.()
+      const player2Id = (duel as any).player2?.user?.id || (duel as any).player2?.user?._id?.toString?.()
+      if (player1Id) await this._wallets.add(player1Id, wager, 'Duel cancel refund')
+      if (player2Id) await this._wallets.add(player2Id, wager, 'Duel cancel refund')
+    }
+    await this._duels.update(id, { status: DuelStatus.Cancelled, winner: null })
+    const updatedDuel = await this._duels.getById(id)
+    if (updatedDuel) {
+      broadcastDuel(id, mapDuel(updatedDuel))
+    }
     return true
   }
 
   async forceDuelResult(id: string, winnerId: string) {
-    return true
+    try {
+      const duel = await this._duelService.finish(id, winnerId)
+      if (duel) {
+        broadcastDuel(id, mapDuel(duel))
+      }
+      return true
+    } catch {
+      return false
+    }
   }
 
   async subscriptionData() {

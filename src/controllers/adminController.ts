@@ -1,17 +1,13 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
-import { DuelStatus } from '../types'
-import { IAdminService, IDuelService } from '../interfaces/services'
-import { IDuelRepository, IWalletRepository } from '../interfaces/repositories'
+
+import { IAdminService } from '../interfaces/services'
 import { ForceDuelResultDTO } from '../dto/request/admin.request.dto'
 
 @singleton()
 export class AdminController {
   constructor(
-    @inject("IAdminService") private _service: IAdminService,
-    @inject("IDuelService") private _duelService: IDuelService,
-    @inject("IDuelRepository") private _duelRepo: IDuelRepository,
-    @inject("IWalletRepository") private _walletRepo: IWalletRepository
+    @inject("IAdminService") private _service: IAdminService
   ) { }
 
   /**
@@ -240,17 +236,8 @@ export class AdminController {
    * @res     { ok: boolean }
    */
   cancelDuel = async (req: Request, res: Response) => {
-    const duel = await this._duelRepo.getById(req.params.id)
-    if (!duel) return res.json({ ok: false })
-    const wager = (duel as any).wager || 0
-    if (wager > 0) {
-      const player1Id = (duel as any).player1?.user?.id || (duel as any).player1?.user?._id?.toString?.()
-      const player2Id = (duel as any).player2?.user?.id || (duel as any).player2?.user?._id?.toString?.()
-      if (player1Id) await this._walletRepo.add(player1Id, wager, 'Duel cancel refund')
-      if (player2Id) await this._walletRepo.add(player2Id, wager, 'Duel cancel refund')
-    }
-    await this._duelRepo.update(req.params.id, { status: DuelStatus.Finished, winner: null })
-    res.json({ ok: true })
+    const ok = await this._service.cancelDuel(req.params.id)
+    res.json({ ok })
   }
 
   /**
@@ -260,12 +247,8 @@ export class AdminController {
    * @res     { ok: boolean }
    */
   forceDuelResult = async (req: Request, res: Response) => {
-    try {
-      const body = req.body as ForceDuelResultDTO
-      await this._duelService.finish(req.params.id, body.winnerId)
-      res.json({ ok: true })
-    } catch {
-      res.json({ ok: false })
-    }
+    const body = req.body as ForceDuelResultDTO
+    const ok = await this._service.forceDuelResult(req.params.id, body.winnerId)
+    res.json({ ok })
   }
 }
