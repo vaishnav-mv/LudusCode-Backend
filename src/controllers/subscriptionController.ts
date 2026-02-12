@@ -26,7 +26,7 @@ export class SubscriptionController {
      * @res     { ok, success, action, expiry }
      */
     subscribe = async (req: Request, res: Response) => {
-        const userId = (req as any).user?.id
+        const userId = req.user?.id || req.user?.sub
         const { planId } = req.body
 
         if (!userId) return res.status(401).json({ ok: false, error: 'Unauthorized' })

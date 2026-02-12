@@ -118,8 +118,8 @@ export class AuthService implements IAuthService {
 
   async refresh(refreshToken: string) {
     const payload = this._jwtService.verify(refreshToken);
-    if (typeof payload === 'string' || !payload.sub) throw new Error(ResponseMessages.INVALID_TOKEN);
-    const user = await this._userRepo.getById(payload.sub as string);
+    if (typeof payload === 'string' || !('sub' in payload)) throw new Error(ResponseMessages.INVALID_TOKEN);
+    const user = await this._userRepo.getById((payload as any).sub);
     if (!user) throw new Error(ResponseMessages.USER_NOT_FOUND);
     if (user.isBanned) throw new Error(ResponseMessages.USER_BANNED);
 

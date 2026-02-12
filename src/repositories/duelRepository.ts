@@ -2,12 +2,13 @@ import { singleton } from 'tsyringe'
 import { IDuelRepository } from '../interfaces/repositories'
 import { DuelModel } from '../models/Duel'
 import { Duel, DuelStatus } from '../types'
+import { Model } from 'mongoose'
 import { BaseRepository } from './BaseRepository'
 
 @singleton()
 export class DuelRepository extends BaseRepository<Duel> implements IDuelRepository {
   constructor() {
-    super(DuelModel)
+    super(DuelModel as unknown as Model<Duel>)
   }
 
   // Override to include population

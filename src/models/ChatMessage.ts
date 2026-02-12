@@ -5,5 +5,8 @@ const ChatMessageSchema = new Schema({
   text: { type: String, required: true },
   timestamp: { type: String, required: true }
 }, { timestamps: true })
-export const ChatMessageModel = mongoose.model('ChatMessage', ChatMessageSchema)
+import { ChatMessage } from '../types'
+import { Document } from 'mongoose'
+
+export const ChatMessageModel = mongoose.model<ChatMessage & Document>('ChatMessage', ChatMessageSchema)
 

@@ -142,7 +142,7 @@ export class DuelService implements IDuelService {
     if (wager > 0) await this._wallets.add(player2UserId, -wager, 'Duel wager')
     // Atomic join
     const updatedDuel = await this._duels.attemptJoin(id, {
-      user: (player2User as any)._id || player2User.id,
+      user: player2User._id?.toString() || player2User.id,
       warnings: 0
     });
 

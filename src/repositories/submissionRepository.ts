@@ -1,56 +1,31 @@
 import { singleton } from 'tsyringe'
 import { ISubmissionRepository } from '../interfaces/repositories'
+import { Model } from 'mongoose'
 import { SubmissionModel } from '../models/Submission'
-import { Submission } from '../types'
+import { ProblemSubmission } from '../types'
 import { BaseRepository } from './BaseRepository'
 
 @singleton()
-export class SubmissionRepository extends BaseRepository<Submission> implements ISubmissionRepository {
+export class SubmissionRepository extends BaseRepository<ProblemSubmission> implements ISubmissionRepository {
     constructor() {
-        super(SubmissionModel)
+        super(SubmissionModel as unknown as Model<ProblemSubmission>)
     }
 
-    async create(data: any) {
+    async create(data: Partial<ProblemSubmission>): Promise<ProblemSubmission> {
         let submission = await this.model.create(data);
         submission = await submission.populate('problemId');
-        const submissionObj = submission.toObject();
-
-        return {
-            id: submissionObj._id.toString(),
-            problem: { ...submissionObj.problemId, id: submissionObj.problemId?._id.toString() },
-            userCode: submissionObj.code,
-            result: {
-                overallStatus: submissionObj.status,
-                results: submissionObj.testCaseResults,
-                executionTime: submissionObj.executionTime,
-                memoryUsage: submissionObj.memoryUsage
-            },
-            submittedAt: submissionObj.createdAt
-        } as any;
+        return submission.toObject();
     }
 
-    async findByUser(userId: string, limit: number = 20) {
-        const submissions = await this.model.find({ userId })
+    async findByUser(userId: string, limit: number = 20): Promise<ProblemSubmission[]> {
+        return await this.model.find({ userId })
             .sort({ createdAt: -1 })
             .limit(limit)
             .populate('problemId')
             .lean();
-
-        return submissions.map((submission: any) => ({
-            id: submission._id.toString(),
-            problem: { ...submission.problemId, id: submission.problemId?._id.toString() },
-            userCode: submission.code,
-            result: {
-                overallStatus: submission.status,
-                results: submission.testCaseResults,
-                executionTime: submission.executionTime,
-                memoryUsage: submission.memoryUsage
-            },
-            submittedAt: submission.createdAt
-        }));
     }
 
-    async getSolvedProblemIds(userId: string) {
+    async getSolvedProblemIds(userId: string): Promise<string[]> {
         const solved = await this.model.find({
             userId,
             status: 'Accepted'

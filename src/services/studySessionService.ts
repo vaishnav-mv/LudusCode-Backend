@@ -3,8 +3,10 @@ import { IStudySessionRepository, IUserRepository, IGroupRepository } from '../i
 import { StudySessionMode, StudySessionStatus, StudySession, Group, User } from '../types'
 import { broadcastSession } from '../realtime/ws'
 
+import { IStudySessionService } from '../interfaces/services'
+
 @singleton()
-export class StudySessionService {
+export class StudySessionService implements IStudySessionService {
     constructor(
         @inject("IStudySessionRepository") private _sessions: IStudySessionRepository,
         @inject("IUserRepository") private _users: IUserRepository,
@@ -18,9 +20,9 @@ export class StudySessionService {
 
         // Verify membership (or ownership)
         const isMember = group.members.some(member => {
-            const memberId = typeof member === 'string' ? member : (member._id || (member as any).id).toString();
+            const memberId = typeof member === 'string' ? member : member._id?.toString() || member.id!;
             return memberId === userId;
-        }) || (typeof group.owner === 'string' ? group.owner : (group.owner._id || (group.owner as any).id).toString()) === userId;
+        }) || (typeof group.owner === 'string' ? group.owner : group.owner._id?.toString() || group.owner.id!) === userId;
         if (!isMember) throw new Error("Must be a group member to create a session");
 
         const sessionData = {
@@ -46,7 +48,10 @@ export class StudySessionService {
 
         // Check ownership
         if (session.createdBy.toString() !== resolvedUserId) {
-            const isParticipant = session.participants.some((participant: any) => participant.user._id.toString() === resolvedUserId);
+            const isParticipant = session.participants.some(participant => {
+                const pUserId = typeof participant.user === 'string' ? participant.user : participant.user._id?.toString() || participant.user.id!;
+                return pUserId === resolvedUserId;
+            });
             if (!isParticipant) {
                 throw new Error("You must be a participant to update this session");
             }
@@ -54,7 +59,7 @@ export class StudySessionService {
 
         const updated = await this._sessions.update(sessionId, data);
         if (updated) broadcastSession(sessionId, updated);
-        return updated;
+        return updated || null;
     }
 
     async join(sessionId: string, userId: string) {
@@ -66,17 +71,17 @@ export class StudySessionService {
         const group = await this._groups.getById(session.groupId.toString());
         if (!group) throw new Error("Group not found");
 
-        const isMember = (group as any).members.find((member: any) => {
-            const memberId = member._id ? member._id.toString() : member.toString();
+        const isMember = group.members.find(member => {
+            const memberId = typeof member === 'string' ? member : member._id?.toString() || member.id!;
             return memberId === resolvedUserId;
-        }) || (group as any).owner?._id?.toString() === resolvedUserId || (group as any).owner?.toString() === resolvedUserId;
+        }) || (typeof group.owner === 'string' ? group.owner : group.owner._id?.toString() || group.owner.id!) === resolvedUserId;
 
         if (!isMember) {
             throw new Error("You must be a member of the group to join this session");
         }
 
-        const exists = session.participants.find((participant: any) => {
-            const participantId = participant.user._id ? participant.user._id.toString() : participant.user.toString();
+        const exists = session.participants.find(participant => {
+            const participantId = typeof participant.user === 'string' ? participant.user : participant.user._id?.toString() || participant.user.id!;
             return participantId === resolvedUserId;
         });
 
@@ -85,9 +90,9 @@ export class StudySessionService {
         }
 
         // Prepare new list, normalizing existing populated users back to IDs
-        const newParticipants = session.participants.map((participant: any) => ({
+        const newParticipants = session.participants.map(participant => ({
             ...participant,
-            user: participant.user._id ? participant.user._id.toString() : participant.user.toString()
+            user: typeof participant.user === 'string' ? participant.user : participant.user._id?.toString() || participant.user.id!
         }));
 
         newParticipants.push({
@@ -98,7 +103,7 @@ export class StudySessionService {
 
         const updated = await this._sessions.update(sessionId, { participants: newParticipants });
         if (updated) broadcastSession(sessionId, updated);
-        return updated;
+        return updated || null;
     }
 
     async leave(sessionId: string, userId: string) {
@@ -107,20 +112,20 @@ export class StudySessionService {
         if (!session) return null;
 
         // Filter out the user, handling both populated and unpopulated states
-        const filteredParticipants = session.participants.filter((participant: any) => {
-            const participantId = participant.user._id ? participant.user._id.toString() : participant.user.toString();
+        const filteredParticipants = session.participants.filter(participant => {
+            const participantId = typeof participant.user === 'string' ? participant.user : participant.user._id?.toString() || participant.user.id!;
             return participantId !== resolvedUserId;
         });
 
         // Normalize for save
-        const saveParticipants = filteredParticipants.map((participant: any) => ({
+        const saveParticipants = filteredParticipants.map(participant => ({
             ...participant,
-            user: participant.user._id ? participant.user._id.toString() : participant.user.toString()
+            user: typeof participant.user === 'string' ? participant.user : participant.user._id?.toString() || participant.user.id!
         }));
 
         const updated = await this._sessions.update(sessionId, { participants: saveParticipants });
         if (updated) broadcastSession(sessionId, updated);
-        return updated;
+        return updated || null;
     }
 
     async passTurn(sessionId: string, userId: string) {
@@ -130,7 +135,7 @@ export class StudySessionService {
 
         if (session.mode !== 'round_robin') throw new Error("Pass Turn is only available in Round Robin mode");
 
-        const participants = session.participants.map((participant: any) => participant.user._id.toString());
+        const participants = session.participants.map(participant => typeof participant.user === 'string' ? participant.user : participant.user._id?.toString() || participant.user.id!);
         if (participants.length === 0) return session;
 
         let currentIndex = -1;
@@ -154,7 +159,7 @@ export class StudySessionService {
             turnStartedAt: new Date()
         });
         if (updated) broadcastSession(sessionId, updated);
-        return updated;
+        return updated || null;
     }
 
     async checkRoundRobinTimers() {
@@ -212,7 +217,8 @@ export class StudySessionService {
     }
 
     async getById(id: string) {
-        return this._sessions.getById(id);
+        const session = await this._sessions.getById(id);
+        return session || null;
     }
 
     async getByIdSecure(id: string, userId: string) {
@@ -225,9 +231,9 @@ export class StudySessionService {
         if (!group) return null; // Or throw error
 
         const isMember = group.members.some(member => {
-            const memberId = typeof member === 'string' ? member : (member._id || (member as any).id).toString();
+            const memberId = typeof member === 'string' ? member : member._id?.toString() || member.id!;
             return memberId === resolvedUserId;
-        }) || (typeof group.owner === 'string' ? group.owner : (group.owner._id || (group.owner as any).id).toString()) === resolvedUserId;
+        }) || (typeof group.owner === 'string' ? group.owner : group.owner._id?.toString() || group.owner.id!) === resolvedUserId;
 
         if (!isMember) {
             throw new Error("You are not authorized to view this session");

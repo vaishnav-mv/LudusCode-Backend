@@ -16,7 +16,7 @@ export class ProblemController {
      */
     approvedProblems = async (req: Request, res: Response) => {
         const { q, sort, difficulty, tags, page, limit } = req.query;
-        const problems = await this._service.list({
+        const result = await this._service.list({
             q: q as string,
             sort: sort as string,
             difficulty: difficulty as string,
@@ -25,8 +25,8 @@ export class ProblemController {
             page: page ? parseInt(page as string) : undefined,
             limit: limit ? parseInt(limit as string) : undefined
         });
-        console.log(`[ProblemController] Approved problems count: ${problems.length}`);
-        res.json(problems);
+        console.log(`[ProblemController] Approved problems count: ${result.data.length} of ${result.total}`);
+        res.json(result);
     }
 
     /**
@@ -66,7 +66,7 @@ export class ProblemController {
      */
     createProblem = async (req: Request, res: Response) => {
         try {
-            const user = (req as any).user;
+            const user = req.user;
             let status = 'Custom';
             if (user && user.isAdmin && req.body.status === 'Approved') {
                 status = 'Approved';

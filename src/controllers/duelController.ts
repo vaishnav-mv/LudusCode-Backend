@@ -17,7 +17,7 @@ export class DuelController {
    * @res     { duel }
    */
   createDuel = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const body = req.body as CreateDuelDTO
     const duel = await this._service.create(body.difficulty as any, body.wager, currentUser.sub, body.player2Id)
@@ -71,7 +71,7 @@ export class DuelController {
    * @res     { duel }
    */
   createOpenChallenge = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const body = req.body as CreateOpenChallengeDTO
     const duel = await this._service.createOpen(body.difficulty as any, body.wager, currentUser.sub)
@@ -86,7 +86,7 @@ export class DuelController {
    * @res     { duel }
    */
   joinDuel = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     // Remove body usage for playerId
     const duel = await this._service.join(req.params.id, currentUser.sub)
@@ -145,7 +145,7 @@ export class DuelController {
    * @res     { duel, submissionResult }
    */
   submitDuelResult = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const body = req.body as SubmitDuelResultDTO
 
@@ -184,7 +184,7 @@ export class DuelController {
    * @res     { duel }
    */
   timeoutDuel = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
 
     try {
@@ -209,7 +209,8 @@ export class DuelController {
    */
   listActiveDuels = async (req: Request, res: Response) => {
     try {
-      const userId = (req as any).user.sub;
+      const userId = req.user?.sub;
+      if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED });
       const duels = await this._service.listActive(userId);
       res.json(duels.map(mapDuel));
     } catch (error: any) {
@@ -224,7 +225,7 @@ export class DuelController {
    * @res     { duel }
    */
   cancelDuel = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const duel = await this._service.cancel(req.params.id, currentUser.sub)
     if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })

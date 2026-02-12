@@ -16,7 +16,8 @@ export class StudySessionController {
      */
     create = async (req: Request, res: Response) => {
         try {
-            const userId = (req as any).user.sub
+            const userId = req.user?.sub
+            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
             const session = await this._service.create({ ...req.body, userId })
             res.status(201).json(session)
         } catch (e: any) {
@@ -33,7 +34,8 @@ export class StudySessionController {
     update = async (req: Request, res: Response) => {
         try {
             const { id } = req.params
-            const userId = (req as any).user.sub
+            const userId = req.user?.sub
+            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
             const session = await this._service.update(id, userId, req.body)
             res.json(session)
         } catch (e: any) {
@@ -67,7 +69,8 @@ export class StudySessionController {
     join = async (req: Request, res: Response) => {
         try {
             const { id } = req.params
-            const userId = (req as any).user.sub
+            const userId = req.user?.sub
+            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
             const session = await this._service.join(id, userId)
             res.json(session)
         } catch (e: any) {
@@ -84,7 +87,8 @@ export class StudySessionController {
     leave = async (req: Request, res: Response) => {
         try {
             const { id } = req.params
-            const userId = (req as any).user.sub
+            const userId = req.user?.sub
+            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
             const session = await this._service.leave(id, userId)
             res.json(session)
         } catch (e: any) {
@@ -101,7 +105,8 @@ export class StudySessionController {
     detail = async (req: Request, res: Response) => {
         try {
             const { id } = req.params
-            const userId = (req as any).user.sub
+            const userId = req.user?.sub
+            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
             // We verify access inside the service
             const session = await this._service.getByIdSecure(id, userId);
             if (!session) return res.status(404).json({ message: 'Session not found' });
@@ -123,7 +128,8 @@ export class StudySessionController {
     passTurn = async (req: Request, res: Response) => {
         try {
             const { id } = req.params
-            const userId = (req as any).user.sub
+            const userId = req.user?.sub
+            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
             const session = await this._service.passTurn(id, userId)
             res.json(session)
         } catch (e: any) {

@@ -55,16 +55,13 @@ export class UserService implements IUserService {
     return updated !== undefined ? updated : null;
   }
 
-  async leaderboard(page: number = 1, limit: number = 100): Promise<any[]> {
+  async leaderboard(page: number = 1, limit: number = 100): Promise<User[]> {
     const list = await this._userRepo.leaderboard((page - 1) * limit, limit);
-    return list.map((user, index) => mapUser(user, (page - 1) * limit + index + 1)).filter(user => user !== null);
+    return list.map((user, index) => ({ ...user, leaderboardRank: (page - 1) * limit + index + 1 }));
   }
 
-  async updateProfile(id: string, data: { name?: string; avatarUrl?: string }): Promise<User | null> {
-    const updateData: any = {};
-    if (data.name) updateData.username = data.name;
-    if (data.avatarUrl) updateData.avatarUrl = data.avatarUrl;
-    const updated = await this._userRepo.update(id, updateData);
+  async updateProfile(id: string, data: Partial<User>): Promise<User | null> {
+    const updated = await this._userRepo.update(id, data);
     return updated !== undefined ? updated : null;
   }
 
@@ -80,7 +77,6 @@ export class UserService implements IUserService {
   }
 
   async search(query: string): Promise<User[]> {
-    const users = await this._userRepo.search(query);
-    return users.map(user => mapUser(user)).filter(user => user !== null && user !== undefined) as User[];
+    return this._userRepo.search(query);
   }
 }

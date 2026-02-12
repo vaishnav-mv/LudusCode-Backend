@@ -1,7 +1,7 @@
 import { singleton, inject } from 'tsyringe'
 import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository } from '../interfaces/repositories'
 import { IAdminService } from '../interfaces/services'
-import { DuelStatus, ProblemStatus } from '../types'
+import { DuelStatus, ProblemStatus, User } from '../types'
 import { SubscriptionPlanModel } from '../models/SubscriptionPlan'
 import { SubscriptionLogModel } from '../models/SubscriptionLog'
 
@@ -21,9 +21,12 @@ export class AdminService implements IAdminService {
     const totalRevenue = allDuels.reduce((acc, duel) => {
       if (duel.status === DuelStatus.Finished && duel.wager && duel.wager > 0 && duel.winner) {
         const pool = duel.wager * 2
-        const winner = duel.winner as any
-        const rate = winner?.isPremium ? 0.05 : 0.1
-        return acc + pool * rate
+        // Check if winner is populated User object
+        const winner = typeof duel.winner === 'object' && duel.winner && 'isPremium' in duel.winner ? duel.winner as User : null;
+        if (winner) {
+          const rate = winner.isPremium ? 0.05 : 0.1
+          return acc + pool * rate
+        }
       }
       return acc
     }, 0)
@@ -32,7 +35,17 @@ export class AdminService implements IAdminService {
 
   async financials() {
     const allDuels = await this._duels.all()
-    const recent: any[] = []
+
+    interface FinancialRecord {
+      duelId: string;
+      problemTitle: string;
+      winnerName: string;
+      wager: number;
+      commission: number;
+      timestamp: number;
+    }
+
+    const recent: FinancialRecord[] = []
     let totalWagered = 0
     let totalCommissions = 0
     const map = new Map<string, number>()
@@ -41,13 +54,26 @@ export class AdminService implements IAdminService {
       if (duel.status === DuelStatus.Finished && duel.wager && duel.wager > 0 && duel.winner) {
         totalWagered += duel.wager * 2
         const pool = duel.wager * 2
-        const winner = duel.winner as any
-        const rate = winner?.isPremium ? 0.05 : 0.1
-        const commission = pool * rate
-        totalCommissions += commission
-        recent.push({ duelId: duel._id!.toString(), problemTitle: (duel.problem as any).title, winnerName: (duel.winner as any).username, wager: duel.wager, commission, timestamp: duel.startTime })
-        const date = new Date(duel.startTime || Date.now()).toISOString().split('T')[0]
-        map.set(date, (map.get(date) || 0) + commission)
+        const winner = typeof duel.winner === 'object' && duel.winner && 'username' in duel.winner ? duel.winner as User : null;
+
+        if (winner) {
+          const rate = winner.isPremium ? 0.05 : 0.1
+          const commission = pool * rate
+          totalCommissions += commission
+
+          const problemTitle = typeof duel.problem === 'object' && duel.problem && 'title' in duel.problem ? (duel.problem as any).title : 'Unknown';
+
+          recent.push({
+            duelId: duel.id || duel._id?.toString() || '',
+            problemTitle: problemTitle,
+            winnerName: winner.username || 'Unknown',
+            wager: duel.wager,
+            commission,
+            timestamp: typeof duel.startTime === 'number' ? duel.startTime : new Date(duel.startTime).getTime()
+          })
+          const date = new Date(duel.startTime || Date.now()).toISOString().split('T')[0]
+          map.set(date, (map.get(date) || 0) + commission)
+        }
       }
     }
 
@@ -97,7 +123,7 @@ export class AdminService implements IAdminService {
 
   async allUsers(page: number = 1, limit: number = 5, query?: string) {
     const skip = (page - 1) * limit
-    const filter: any = { isAdmin: { $ne: true } }
+    const filter: Record<string, unknown> = { isAdmin: { $ne: true } }
 
     if (query) {
       const regex = new RegExp(query, 'i')
@@ -124,22 +150,28 @@ export class AdminService implements IAdminService {
       // Remove from all groups
       const allGroups = await this._groups.all()
       for (const group of allGroups) {
-        const memberIndex = (group.members || []).findIndex((member: any) => (member._id?.toString?.() || member.id) === id)
-        const pendingIndex = (group.pendingMembers || []).findIndex((member: any) => (member._id?.toString?.() || member.id) === id)
+        const memberIndex = (group.members || []).findIndex(member => {
+          if (typeof member === 'string') return member === id;
+          return member._id?.toString() === id || member.id === id;
+        });
+        const pendingIndex = (group.pendingMembers || []).findIndex(member => {
+          if (typeof member === 'string') return member === id;
+          return member._id?.toString() === id || member.id === id;
+        });
 
         let changed = false
         if (memberIndex !== -1) {
-          (group.members as any[]).splice(memberIndex, 1)
+          group.members.splice(memberIndex, 1)
           changed = true
         }
         if (pendingIndex !== -1) {
-          (group.pendingMembers as any[]).splice(pendingIndex, 1)
+          (group.pendingMembers || []).splice(pendingIndex, 1)
           changed = true
         }
 
         if (changed) {
-          const members = (group.members as any[]).map((member: any) => member._id?.toString?.() || member.id)
-          const pendingMembers = (group.pendingMembers as any[]).map((member: any) => member._id?.toString?.() || member.id)
+          const members = group.members.map(member => typeof member === 'string' ? member : member._id?.toString() || member.id!).filter(Boolean)
+          const pendingMembers = (group.pendingMembers || []).map(member => typeof member === 'string' ? member : member._id?.toString() || member.id!).filter(Boolean)
           await this._groups.update(group._id as string, { members, pendingMembers })
         }
       }
@@ -192,7 +224,7 @@ export class AdminService implements IAdminService {
         }
       }
     }
-    const out: any[] = []
+    const out: { _id?: string, user: User, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[] = []
     for (const [uid, flagData] of flags.entries()) {
       const user = await this._users.getById(uid)
       if (user) out.push({ user: user, totalWarnings: flagData.count, lastOffense: new Date(flagData.last || Date.now()).toISOString(), breakdown: { paste: flagData.paste, visibility: flagData.visibility } })
@@ -345,8 +377,8 @@ export class AdminService implements IAdminService {
 
     await this._users.update(userId, {
       isPremium: false,
-      currentPlanId: null as any,
-      subscriptionExpiry: null as any
+      currentPlanId: undefined, // Mongoose update will unset or set to null if schema allows, or use $unset
+      subscriptionExpiry: undefined
     })
 
     await SubscriptionLogModel.create({

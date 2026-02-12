@@ -6,6 +6,22 @@ let io: Server
 import { container } from 'tsyringe'
 import { IJudgeService } from '../interfaces/services'
 import { IProblemRepository } from '../interfaces/repositories'
+import { ChatMessageResponseDTO } from '../dto/response/chat.response.dto'
+import { DuelResponseDTO } from '../dto/response/duel.response.dto'
+import { CompetitionResponseDTO } from '../dto/response/competition.response.dto'
+import { StudySession, Problem, TestCase } from '../types'
+
+interface SignalData {
+  type: 'offer' | 'answer' | 'candidate';
+  sdp?: string;
+  candidate?: any; // WebRTC candidate structure
+}
+
+interface DuelProgressData {
+  testsPassed: number;
+  totalTests: number;
+  status: string;
+}
 
 export const initRealtime = (server: HttpServer) => {
   io = new Server(server, {
@@ -26,12 +42,12 @@ export const initRealtime = (server: HttpServer) => {
       socket.leave(room)
     })
 
-    socket.on('code:change', ({ sessionId, code }) => {
+    socket.on('code:change', ({ sessionId, code }: { sessionId: string, code: string }) => {
       // Broadcast to everyone in the session EXCEPT the sender
       socket.to(`session:${sessionId}`).emit('code:update', { code });
     });
 
-    socket.on('code:run', async ({ sessionId, code, problemId, language }) => {
+    socket.on('code:run', async ({ sessionId, code, problemId, language }: { sessionId: string, code: string, problemId?: string, language?: string }) => {
       try {
         const judgeService = container.resolve<IJudgeService>("IJudgeService");
 
@@ -53,7 +69,7 @@ export const initRealtime = (server: HttpServer) => {
         }
 
         // Using first test case as a sample run if sample exists, else use first
-        const sampleCases = (problem.testCases || []).filter((tc: any) => tc.isSample);
+        const sampleCases = (problem.testCases || []).filter((tc: TestCase) => tc.isSample);
         const casesToRun = sampleCases.length > 0 ? sampleCases : [(problem.testCases || [])[0]];
 
         const result = await judgeService.execute(code, problem.solution?.code || '', casesToRun, problem, language);
@@ -61,17 +77,18 @@ export const initRealtime = (server: HttpServer) => {
         // Broadcast result to everyone (so they see the output of the run)
         io.to(`session:${sessionId}`).emit('execution_result', { result, runBy: socket.id });
 
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error("Code Run Error", e);
-        socket.emit('execution_result', { error: e.message || 'Execution failed' });
+        const message = (e instanceof Error) ? e.message : 'Execution failed';
+        socket.emit('execution_result', { error: message });
       }
     });
 
-    socket.on('signal', ({ to, signal }) => {
+    socket.on('signal', ({ to, signal }: { to: string, signal: SignalData }) => {
       io.to(to).emit('signal', { from: socket.id, signal });
     });
 
-    socket.on('duel:progress', ({ duelId, progress }) => {
+    socket.on('duel:progress', ({ duelId, progress }: { duelId: string, progress: DuelProgressData }) => {
       // Broadcast to opponent in the same duel room (excluding sender)
       socket.to(`duel:${duelId}`).emit('duel:progress', { playerId: socket.id, progress });
     });
@@ -82,25 +99,25 @@ export const initRealtime = (server: HttpServer) => {
   })
 }
 
-export const broadcastChat = (groupId: string, payload: any) => {
+export const broadcastChat = (groupId: string, payload: ChatMessageResponseDTO) => {
   if (io) {
     io.to(`chat:${groupId}`).emit('chat', { groupId, message: payload })
   }
 }
 
-export const broadcastDuel = (duelId: string, payload: any) => {
+export const broadcastDuel = (duelId: string, payload: DuelResponseDTO) => {
   if (io) {
     io.to(`duel:${duelId}`).emit('duel', { duelId, duel: payload })
   }
 }
 
-export const broadcastCompetition = (competitionId: string, payload: any) => {
+export const broadcastCompetition = (competitionId: string, payload: CompetitionResponseDTO) => {
   if (io) {
     io.to(`competition:${competitionId}`).emit('competition', { competitionId, competition: payload })
   }
 }
 
-export const broadcastSession = (sessionId: string, payload: any) => {
+export const broadcastSession = (sessionId: string, payload: Partial<StudySession> | StudySession) => {
   if (io) {
     io.to(`session:${sessionId}`).emit('session', { sessionId, session: payload })
   }

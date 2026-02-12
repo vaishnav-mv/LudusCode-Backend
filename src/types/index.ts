@@ -238,7 +238,7 @@ export interface Wallet {
     userId: string | User;
     balance: number;
     currency: string;
-    transactions: Transaction[];
+    transactions?: Transaction[];
     id?: string;
 }
 
@@ -304,4 +304,39 @@ export interface Competition {
     }[];
     status: CompetitionStatus;
     id?: string;
+}
+
+export interface PaginatedResponse<T> {
+    data: T[];
+    total: number;
+    page: number;
+    totalPages: number;
+}
+declare global {
+    namespace Express {
+        interface Request {
+            user?: { sub: string, [key: string]: any }; // Minimally required for now, or full User if available
+        }
+    }
+}
+export interface RazorpayOrder {
+    id: string;
+    entity: string;
+    amount: number;
+    amount_paid: number;
+    amount_due: number;
+    currency: string;
+    receipt: string;
+    offer_id: string | null;
+    status: string;
+    attempts: number;
+    notes: any[];
+    created_at: number;
+}
+
+export interface JwtPayload {
+    sub?: string;
+    iat?: number;
+    exp?: number;
+    [key: string]: any;
 }

@@ -1,5 +1,6 @@
 import { singleton } from 'tsyringe'
 import { IUserRepository } from '../interfaces/repositories'
+import { Model } from 'mongoose'
 import { UserModel } from '../models/User'
 import { User } from '../types'
 import { BaseRepository } from './BaseRepository'
@@ -7,19 +8,22 @@ import { BaseRepository } from './BaseRepository'
 @singleton()
 export class UserRepository extends BaseRepository<User> implements IUserRepository {
   constructor() {
-    super(UserModel)
+    super(UserModel as unknown as Model<User>)
   }
 
   // Override getById to include rank calculation logic
-  async getById(id: string) {
+  async getById(id: string): Promise<User | undefined> {
     let foundUser;
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
       foundUser = await this.model.findById(id).lean();
     }
 
     if (foundUser) {
-      const user = foundUser as any;
+      // @ts-ignore
+      const user = foundUser;
+      // @ts-ignore
       const rank = await this.model.countDocuments({ elo: { $gt: user.elo } }) + 1;
+      // @ts-ignore
       return { ...this.mapDoc(user), leaderboardRank: rank } as User;
     }
     return undefined;

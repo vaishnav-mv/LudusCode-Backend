@@ -5,8 +5,10 @@ import { singleton } from 'tsyringe'
 export class ErrorMiddleware {
   constructor() { }
 
-  public handle = (err: any, req: Request, res: Response, next: NextFunction) => {
-    const status = err.status || 500
-    res.status(status).json({ message: err.message || 'Internal error' })
+  public handle = (err: unknown, req: Request, res: Response, next: NextFunction) => {
+    const error = err as { status?: number, message?: string }
+    const status = error.status || 500
+    const message = error.message || 'Internal error'
+    res.status(status).json({ message })
   }
 }

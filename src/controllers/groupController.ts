@@ -15,7 +15,7 @@ export class GroupController {
    * @res     { group }
    */
   createGroup = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     const body = req.body as CreateGroupDTO
     // Fix: Ensure description is a string
     const createdGroup = await this._service.create(body.name, body.description || '', body.topics || [], currentUser?.sub as string, !!body.isPrivate)
@@ -29,7 +29,7 @@ export class GroupController {
    * @res     { group }
    */
   updateGroup = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     const body = req.body as UpdateGroupDTO
     try {
       const updated = await this._service.update(req.params.id, currentUser?.sub as string, {
@@ -54,17 +54,17 @@ export class GroupController {
    */
   listGroups = async (req: Request, res: Response) => {
     try {
-      const currentUser = (req as any).user;
+      const currentUser = req.user;
       const { q, sort, isPrivate, page, limit } = req.query;
-      const groups = await this._service.list(currentUser?.sub, {
+      const result = await this._service.list(currentUser?.sub, {
         q: q as string,
         sort: sort as string,
         isPrivate: isPrivate as string,
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined
       })
-      console.log(`[GroupController] Listing groups. Found: ${groups.length}`);
-      res.json(groups);
+      console.log(`[GroupController] Listing groups. Found: ${result.data.length} of ${result.total}`);
+      res.json(result);
     } catch (err) {
       console.error('GroupController: Error listing groups:', err);
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: ResponseMessages.INTERNAL_ERROR });
@@ -93,7 +93,7 @@ export class GroupController {
    */
   joinGroup = async (req: Request, res: Response) => {
     try {
-      const currentUser = (req as any).user
+      const currentUser = req.user
       if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
       const body = req.body as GroupMemberActionDTO
       const ok = await this._service.join(req.params.id, currentUser.sub)
@@ -110,7 +110,7 @@ export class GroupController {
    * @res     { ok: boolean }
    */
   leaveGroup = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.leave(req.params.id, currentUser.sub)
@@ -124,7 +124,7 @@ export class GroupController {
    * @res     { ok: boolean }
    */
   approveGroupJoin = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.approveJoin(req.params.id, body.userId, currentUser?.sub as string)
     res.json({ ok })
@@ -137,7 +137,7 @@ export class GroupController {
    * @res     { ok: boolean }
    */
   rejectGroupJoin = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.rejectJoin(req.params.id, body.userId, currentUser?.sub as string)
     res.json({ ok })
@@ -150,7 +150,7 @@ export class GroupController {
    * @res     { ok: boolean }
    */
   kickGroupMember = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.kickMember(req.params.id, body.userId, currentUser?.sub as string)
     res.json({ ok })
@@ -163,7 +163,7 @@ export class GroupController {
    * @res     { ok: boolean }
    */
   deleteGroup = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     const ok = await this._service.delete(req.params.id, currentUser?.sub as string)
     res.json({ ok })
   }
@@ -175,7 +175,7 @@ export class GroupController {
    * @res     { ok: boolean }
    */
   blockGroupMember = async (req: Request, res: Response) => {
-    const currentUser = (req as any).user
+    const currentUser = req.user
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.blockMember(req.params.id, body.userId, currentUser?.sub as string)
     res.json({ ok })
@@ -189,7 +189,7 @@ export class GroupController {
    */
   addGroupMember = async (req: Request, res: Response) => {
     try {
-      const currentUser = (req as any).user
+      const currentUser = req.user
       const body = req.body as AddMemberDTO
       const ok = await this._service.addMember(req.params.id, body.userId, currentUser?.sub as string)
       res.json({ ok })

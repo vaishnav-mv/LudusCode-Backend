@@ -4,6 +4,8 @@ import { Request, Response } from 'express'
 import { HttpStatus, ResponseMessages } from '../constants'
 import { IUserService, ICloudinaryService } from '../interfaces/services'
 import { UpdateProfileRequestDTO, ChangePasswordRequestDTO } from '../dto/request/user.request.dto'
+import { mapUser } from '../utils/mapper'
+import { User } from '../types'
 
 @singleton()
 export class UserController {
@@ -32,7 +34,7 @@ export class UserController {
      * @res     { user }
      */
     setPremium = async (req: Request, res: Response) => {
-        const currentUser = (req as any).user;
+        const currentUser = req.user;
         if (!currentUser || !currentUser.isAdmin) {
             return res.status(HttpStatus.FORBIDDEN).json({ message: ResponseMessages.FORBIDDEN });
         }
@@ -52,7 +54,7 @@ export class UserController {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 100;
         const users = await this._service.leaderboard(page, limit);
-        res.json(users);
+        res.json(users.map(u => mapUser(u)));
     }
 
     /**
@@ -63,7 +65,7 @@ export class UserController {
      */
     updateProfile = async (req: Request, res: Response) => {
         const userId = req.params.id;
-        const currentUser = (req as any).user;
+        const currentUser = req.user;
         if (!currentUser || (!currentUser.isAdmin && currentUser.sub !== userId)) return res.status(HttpStatus.FORBIDDEN).json({ message: ResponseMessages.FORBIDDEN });
 
         let avatarUrl = req.body.avatarUrl;
@@ -76,9 +78,13 @@ export class UserController {
         }
 
         const body = req.body as UpdateProfileRequestDTO;
-        const updatedUser = await this._service.updateProfile(userId, { name: body.name, avatarUrl });
+        const updateData: Partial<User> = {};
+        if (body.name) updateData.username = body.name;
+        if (avatarUrl) updateData.avatarUrl = avatarUrl;
+
+        const updatedUser = await this._service.updateProfile(userId, updateData);
         if (!updatedUser) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
-        res.json({ user: updatedUser });
+        res.json({ user: mapUser(updatedUser) });
     }
 
     /**
@@ -88,7 +94,8 @@ export class UserController {
      * @res     { message }
      */
     changePassword = async (req: Request, res: Response) => {
-        const userId = (req as any).user.sub;
+        const userId = req.user?.sub;
+        if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED });
         const { oldPassword, newPassword } = req.body as ChangePasswordRequestDTO;
         try {
             await this._service.changePassword(userId, oldPassword, newPassword);
@@ -110,6 +117,6 @@ export class UserController {
             return res.json([]);
         }
         const users = await this._service.search(query);
-        res.json(users);
+        res.json(users.map(u => mapUser(u)));
     }
 }

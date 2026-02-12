@@ -16,7 +16,8 @@ export class SubmissionController {
      */
     create = async (req: Request, res: Response) => {
         try {
-            const userId = (req as any).user.sub;
+            const userId = req.user?.sub;
+            if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: "Unauthorized" });
             const { problemId, code, language, result } = req.body;
             // Validate input
             if (!problemId || !code || !language || !result) {
@@ -38,7 +39,8 @@ export class SubmissionController {
      */
     getUserSubmissions = async (req: Request, res: Response) => {
         try {
-            const userId = req.params.userId || (req as any).user.sub;
+            const userId = req.params.userId || req.user?.sub;
+            if (!userId) return res.status(HttpStatus.BAD_REQUEST).json({ message: "UserId required" });
             const submissions = await this._service.getUserSubmissions(userId);
             res.json(submissions);
         } catch (error: any) {
@@ -54,7 +56,8 @@ export class SubmissionController {
      */
     getSolvedProblems = async (req: Request, res: Response) => {
         try {
-            const userId = req.params.userId || (req as any).user.sub;
+            const userId = req.params.userId || req.user?.sub;
+            if (!userId) return res.status(HttpStatus.BAD_REQUEST).json({ message: "UserId required" });
             const solvedIds = await this._service.getSolvedProblemIds(userId);
             res.json(solvedIds);
         } catch (error: any) {

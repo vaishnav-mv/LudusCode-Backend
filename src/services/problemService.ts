@@ -1,20 +1,21 @@
 import { singleton, inject } from 'tsyringe'
 import { IProblemRepository } from '../interfaces/repositories'
-import { IProblemService, IAiService } from '../interfaces/services'
+import { IProblemService, ProblemListParams } from '../interfaces/services'
 import { mapProblem } from '../utils/mapper'
+import { Problem, PaginatedResponse } from '../types'
 
 @singleton()
 export class ProblemService implements IProblemService {
   constructor(
     @inject("IProblemRepository") private _repo: IProblemRepository,
-    @inject("IAiService") private _ai: IAiService
+    @inject("IAiService") private _ai: import('../interfaces/services').IAiService
   ) { }
 
-  async list(params: any = {}) {
-    const { q, sort, difficulty, status, tags, page = 1, limit = 100 } = params;
+  async list(params: ProblemListParams = {}) {
+    const { q, sort, difficulty, status, tags, page = 1, limit = 12 } = params;
     const skip = (page - 1) * limit;
 
-    const filter: any = {};
+    const filter: Record<string, unknown> = {};
     if (status) filter.status = status;
 
     if (q) {
@@ -28,12 +29,18 @@ export class ProblemService implements IProblemService {
       filter.tags = { $in: typeof tags === 'string' ? tags.split(',') : tags };
     }
 
-    let sortOption: any = { createdAt: -1 };
+    let sortOption: Record<string, 1 | -1> = { createdAt: -1 };
     if (sort === 'oldest') sortOption = { createdAt: 1 };
     if (sort === 'difficulty') sortOption = { difficulty: 1 };
 
     const problems = await this._repo.all(skip, limit, filter, sortOption);
-    return problems.map(mapProblem);
+    const total = await this._repo.count(filter);
+    return {
+      data: problems.map(mapProblem),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   async daily() {
@@ -43,8 +50,7 @@ export class ProblemService implements IProblemService {
     return mapProblem(list[idx]);
   }
 
-  async create(data: any) {
-    // @ts-ignore
+  async create(data: Partial<Problem>) {
     const problem = await this._repo.create(data);
     return mapProblem(problem);
   }

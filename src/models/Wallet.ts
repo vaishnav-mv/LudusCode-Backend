@@ -10,4 +10,7 @@ const WalletSchema = new Schema({
     timestamps: true
 })
 
-export const WalletModel = mongoose.model('Wallet', WalletSchema)
+import { Wallet } from '../types'
+import { Document } from 'mongoose'
+
+export const WalletModel = mongoose.model<Wallet & Document>('Wallet', WalletSchema)

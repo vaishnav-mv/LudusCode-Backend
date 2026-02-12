@@ -185,7 +185,7 @@ export class AuthController {
    */
   me = async (req: Request, res: Response) => {
     try {
-      const currentAuth = (req as any).user
+      const currentAuth = req.user
       if (!currentAuth?.sub) {
         return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
       }

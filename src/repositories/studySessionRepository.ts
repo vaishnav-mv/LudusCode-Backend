@@ -1,12 +1,14 @@
 import { singleton } from 'tsyringe'
 import { StudySessionModel } from '../models/StudySession'
 import { StudySession, StudySessionStatus } from '../types'
+import { Model } from 'mongoose'
+import { IStudySessionRepository } from '../interfaces/repositories'
 import { BaseRepository } from './BaseRepository'
 
 @singleton()
-export class StudySessionRepository extends BaseRepository<StudySession> {
+export class StudySessionRepository extends BaseRepository<StudySession> implements IStudySessionRepository {
     constructor() {
-        super(StudySessionModel)
+        super(StudySessionModel as unknown as Model<StudySession>)
     }
 
     // Create inherited (Base is sufficient if no populate needed immediately, original had no populate)

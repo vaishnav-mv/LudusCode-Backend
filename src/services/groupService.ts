@@ -1,7 +1,8 @@
 import { singleton, inject } from 'tsyringe'
 import { IGroupRepository, IUserRepository } from '../interfaces/repositories'
-import { IGroupService } from '../interfaces/services'
+import { IGroupService, GroupListParams } from '../interfaces/services'
 import { mapGroup } from '../utils/mapper'
+import { PaginatedResponse, User } from '../types'
 
 import { ResponseMessages } from '../constants'
 
@@ -12,12 +13,12 @@ export class GroupService implements IGroupService {
         @inject("IUserRepository") private _users: IUserRepository
     ) { }
 
-    async list(userId?: string, params: any = {}) {
-        const { q, sort, isPrivate, page = 1, limit = 100 } = params;
+    async list(userId?: string, params: GroupListParams = {}) {
+        const { q, sort, isPrivate, page = 1, limit = 12 } = params;
         const skip = (page - 1) * limit;
 
         // Base Filter: Default to public groups only
-        let baseFilter: any = { isPrivate: { $ne: true } };
+        let baseFilter: Record<string, unknown> = { isPrivate: { $ne: true } };
 
         if (userId) {
             const resolvedId = userId;
@@ -32,7 +33,7 @@ export class GroupService implements IGroupService {
         }
 
         // Additional Filters from Params
-        const queryFilter: any = {};
+        const queryFilter: Record<string, unknown> = {};
         if (q) {
             queryFilter.$or = [
                 { name: { $regex: q, $options: 'i' } },
@@ -48,12 +49,18 @@ export class GroupService implements IGroupService {
         const finalFilter = { $and: [baseFilter, queryFilter] };
 
         // Sort Logic
-        let sortOption: any = { createdAt: -1 };
+        let sortOption: Record<string, 1 | -1> = { createdAt: -1 };
         if (sort === 'oldest') sortOption = { createdAt: 1 };
         if (sort === 'alphabetical') sortOption = { name: 1 };
 
         const groups = await this._groups.all(skip, limit, finalFilter, sortOption);
-        return groups.map(mapGroup);
+        const total = await this._groups.count(finalFilter);
+        return {
+            data: groups.map(mapGroup),
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        };
     }
 
     async detail(id: string) {
@@ -62,8 +69,8 @@ export class GroupService implements IGroupService {
             if (group.members && Array.isArray(group.members)) {
                 // Populate ranks for members
                 // Parallelize for performance
-                await Promise.all(group.members.map(async (member: any) => {
-                    if (member.elo !== undefined) {
+                await Promise.all(group.members.map(async (member) => {
+                    if (typeof member !== 'string' && member.elo !== undefined) {
                         member.leaderboardRank = await this._users.getRank(member.elo);
                     }
                 }));
@@ -83,7 +90,7 @@ export class GroupService implements IGroupService {
             throw new Error(ResponseMessages.GROUP_NAME_TAKEN);
         }
 
-        const created = await this._groups.create({ name, description, isPrivate, topics: topics || [], members: [creator], owner: creator } as any);
+        const created = await this._groups.create({ name, description, isPrivate, topics: topics || [], members: [creator], owner: creator });
         return mapGroup(created);
     }
 
@@ -91,7 +98,7 @@ export class GroupService implements IGroupService {
         const group = await this._groups.getById(id);
         if (!group) return null;
 
-        const ownerId = (group as any).owner?._id?.toString?.() || (group as any).owner?.toString?.();
+        const ownerId = typeof group.owner === 'string' ? group.owner : group.owner._id?.toString() || group.owner.id;
         const resolvedUserId = userId;
 
         if (ownerId !== resolvedUserId) {
@@ -102,8 +109,9 @@ export class GroupService implements IGroupService {
         return updated ? mapGroup(updated) : null;
     }
 
-    private getId(member: any) {
-        return member && (member._id?.toString?.() || member.id);
+    private getId(member: string | User | any) {
+        if (typeof member === 'string') return member;
+        return member._id?.toString() || member.id;
     }
 
     async join(groupId: string, userId: string) {
@@ -114,18 +122,18 @@ export class GroupService implements IGroupService {
         if (!group || !user) return false;
 
         // Check if blocked
-        if (group.blockedMembers && group.blockedMembers.some((member: any) => this.getId(member) === resolvedUserId)) {
+        if (group.blockedMembers && group.blockedMembers.some(member => this.getId(member) === resolvedUserId)) {
             throw new Error(ResponseMessages.BLOCKED_FROM_GROUP);
         }
 
         // If already a member, do nothing
-        if (group.members.find((member: any) => this.getId(member) === resolvedUserId)) return true;
+        if (group.members.find(member => this.getId(member) === resolvedUserId)) return true;
 
         // Add to pendingMembers if not already there
-        if (!(group.pendingMembers || []).find((member: any) => this.getId(member) === resolvedUserId)) {
+        if (!(group.pendingMembers || []).find(member => this.getId(member) === resolvedUserId)) {
             if (!group.pendingMembers) group.pendingMembers = [];
-            group.pendingMembers.push(user as any);
-            const pendingMemberIds = group.pendingMembers.map((member: any) => this.getId(member)).filter(Boolean);
+            group.pendingMembers.push(user);
+            const pendingMemberIds = group.pendingMembers.map(member => this.getId(member)).filter(Boolean);
             await this._groups.update(resolvedGroupId, { pendingMembers: pendingMemberIds });
         }
         return true;

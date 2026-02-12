@@ -4,6 +4,7 @@ import { singleton, inject } from 'tsyringe'
 import { broadcastChat } from '../realtime/ws'
 import { IChatService } from '../interfaces/services'
 import { SendMessageDTO } from '../dto/request/chat.request.dto'
+import { mapMessage } from '../utils/mapper'
 
 @singleton()
 export class ChatController {
@@ -18,7 +19,7 @@ export class ChatController {
     getMessages = async (req: Request, res: Response) => {
         const groupId = req.params.groupId;
         const messages = await this._service.getMessages(groupId);
-        res.json(messages);
+        res.json(messages.map(mapMessage));
     }
 
     /**
@@ -32,8 +33,9 @@ export class ChatController {
         const body = req.body as SendMessageDTO
         const userId = body.userId;
         const sentMessage = await this._service.sendMessage(groupId, userId, body.text);
-        broadcastChat(groupId, sentMessage);
+        const dto = mapMessage(sentMessage);
+        broadcastChat(groupId, dto);
 
-        res.json(sentMessage);
+        res.json(dto);
     }
 }

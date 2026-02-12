@@ -1,11 +1,11 @@
-import { User, Group, Problem, Duel, Competition, Submission, Wallet, StudySession } from '../types';
+import { User, Group, Problem, Duel, DuelPlayer, Competition, ProblemSubmission, Wallet, StudySession, ChatMessage } from '../types';
 
 export interface IBaseRepository<T> {
     all(skip?: number, limit?: number, filter?: any, sort?: any): Promise<T[]>;
     count(filter?: any): Promise<number>;
     getById(id: string): Promise<T | undefined>;
-    create(item: Partial<T> | any): Promise<T>;
-    update(id: string, partial: Partial<T>): Promise<T | undefined>;
+    create(item: Partial<T>): Promise<T>;
+    update(id: string, partial: any): Promise<T | undefined>;
     delete(id: string): Promise<boolean>;
 }
 
@@ -26,7 +26,7 @@ export interface IProblemRepository extends IBaseRepository<Problem> {
 }
 
 export interface IDuelRepository extends IBaseRepository<Duel> {
-    attemptJoin(id: string, player2Data: any): Promise<Duel | null>;
+    attemptJoin(id: string, player2Data: Partial<DuelPlayer>): Promise<Duel | null>;
 }
 
 export interface ICompetitionRepository extends IBaseRepository<Competition> {
@@ -34,8 +34,8 @@ export interface ICompetitionRepository extends IBaseRepository<Competition> {
 }
 
 export interface ISubmissionRepository {
-    create(data: any): Promise<any>;
-    findByUser(userId: string, limit?: number): Promise<any[]>;
+    create(data: Partial<ProblemSubmission>): Promise<ProblemSubmission>;
+    findByUser(userId: string, limit?: number): Promise<ProblemSubmission[]>;
     getSolvedProblemIds(userId: string): Promise<string[]>;
 }
 
@@ -52,6 +52,6 @@ export interface IWalletRepository {
 }
 
 export interface IChatRepository {
-    getByGroup(groupId: string): Promise<any[]>;
-    add(groupId: string, userId: string, text: string, timestamp: string): Promise<any>;
+    getByGroup(groupId: string): Promise<ChatMessage[]>;
+    add(groupId: string, userId: string, text: string, timestamp: string): Promise<ChatMessage>;
 }
