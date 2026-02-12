@@ -171,12 +171,43 @@ export class DuelService implements IDuelService {
     return this._duels.getById(id)
   }
   async finish(id: string, winnerId?: string, finalOverallStatus?: string, finalUserCode?: string) {
-    const finishedDuel = await this.updateState(id, DuelStatus.Finished, winnerId)
-    if (finalOverallStatus || finalUserCode) {
-      await this._duels.update(id, { finalOverallStatus: finalOverallStatus as SubmissionStatus, finalUserCode })
+    // 1. Determine the winner object
+    let winner: any = null;
+    if (winnerId) {
+      const resolvedWinnerId = winnerId;
+      const user = await this._users.getById(resolvedWinnerId);
+      winner = user || null;
     }
+
+    // 2. Atomic Update: Try to set status to Finished
+    // This returns the updated doc ONLY if it was previously InProgress
+    const finishedDuel = await this._duels.attemptFinish(id, winner, DuelStatus.Finished);
+
+    if (!finishedDuel) {
+      console.log(`[DuelService.finish] Atomic finish failed for duel ${id}. It may have already been finished.`);
+      // If it failed, we can still perform the "side effect" of updating the submission details 
+      // if we want, but we should NOT process money or ELO.
+      if (finalOverallStatus || finalUserCode) {
+        await this._duels.update(id, { finalOverallStatus: finalOverallStatus as SubmissionStatus, finalUserCode });
+      }
+      return this._duels.getById(id);
+    }
+
+    // 3. Post-Finish Logic (Run only once because attemptFinish is atomic)
+
+    // A. Update submission details
+    if (finalOverallStatus || finalUserCode) {
+      await this._duels.update(id, { finalOverallStatus: finalOverallStatus as SubmissionStatus, finalUserCode });
+    }
+
+    // B. Transfer Winnings
+    if (winner && finishedDuel.wager && finishedDuel.wager > 0) {
+      await this._wallets.add((winner as any)._id?.toString?.() || (winner as any).id, finishedDuel.wager * 2, 'Duel winnings');
+    }
+
+    // C. ELO Calculation
     try {
-      const duelForElo = await this._duels.getById(id)
+      const duelForElo = finishedDuel; // We already have the updated duel
       if (duelForElo && duelForElo.winner) {
         const player1Id = (duelForElo as any).player1?.user?._id?.toString?.() || (duelForElo as any).player1?.user?.id
         const player2Id = (duelForElo as any).player2?.user?._id?.toString?.() || (duelForElo as any).player2?.user?.id
@@ -196,9 +227,13 @@ export class DuelService implements IDuelService {
         }
       }
     } catch { }
-    return this._duels.getById(id)
+
+    return this._duels.getById(id); // Return fresh copy
   }
 
+  /**
+   * Finish the duel as a draw (no winner). Refunds both players' wagers.
+   */
   /**
    * Finish the duel as a draw (no winner). Refunds both players' wagers.
    */
@@ -206,17 +241,13 @@ export class DuelService implements IDuelService {
     const duel = await this._duels.getById(id);
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND);
 
-    // Guard: only finish if still in progress
-    if (duel.status === DuelStatus.Finished) {
-      console.log(`[DuelService.finishDraw] Duel ${id} already finished, returning as-is.`);
-      return duel;
-    }
-    if (duel.status !== DuelStatus.InProgress) {
-      throw new Error(ResponseMessages.DUEL_NOT_IN_PROGRESS);
-    }
+    // Atomic update: only succeeds if status is still InProgress
+    const finishedDuel = await this._duels.attemptFinish(id, null, DuelStatus.Finished);
 
-    // Mark as finished with no winner
-    await this._duels.update(id, { status: DuelStatus.Finished, winner: null });
+    if (!finishedDuel) {
+      console.log(`[DuelService.finishDraw] Atomic finish failed for duel ${id}. It may have already been finished.`);
+      return this._duels.getById(id);
+    }
 
     // Refund both players' wagers (no one wins, no commission)
     const wager = duel.wager || 0;
@@ -228,7 +259,7 @@ export class DuelService implements IDuelService {
     }
 
     console.log(`[DuelService.finishDraw] Duel ${id} ended as a draw. Wagers refunded.`);
-    return this._duels.getById(id);
+    return finishedDuel;
   }
 
   // Helper to extract player IDs from a duel
@@ -361,17 +392,45 @@ export class DuelService implements IDuelService {
     }
 
     // Refund wager
-    if (duel.wager && duel.wager > 0) {
-      await this._wallets.add(requestUserId, duel.wager, 'Duel Refund');
-    }
+    // Guarded by attemptCancel below
 
     try {
-      await this._duels.update(id, { status: DuelStatus.Cancelled, winner: null });
+      // Atomic Update: Only cancel if Waiting
+      const cancelledDuel = await this._duels.attemptCancel(id);
+
+      if (!cancelledDuel) {
+        // Race condition: Someone presumably joined or it was cancelled already
+        throw new Error(ResponseMessages.CANNOT_CANCEL_NOT_WAITING);
+      }
+
+      // If atomic update succeeded, Refund
+      if (duel.wager && duel.wager > 0) {
+        await this._wallets.add(requestUserId, duel.wager, 'Duel Refund');
+      }
+
+      return cancelledDuel;
     } catch (error) {
       console.error('[DuelService.cancel] Update Failed:', error);
       throw error;
     }
+  }
+  async forfeit(id: string, playerId: string) {
+    const duel = await this._duels.getById(id)
+    if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
+    if (duel.status !== DuelStatus.InProgress) throw new Error(ResponseMessages.DUEL_NOT_IN_PROGRESS)
 
-    return this._duels.getById(id);
+    const { p1Id, p2Id } = this._getPlayerIds(duel)
+    if (playerId !== p1Id && playerId !== p2Id) {
+      throw new Error(ResponseMessages.NOT_A_PARTICIPANT)
+    }
+
+    const winnerId = playerId === p1Id ? p2Id : p1Id
+    if (!winnerId) {
+      // Should not happen if duel is InProgress and valid
+      throw new Error(ResponseMessages.USER_NOT_FOUND)
+    }
+
+    console.log(`[DuelService.forfeit] Player ${playerId} forfeited. Winner: ${winnerId}`);
+    return this.finish(id, winnerId, SubmissionStatus.Forfeit)
   }
 }

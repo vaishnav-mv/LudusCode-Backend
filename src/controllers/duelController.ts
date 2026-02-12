@@ -232,4 +232,29 @@ export class DuelController {
     broadcastDuel(duel._id!, mapDuel(duel))
     res.json(mapDuel(duel))
   }
+  /**
+   * @desc    Forfeit a duel
+   * @route   POST /api/duels/:id/forfeit
+   * @req     params: { id }
+   * @res     { duel }
+   */
+  forfeitDuel = async (req: Request, res: Response) => {
+    const currentUser = req.user
+    if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+
+    try {
+      const duel = await this._service.forfeit(req.params.id, currentUser.sub)
+      if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
+      broadcastDuel(req.params.id, mapDuel(duel))
+      res.json(mapDuel(duel))
+    } catch (e: any) {
+      if (e.message === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ message: e.message });
+      }
+      if (e.message === ResponseMessages.NOT_A_PARTICIPANT) {
+        return res.status(HttpStatus.FORBIDDEN).json({ message: e.message });
+      }
+      throw e;
+    }
+  }
 }

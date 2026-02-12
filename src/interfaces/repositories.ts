@@ -27,6 +27,8 @@ export interface IProblemRepository extends IBaseRepository<Problem> {
 
 export interface IDuelRepository extends IBaseRepository<Duel> {
     attemptJoin(id: string, player2Data: Partial<DuelPlayer>): Promise<Duel | null>;
+    attemptFinish(id: string, winner: any, finalStatus: string): Promise<Duel | null>;
+    attemptCancel(id: string): Promise<Duel | null>;
 }
 
 export interface ICompetitionRepository extends IBaseRepository<Competition> {

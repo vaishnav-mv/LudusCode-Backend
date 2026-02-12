@@ -73,5 +73,44 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
     const result = updatedDuel ? this.mapDoc(updatedDuel) : null;
     return result || null;
   }
+
+  async attemptFinish(id: string, winner: any, finalStatus: string) {
+    const updatedDuel = await this.model.findOneAndUpdate(
+      { _id: id, status: DuelStatus.InProgress },
+      {
+        $set: {
+          status: finalStatus as DuelStatus,
+          winner
+        }
+      },
+      { new: true }
+    )
+      .populate('problem')
+      .populate('player1.user')
+      .populate('player2.user')
+      .populate('winner')
+      .lean();
+
+    return (updatedDuel ? this.mapDoc(updatedDuel) : null) || null;
+  }
+
+  async attemptCancel(id: string) {
+    const updatedDuel = await this.model.findOneAndUpdate(
+      { _id: id, status: DuelStatus.Waiting },
+      {
+        $set: {
+          status: DuelStatus.Cancelled
+        }
+      },
+      { new: true }
+    )
+      .populate('problem')
+      .populate('player1.user')
+      .populate('player2.user')
+      .populate('winner')
+      .lean();
+
+    return (updatedDuel ? this.mapDoc(updatedDuel) : null) || null;
+  }
 }
 

@@ -83,6 +83,7 @@ export interface IDuelService {
   finishDraw(id: string): Promise<Duel | undefined>
   submitSolution(id: string, playerId: string, userCode: string): Promise<Duel | undefined>
   cancel(id: string, playerId: string): Promise<Duel | undefined>
+  forfeit(id: string, playerId: string): Promise<Duel | undefined>
 }
 
 export interface IWalletService {

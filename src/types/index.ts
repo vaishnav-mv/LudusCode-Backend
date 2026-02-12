@@ -17,7 +17,8 @@ export enum SubmissionStatus {
     WrongAnswer = 'Wrong Answer',
     TimeLimitExceeded = 'Time Limit Exceeded',
     RuntimeError = 'Runtime Error',
-    Disqualified = 'Disqualified'
+    Disqualified = 'Disqualified',
+    Forfeit = 'Forfeit'
 }
 
 export enum StudySessionMode {
