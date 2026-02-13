@@ -34,7 +34,12 @@ export class AuthMiddleware {
         return res.status(401).json({ message: 'Unauthorized' })
       }
 
-      req.user = payload as { sub: string, [key: string]: any }
+      req.user = {
+        sub: payload.sub as string,
+        username: user.username,
+        isAdmin: user.isAdmin,
+        ...payload
+      }
       next()
     } catch (e) {
       return res.status(401).json({ message: 'Unauthorized' })

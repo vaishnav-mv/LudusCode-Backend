@@ -97,6 +97,17 @@ export class DuelService implements IDuelService {
     console.log(`[DuelService.listActive] Found ${active.length} active duels for user ${resolvedId}`);
     return active;
   }
+  async listInvites(userId: string) {
+    const all = await this._duels.all();
+    // Filter for duels where I am player2 AND status is Waiting
+    const invites = all.filter(duel => {
+      const player2 = (duel.player2?.user as any);
+      const p2Id = player2?._id?.toString() || player2?.id || (typeof player2 === 'string' ? player2 : null);
+
+      return p2Id === userId && duel.status === DuelStatus.Waiting;
+    });
+    return invites;
+  }
   async createOpen(difficulty: Difficulty, wager: number, playerId: string) {
     const allProblems = await this._problems.all()
     // Filter out Custom problems
@@ -375,20 +386,22 @@ export class DuelService implements IDuelService {
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
 
     // Auth check: Is user creator?
-    const player1Id = (duel.player1.user as any)._id?.toString() || (duel.player1.user as any).id || duel.player1.user;
+    const { p1Id, p2Id } = this._getPlayerIds(duel);
     const requestUserId = playerId;
 
     console.log('[DuelService.cancel] Debug:', {
       duelId: id,
       playerId,
       requestUserId: requestUserId?.toString(),
-      player1Id: player1Id?.toString(),
-      match: player1Id?.toString() === requestUserId?.toString(),
+      p1Id: p1Id?.toString(),
+      p2Id: p2Id?.toString(),
+      matchP1: p1Id?.toString() === requestUserId?.toString(),
+      matchP2: p2Id?.toString() === requestUserId?.toString(),
       duelStatus: duel.status
     });
 
-    if (player1Id.toString() !== requestUserId.toString()) {
-      throw new Error(ResponseMessages.ONLY_CREATOR_CAN_CANCEL);
+    if (p1Id?.toString() !== requestUserId.toString() && p2Id?.toString() !== requestUserId.toString()) {
+      throw new Error(ResponseMessages.ONLY_CREATOR_CAN_CANCEL); // or "Only participants can cancel"
     }
 
     if (duel.status !== DuelStatus.Waiting) {

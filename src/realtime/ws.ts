@@ -111,6 +111,18 @@ export const broadcastDuel = (duelId: string, payload: DuelResponseDTO) => {
   }
 }
 
+export const broadcastDuelLobby = (payload: DuelResponseDTO) => {
+  if (io) {
+    io.to('duel-lobby').emit('duel', { duel: payload })
+  }
+}
+
+export const broadcastDuelInvite = (userId: string, payload: any) => {
+  if (io) {
+    io.to(`user:${userId}`).emit('duel:invite', payload)
+  }
+}
+
 export const broadcastCompetition = (competitionId: string, payload: CompetitionResponseDTO) => {
   if (io) {
     io.to(`competition:${competitionId}`).emit('competition', { competitionId, competition: payload })

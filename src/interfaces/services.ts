@@ -76,6 +76,7 @@ export interface IDuelService {
   updateState(id: string, status: string, winnerId?: string): Promise<Duel | undefined>
   listOpen(): Promise<Duel[]>
   listActive(playerId: string): Promise<Duel[]>
+  listInvites(userId: string): Promise<Duel[]>
   createOpen(difficulty: string, wager: number, playerId: string): Promise<Duel>
   join(id: string, playerId: string): Promise<Duel | undefined>
   setSummary(id: string, finalOverallStatus: string, finalUserCode: string): Promise<Duel | undefined>

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
 import { HttpStatus, ResponseMessages } from '../constants'
-import { broadcastDuel } from '../realtime/ws'
+import { broadcastDuel, broadcastDuelLobby, broadcastDuelInvite } from '../realtime/ws'
 import { IDuelService } from '../interfaces/services'
 import { CreateDuelDTO, UpdateDuelStateDTO, CreateOpenChallengeDTO, DuelPlayerActionDTO, SetSummaryDTO, FinishDuelDTO, SubmitDuelResultDTO } from '../dto/request/duel.request.dto'
 import { mapDuel } from '../utils/mapper'
@@ -22,6 +22,17 @@ export class DuelController {
     const body = req.body as CreateDuelDTO
     const duel = await this._service.create(body.difficulty as any, body.wager, currentUser.sub, body.player2Id)
     broadcastDuel(duel._id!, mapDuel(duel))
+
+    // Broadcast invite if it's a private duel
+    if (body.player2Id) {
+      broadcastDuelInvite(body.player2Id, {
+        duelId: duel._id,
+        challengerName: currentUser.username,
+        wager: body.wager,
+        difficulty: body.difficulty
+      })
+    }
+
     res.json(mapDuel(duel))
   }
 
@@ -65,6 +76,19 @@ export class DuelController {
   }
 
   /**
+   * @desc    List duel invites for user
+   * @route   GET /api/duels/invites
+   * @req     -
+   * @res     [Duel]
+   */
+  listInvites = async (req: Request, res: Response) => {
+    const currentUser = req.user
+    if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    const duels = await this._service.listInvites(currentUser.sub)
+    res.json(duels.map(mapDuel))
+  }
+
+  /**
    * @desc    Create an open challenge
    * @route   POST /api/duels/open
    * @req     body: { difficulty, wager, playerId }
@@ -76,6 +100,7 @@ export class DuelController {
     const body = req.body as CreateOpenChallengeDTO
     const duel = await this._service.createOpen(body.difficulty as any, body.wager, currentUser.sub)
     broadcastDuel(duel._id!, mapDuel(duel))
+    broadcastDuelLobby(mapDuel(duel))
     res.json(mapDuel(duel))
   }
 
@@ -94,6 +119,7 @@ export class DuelController {
 
     console.log('[DuelController] Join successful. Broadcasting update:', JSON.stringify(mapDuel(duel), null, 2));
     broadcastDuel(req.params.id, mapDuel(duel))
+    broadcastDuelLobby(mapDuel(duel))
     res.json(mapDuel(duel))
   }
 
@@ -230,6 +256,7 @@ export class DuelController {
     const duel = await this._service.cancel(req.params.id, currentUser.sub)
     if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
     broadcastDuel(duel._id!, mapDuel(duel))
+    broadcastDuelLobby(mapDuel(duel))
     res.json(mapDuel(duel))
   }
   /**

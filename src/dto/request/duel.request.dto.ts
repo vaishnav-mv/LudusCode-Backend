@@ -3,7 +3,6 @@ import { z } from 'zod'
 export const CreateDuelSchema = z.object({
     difficulty: z.enum(['Easy', 'Medium', 'Hard']),
     wager: z.number().int().nonnegative(),
-    player1Id: z.string(),
     player2Id: z.string()
 })
 export type CreateDuelDTO = z.infer<typeof CreateDuelSchema>

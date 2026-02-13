@@ -20,6 +20,7 @@ export class DuelRoutes {
     private setupRoutes() {
         this.router.post('/', auth, validate(CreateDuelSchema), (req, res, next) => this._controller.createDuel(req, res).catch(next))
         this.router.get('/open', (req, res, next) => this._controller.listOpenDuels(req, res).catch(next))
+        this.router.get('/invites', auth, (req, res, next) => this._controller.listInvites(req, res).catch(next))
         this.router.get('/active', auth, (req, res, next) => this._controller.listActiveDuels(req, res).catch(next))
         this.router.post('/open', auth, validate(CreateOpenChallengeSchema), (req, res, next) => this._controller.createOpenChallenge(req, res).catch(next))
         this.router.get('/:id', (req, res, next) => this._controller.duelDetail(req, res).catch(next))
