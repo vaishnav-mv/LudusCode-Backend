@@ -79,8 +79,7 @@ try:
         func = locals()['${fnName}']
         if isinstance(input_val, list) and not isinstance(input_val, str):
              # Simple heuristic: if input is list, try unpacking? 
-             # Actually, for Piston/LeetCode style, usually precise input format is known.
-             # Let's assume standard single arg or list args.
+             # Assumption: Input is either a single argument or a list of arguments (piston/leetcode style).
              try:
                 print(json.dumps(func(*input_val)))
              except TypeError:
@@ -120,12 +119,7 @@ except Exception as e:
         const output = run.stdout ? run.stdout.trim() : '';
         const stderr = run.stderr ? run.stderr.trim() : '';
 
-        // Calculate usage
-        // Piston gives memory in bytes? unsure about public API unit, likely bytes. 
-        // We'll normalize later if needed.
-        // For now, accept whatever Piston says or 0.
-        // Public Piston API might not return granular memory stats always.
-
+        
         if (run.code !== 0 || stderr) {
           results.push({ testCase, status: SubmissionStatus.RuntimeError, userOutput: stderr || "Runtime Error" });
         } else {
