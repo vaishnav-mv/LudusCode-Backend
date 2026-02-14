@@ -190,7 +190,7 @@ export class StudySessionService implements IStudySessionService {
 
     async list(groupId: string, page: number = 1, limit: number = 20, options: { status?: string, sort?: string, q?: string } = {}) {
         const skip = (page - 1) * limit;
-        const sessions = await this._sessions.listByGroup(groupId, skip, limit, options);
+        const { sessions, total } = await this._sessions.listByGroup(groupId, skip, limit, options);
 
         // Update statuses dynamically
         const now = Date.now();
@@ -213,7 +213,12 @@ export class StudySessionService implements IStudySessionService {
             return session;
         }));
 
-        return updatedSessions;
+        return {
+            sessions: updatedSessions,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        };
     }
 
     async getById(id: string) {

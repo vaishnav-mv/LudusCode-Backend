@@ -42,7 +42,7 @@ export interface ISubmissionRepository {
 }
 
 export interface IStudySessionRepository extends IBaseRepository<StudySession> {
-    listByGroup(groupId: string, skip: number, limit: number, options: { status?: string, sort?: string, q?: string }): Promise<StudySession[]>;
+    listByGroup(groupId: string, skip: number, limit: number, options: { status?: string, sort?: string, q?: string }): Promise<{ sessions: StudySession[], total: number }>;
     findActiveRoundRobin(): Promise<StudySession[]>;
 }
 

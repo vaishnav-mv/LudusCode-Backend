@@ -188,7 +188,7 @@ export interface IStudySessionService {
   join(sessionId: string, userId: string): Promise<StudySession | null>
   leave(sessionId: string, userId: string): Promise<StudySession | null>
   passTurn(sessionId: string, userId: string): Promise<StudySession | null>
-  list(groupId: string, page?: number, limit?: number, options?: { status?: string, sort?: string, q?: string }): Promise<StudySession[]>
+  list(groupId: string, page?: number, limit?: number, options?: { status?: string, sort?: string, q?: string }): Promise<{ sessions: StudySession[], total: number, page: number, totalPages: number }>
   getById(id: string): Promise<StudySession | null>
   getByIdSecure(id: string, userId: string): Promise<StudySession | null>
 }

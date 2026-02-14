@@ -84,6 +84,7 @@ export const initRealtime = (server: HttpServer) => {
       }
     });
 
+    //WebRTC Signaling
     socket.on('signal', ({ to, signal }: { to: string, signal: SignalData }) => {
       io.to(to).emit('signal', { from: socket.id, signal });
     });

@@ -47,13 +47,20 @@ export class StudySessionRepository extends BaseRepository<StudySession> impleme
             sort = { startTime: -1 };
         }
 
-        const sessions = await this.model.find(query)
-            .sort(sort)
-            .skip(skip)
-            .limit(limit)
-            .populate('participants.user')
-            .lean();
-        return sessions.map((s: any) => this.mapDoc(s)!);
+        const [sessions, total] = await Promise.all([
+            this.model.find(query)
+                .sort(sort)
+                .skip(skip)
+                .limit(limit)
+                .populate('participants.user')
+                .lean(),
+            this.model.countDocuments(query)
+        ]);
+
+        return {
+            sessions: sessions.map((s: any) => this.mapDoc(s)!),
+            total
+        };
     }
 
     // Delete inherited
