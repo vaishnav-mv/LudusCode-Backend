@@ -23,12 +23,14 @@ export class SubmissionService implements ISubmissionService {
             memoryUsage: result.memoryUsage,
             testCaseResults: result.results
         });
-        return mapSubmission(submission);
+        const dto = mapSubmission(submission);
+        if (!dto) throw new Error('Failed to map submission');
+        return dto;
     }
 
     async getUserSubmissions(userId: string) {
         const submissions = await this._submissionRepo.findByUser(userId);
-        return submissions.map(mapSubmission);
+        return submissions.map(doc => mapSubmission(doc)).filter((s) => s !== null) as import('../dto/response/submission.response.dto').SubmissionResponseDTO[];
     }
 
     async getSolvedProblemIds(userId: string) {

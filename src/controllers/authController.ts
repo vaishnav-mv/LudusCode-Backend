@@ -9,6 +9,7 @@ import {
   LoginRequestDTO, RegisterRequestDTO, VerifyOtpRequestDTO,
   ResendOtpRequestDTO, ForgotPasswordRequestDTO, ResetPasswordRequestDTO
 } from '../dto/request/auth.request.dto'
+import { getErrorMessage } from '../utils/errorUtils'
 
 @singleton()
 export class AuthController {
@@ -31,7 +32,7 @@ export class AuthController {
       const loginResult = await this._service.login(email, password)
       this.setCookies(res, loginResult)
       res.json({ user: loginResult.user })
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.handleError(res, e)
     }
   }
@@ -48,7 +49,7 @@ export class AuthController {
       const loginResult = await this._service.adminLogin(email, password)
       this.setCookies(res, loginResult)
       res.json({ user: loginResult.user })
-    } catch (e: any) {
+    } catch (e: unknown) {
       this.handleError(res, e)
     }
   }
@@ -64,9 +65,9 @@ export class AuthController {
     try {
       const registrationResult = await this._service.register(username, email, password)
       res.json(registrationResult)
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error({ message: 'Registration error', error: e })
-      res.status(HttpStatus.BAD_REQUEST).json({ message: e.message })
+      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
     }
   }
 
@@ -86,8 +87,8 @@ export class AuthController {
       } else {
         res.json({ ok: true })
       }
-    } catch (e: any) {
-      res.status(HttpStatus.BAD_REQUEST).json({ message: e.message })
+    } catch (e: unknown) {
+      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
     }
   }
 
@@ -102,8 +103,8 @@ export class AuthController {
     try {
       await this._service.resendVerificationOtp(email)
       res.json({ ok: true })
-    } catch (e: any) {
-      res.status(HttpStatus.BAD_REQUEST).json({ message: e.message })
+    } catch (e: unknown) {
+      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
     }
   }
 
@@ -118,8 +119,8 @@ export class AuthController {
     try {
       await this._service.forgotPassword(email)
       res.json({ ok: true })
-    } catch (e: any) {
-      res.status(HttpStatus.BAD_REQUEST).json({ message: e.message })
+    } catch (e: unknown) {
+      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
     }
   }
 
@@ -134,8 +135,8 @@ export class AuthController {
     try {
       await this._service.resetPassword(email, code, newPassword)
       res.json({ ok: true })
-    } catch (e: any) {
-      res.status(HttpStatus.BAD_REQUEST).json({ message: e.message })
+    } catch (e: unknown) {
+      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
     }
   }
 
@@ -160,7 +161,7 @@ export class AuthController {
         maxAge: 15 * 60 * 1000
       })
       res.json({ ok: true })
-    } catch (e: any) {
+    } catch {
       res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     }
   }
@@ -193,7 +194,7 @@ export class AuthController {
       if (!user) {
         return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
       }
-      if ((user as any).isBanned) {
+      if (user.isBanned) {
         return res.status(HttpStatus.FORBIDDEN).json({ message: ResponseMessages.USER_BANNED })
       }
       res.json({ user })
@@ -231,12 +232,12 @@ export class AuthController {
       res.cookie('access_token', result.tokens.access, { httpOnly: true, secure: env.COOKIE_SECURE, domain: env.COOKIE_DOMAIN, sameSite: 'lax', maxAge: 15 * 60 * 1000 })
       res.cookie('refresh_token', result.tokens.refresh, { httpOnly: true, secure: env.COOKIE_SECURE, domain: env.COOKIE_DOMAIN, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 })
       res.redirect(env.FRONTEND_URL)
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error({ message: 'Google OAuth error', error: e })
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
         message: ResponseMessages.OAUTH_ERROR,
-        details: e.message,
-        stack: e.stack
+        details: getErrorMessage(e),
+        // stack: e.stack
       })
     }
   }
@@ -270,14 +271,14 @@ export class AuthController {
       res.cookie('access_token', result.tokens.access, { httpOnly: true, secure: env.COOKIE_SECURE, domain: env.COOKIE_DOMAIN, sameSite: 'lax', maxAge: 15 * 60 * 1000 })
       res.cookie('refresh_token', result.tokens.refresh, { httpOnly: true, secure: env.COOKIE_SECURE, domain: env.COOKIE_DOMAIN, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 })
       res.redirect(env.FRONTEND_URL)
-    } catch (e: any) {
+    } catch (e: unknown) {
       logger.error({ message: 'GitHub OAuth error', error: e })
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: ResponseMessages.OAUTH_ERROR })
     }
   }
 
-  private setCookies(res: Response, result: any) {
-    if (result.tokens) {
+  private setCookies(res: Response, result: { tokens?: { access: string, refresh: string }, cookie?: { secure: boolean, domain: string } }) {
+    if (result.tokens && result.cookie) {
       res.cookie('access_token', result.tokens.access, {
         httpOnly: true,
         secure: result.cookie.secure,
@@ -295,12 +296,13 @@ export class AuthController {
     }
   }
 
-  private handleError(res: Response, e: any) {
+  private handleError(res: Response, e: unknown) {
     logger.error({ message: 'Auth error', error: e })
-    if (e.message === ResponseMessages.USER_BANNED) {
-      res.status(HttpStatus.FORBIDDEN).json({ message: e.message })
+    const msg = getErrorMessage(e)
+    if (msg === ResponseMessages.USER_BANNED) {
+      res.status(HttpStatus.FORBIDDEN).json({ message: msg })
     } else {
-      res.status(HttpStatus.UNAUTHORIZED).json({ message: e.message })
+      res.status(HttpStatus.UNAUTHORIZED).json({ message: msg })
     }
   }
 }

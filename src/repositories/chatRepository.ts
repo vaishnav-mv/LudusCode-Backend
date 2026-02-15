@@ -8,7 +8,7 @@ import { Model } from 'mongoose'
 @singleton()
 export class ChatRepository extends BaseRepository<ChatMessage> implements IChatRepository {
   constructor() {
-    super(ChatMessageModel as any)
+    super(ChatMessageModel as unknown as Model<ChatMessage>)
   }
   async getByGroup(groupId: string) {
     const messages = await this.model.find({ groupId })

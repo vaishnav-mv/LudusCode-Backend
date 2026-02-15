@@ -8,11 +8,11 @@ export abstract class BaseRepository<T> implements IBaseRepository<T> {
     this.model = model;
   }
 
-  async all(skip: number = 0, limit: number = 0, filter: FilterQuery<T> = {}, sort: Record<string, SortOrder> = { createdAt: -1 }): Promise<T[]> {
+  async all(skip: number = 0, limit: number = 0, filter: FilterQuery<T> = {}, sort: Record<string, SortOrder> | string = { createdAt: -1 }): Promise<T[]> {
     const query = this.model.find(filter).sort(sort);
     if (limit > 0) query.skip(skip).limit(limit);
     const list = await query.lean();
-    return list.map((doc) => this.mapDoc(doc as any)).filter((item): item is T => item !== undefined);
+    return list.map((doc) => this.mapDoc(doc)).filter((item): item is T => item !== undefined);
   }
 
   async count(filter: FilterQuery<T> = {}): Promise<number> {
@@ -21,17 +21,17 @@ export abstract class BaseRepository<T> implements IBaseRepository<T> {
 
   async getById(id: string): Promise<T | undefined> {
     const doc = await this.model.findById(id).lean();
-    return this.mapDoc(doc as any);
+    return this.mapDoc(doc);
   }
 
   async create(item: Partial<T>): Promise<T> {
     const createdDoc = await this.model.create(item);
-    return this.mapDoc(createdDoc.toObject() as any) as T;
+    return this.mapDoc(createdDoc.toObject()) as T;
   }
 
   async update(id: string, partial: UpdateQuery<T>): Promise<T | undefined> {
     const updatedDoc = await this.model.findByIdAndUpdate(id, partial, { new: true }).lean();
-    return this.mapDoc(updatedDoc as any);
+    return this.mapDoc(updatedDoc);
   }
 
   async delete(id: string): Promise<boolean> {
@@ -39,9 +39,10 @@ export abstract class BaseRepository<T> implements IBaseRepository<T> {
     return !!res;
   }
 
-  protected mapDoc(doc: any): T | undefined {
-    if (!doc) return undefined;
-    return { ...doc, id: doc._id?.toString() || doc.id } as T;
+  protected mapDoc(doc: unknown): T | undefined {
+    if (!doc || typeof doc !== 'object') return undefined;
+    const d = doc as Record<string, unknown> & { _id?: unknown, id?: unknown };
+    return { ...d, id: d._id?.toString() || d.id } as unknown as T;
   }
 }
 

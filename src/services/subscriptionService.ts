@@ -3,15 +3,17 @@ import { SubscriptionPlanModel } from '../models/SubscriptionPlan'
 import { SubscriptionLogModel } from '../models/SubscriptionLog'
 import { IUserRepository } from '../interfaces/repositories'
 
+import { SubscriptionPlan } from '../types'
+
 @singleton()
 export class SubscriptionService {
     constructor(
         @inject("IUserRepository") private _users: IUserRepository
     ) { }
 
-    async getPlans() {
+    async getPlans(): Promise<SubscriptionPlan[]> {
         const plans = await SubscriptionPlanModel.find().lean();
-        return plans.map((p: any) => ({ ...p, id: p._id.toString() }));
+        return plans.map((plan) => ({ ...plan, id: plan._id.toString() })) as unknown as SubscriptionPlan[];
     }
 
     async subscribe(userId: string, planId: string) {

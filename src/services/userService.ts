@@ -3,7 +3,9 @@ import { IUserService } from '../interfaces/services'
 import { IUserRepository, IGroupRepository, IDuelRepository } from '../interfaces/repositories'
 import { mapUser, mapGroup } from '../utils/mapper'
 import { ResponseMessages } from '../constants'
-import { User } from '../types'
+import { User, Duel, Group } from '../types'
+import { UserResponseDTO } from '../dto/response/user.response.dto'
+import { GroupResponseDTO } from '../dto/response/group.response.dto'
 
 @singleton()
 export class UserService implements IUserService {
@@ -13,7 +15,12 @@ export class UserService implements IUserService {
     @inject("IDuelRepository") private _duelRepo: IDuelRepository
   ) { }
 
-  async profile(id: string): Promise<any> {
+  async profile(id: string): Promise<{
+    user: UserResponseDTO | null;
+    recentDuels: Duel[];
+    joinedGroups: GroupResponseDTO[];
+    submissionStats: { total: number, accepted: number, acceptanceRate: number };
+  } | null> {
     const userDoc = await this._userRepo.getById(id);
     if (!userDoc) {
       console.error(`User profile not found for id: ${id}`);
@@ -22,15 +29,20 @@ export class UserService implements IUserService {
 
     // Fetch duels involving the user
     const allDuels = await this._duelRepo.all();
-    const duels = allDuels.filter((duel: any) =>
-      (duel.player1.user?._id?.toString?.() === id || duel.player1.user?.id === id) ||
-      (duel.player2.user?._id?.toString?.() === id || duel.player2.user?.id === id)
-    ).sort((a: any, b: any) => b.startTime - a.startTime);
+    const duels = allDuels.filter((duel: Duel) =>
+      (typeof duel.player1.user === 'object' && duel.player1.user && '_id' in duel.player1.user && duel.player1.user._id?.toString() === id) ||
+      (typeof duel.player1.user === 'string' && duel.player1.user === id) ||
+      (typeof duel.player2.user === 'object' && duel.player2.user && '_id' in duel.player2.user && duel.player2.user._id?.toString() === id) ||
+      (typeof duel.player2.user === 'string' && duel.player2.user === id)
+    ).sort((a: Duel, b: Duel) => b.startTime - a.startTime);
 
     // Fetch groups the user is a member of
     const allGroups = await this._groupRepo.all();
-    const groupsDocs = allGroups.filter((group: any) =>
-      (group.members || []).some((member: any) => (member._id?.toString?.() === id || member.id === id))
+    const groupsDocs = allGroups.filter((group: Group) =>
+      (group.members || []).some((member: User | string) => {
+        if (typeof member === 'string') return member === id;
+        return member._id?.toString() === id || member.id === id;
+      })
     );
 
     const submissionStats = {
@@ -45,7 +57,7 @@ export class UserService implements IUserService {
     return {
       user: mapUser(userDoc, rank),
       recentDuels: duels,
-      joinedGroups: groupsDocs.map(mapGroup),
+      joinedGroups: groupsDocs.map(g => mapGroup(g)).filter((g): g is GroupResponseDTO => g !== null),
       submissionStats
     };
   }

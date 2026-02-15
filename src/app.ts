@@ -22,6 +22,8 @@ import { SubmissionRoutes } from './routes/submission.routes'
 import { SubscriptionRoutes } from './routes/subscription.routes'
 import { HealthRoutes } from './routes/health.routes'
 import { container } from 'tsyringe'
+import Logger from './utils/logger'
+import { ErrorMiddleware } from './middleware/errorHandler'
 import { AuthMiddleware } from './middleware/auth'
 const auth = container.resolve(AuthMiddleware).auth
 import { PermissionsMiddleware } from './middleware/permissions'
@@ -32,7 +34,6 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(cors({ origin: env.CORS_ORIGIN, credentials: true }))
 app.use(helmet())
-import Logger from './utils/logger'
 
 const morganFormat = ':method :url :status :response-time ms'
 
@@ -54,7 +55,7 @@ app.use(
 const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 100 })
 const apiLimiter = rateLimit({ windowMs: 60 * 1000, max: 500 })
 const csrfProtection = csurf({ cookie: true, ignoreMethods: ['GET', 'HEAD', 'OPTIONS'] })
-app.get('/api/csrf-token', csrfProtection, (req, res) => { res.json({ csrfToken: (req as any).csrfToken() }) })
+app.get('/api/csrf-token', csrfProtection, (req, res) => { res.json({ csrfToken: req.csrfToken() }) })
 app.use('/api/auth', authLimiter, csrfProtection, new AuthRoutes().router)
 app.use('/api/groups', apiLimiter, csrfProtection, auth, new GroupRoutes().router)
 app.use('/api/study-sessions', apiLimiter, csrfProtection, auth, new StudySessionRoutes().router)
@@ -70,7 +71,6 @@ app.use('/api/submissions', apiLimiter, csrfProtection, auth, new SubmissionRout
 app.use('/api/subscriptions', apiLimiter, csrfProtection, new SubscriptionRoutes().router)
 app.use('/api/health', new HealthRoutes().router)
 app.use((req, res) => res.status(404).json({ message: 'Not found' }))
-import { ErrorMiddleware } from './middleware/errorHandler'
 const errorHandler = container.resolve(ErrorMiddleware).handle
 app.use(errorHandler)
 export default app

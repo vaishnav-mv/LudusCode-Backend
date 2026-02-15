@@ -12,5 +12,6 @@ export interface DuelResponseDTO {
     wager?: number
     finalOverallStatus?: SubmissionStatus
     finalUserCode?: string
-    submissions?: any[]
+    submissions?: Submission[]
 }
+import { Submission } from '../../types'

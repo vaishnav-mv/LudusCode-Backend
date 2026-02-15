@@ -18,11 +18,12 @@ export class SubmissionRepository extends BaseRepository<ProblemSubmission> impl
     }
 
     async findByUser(userId: string, limit: number = 20): Promise<ProblemSubmission[]> {
-        return await this.model.find({ userId })
+        const list = await this.model.find({ userId })
             .sort({ createdAt: -1 })
             .limit(limit)
             .populate('problemId')
             .lean();
+        return list.map(doc => this.mapDoc(doc)!);
     }
 
     async getSolvedProblemIds(userId: string): Promise<string[]> {

@@ -4,6 +4,7 @@ import { HttpStatus, ResponseMessages } from '../constants'
 import { IAiService } from '../interfaces/services'
 import { IProblemRepository, IUserRepository, IGroupRepository } from '../interfaces/repositories'
 import { HintDTO, CodeReviewDTO, PerformanceDTO } from '../dto/request/ai.request.dto'
+import { getErrorMessage } from '../utils/errorUtils'
 
 @singleton()
 export class AiController {
@@ -28,8 +29,8 @@ export class AiController {
             if (!problem) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
             const hintText = await this._service.hint(problem, userCode);
             res.json({ hint: hintText });
-        } catch (e: any) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: e.message });
+        } catch (e: unknown) {
+            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
         }
     }
 
@@ -47,8 +48,8 @@ export class AiController {
             if (!problem) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
             const review = await this._service.codeReview(problem, userCode);
             res.json({ review: review });
-        } catch (e: any) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: e.message });
+        } catch (e: unknown) {
+            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
         }
     }
 
@@ -64,16 +65,19 @@ export class AiController {
             const { userId } = body;
             const profile = await this._userRepo.getById(userId);
             if (!profile) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
-            const joinedGroups = (await this._groupRepo.all()).filter((group: any) => (group.members || []).some((member: any) => (member._id?.toString?.() === userId)));
+            const joinedGroups = (await this._groupRepo.all()).filter(group => (group.members || []).some(member => {
+                const memberId = typeof member === 'string' ? member : member._id?.toString() || member.id;
+                return memberId === userId;
+            }));
             const submissionStats = {
-                total: (profile as any).duelsWon + (profile as any).duelsLost,
-                accepted: (profile as any).duelsWon,
-                acceptanceRate: ((profile as any).duelsWon + (profile as any).duelsLost) > 0 ? ((profile as any).duelsWon / ((profile as any).duelsWon + (profile as any).duelsLost)) * 100 : 0
+                total: profile.duelsWon + profile.duelsLost,
+                accepted: profile.duelsWon,
+                acceptanceRate: (profile.duelsWon + profile.duelsLost) > 0 ? (profile.duelsWon / (profile.duelsWon + profile.duelsLost)) * 100 : 0
             };
             const analysis = await this._service.performance({ user: profile, submissionStats, joinedGroups });
             res.json({ analysis });
-        } catch (e: any) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: e.message });
+        } catch (e: unknown) {
+            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
         }
     }
 
@@ -88,8 +92,8 @@ export class AiController {
             const { concept } = req.body;
             const explanation = await this._service.explainConcept(concept);
             res.json({ explanation });
-        } catch (e: any) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: e.message });
+        } catch (e: unknown) {
+            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
         }
     }
 
@@ -104,8 +108,8 @@ export class AiController {
             const { messages } = req.body;
             const summary = await this._service.summarizeDiscussion(messages);
             res.json({ summary });
-        } catch (e: any) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: e.message });
+        } catch (e: unknown) {
+            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
         }
     }
 
@@ -120,8 +124,8 @@ export class AiController {
             const { difficulty, topic } = req.body;
             const problem = await this._service.generateProblem(difficulty, topic);
             res.json(problem);
-        } catch (e: any) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: e.message });
+        } catch (e: unknown) {
+            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
         }
     }
 }

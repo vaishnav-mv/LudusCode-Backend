@@ -1,21 +1,23 @@
 import { singleton, inject } from 'tsyringe'
+import Razorpay from 'razorpay'
 import crypto from 'crypto'
 import { IWalletRepository } from '../interfaces/repositories'
 import { IWalletService } from '../interfaces/services'
 import { env } from '../config/env'
+import { RazorpayOrder } from '../types'
 
 @singleton()
 export class WalletService implements IWalletService {
-    private _razorpay: any
+    private _razorpay: Razorpay
 
     constructor(@inject("IWalletRepository") private _wallets: IWalletRepository) {
         // Initialize Razorpay with env vars (or defaults for safety)
-        const Razorpay = require('razorpay');
         this._razorpay = new Razorpay({
             key_id: env.RAZORPAY_KEY_ID || 'rzp_test_123',
             key_secret: env.RAZORPAY_KEY_SECRET || 'secret'
         })
     }
+
 
     async get(userId: string) {
         return this._wallets.get(userId);
@@ -29,8 +31,8 @@ export class WalletService implements IWalletService {
         };
         try {
             const order = await this._razorpay.orders.create(options);
-            return order;
-        } catch (error) {
+            return order as unknown as RazorpayOrder;
+        } catch (error: unknown) {
             console.error("Razorpay Error:", error);
             throw new Error("Failed to create payment order");
         }
@@ -38,12 +40,12 @@ export class WalletService implements IWalletService {
 
     async verifyDeposit(userId: string, orderId: string, paymentId: string, signature: string) {
         const secret = env.RAZORPAY_KEY_SECRET || 'secret';
-        const generated_signature = crypto
+        const generatedSignature = crypto
             .createHmac('sha256', secret)
             .update(orderId + "|" + paymentId)
             .digest('hex');
 
-        if (generated_signature === signature) {
+        if (generatedSignature === signature) {
             // Signature valid, proceed to deposit
             // For simplicity/MVP as per plan: just fetch the payment details to get AMOUNT
             const payment = await this._razorpay.payments.fetch(paymentId);
@@ -55,13 +57,12 @@ export class WalletService implements IWalletService {
         return false;
     }
 
-    // Manual/Admin deposit (internal use)
     async deposit(userId: string, amount: number) {
         await this._wallets.deposit(userId, amount, `Deposit of ₹${amount.toFixed(2)}`);
     }
 
     // Updated: Simulated Withdrawal (since Razorpay Test Mode doesn't support real Payouts)
-    async withdraw(userId: string, amount: number, vpa: string, name: string = "User", email: string = "user@example.com", phone: string = "9999999999") {
+    async withdraw(userId: string, amount: number, vpa: string, _name?: string, _email?: string, _phone?: string) {
         // 1. Check Balance locally first
         const wallet = await this._wallets.get(userId);
         if (!wallet || wallet.balance < amount) return false;
@@ -77,9 +78,10 @@ export class WalletService implements IWalletService {
 
             console.log(`[WalletService] Withdrawal successful.`);
             return true;
-        } catch (error: any) {
-            console.error("Withdrawal Error:", error.message);
-            throw new Error(error.message || "Withdrawal failed");
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : 'Withdrawal failed';
+            console.error("Withdrawal Error:", msg);
+            throw new Error(msg);
         }
     }
 

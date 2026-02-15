@@ -3,9 +3,8 @@ import { singleton, inject } from 'tsyringe'
 import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository, IWalletRepository } from '../interfaces/repositories'
 import { broadcastDuel } from '../realtime/ws'
 import { mapDuel } from '../utils/mapper'
-import { createHash } from 'crypto'
 import { IAdminService, IJudgeService, IDuelService } from '../interfaces/services'
-import { DuelStatus, ProblemStatus, User } from '../types'
+import { DuelStatus, ProblemStatus, User, SubscriptionPlan, Problem } from '../types'
 import { SubscriptionPlanModel } from '../models/SubscriptionPlan'
 import { SubscriptionLogModel } from '../models/SubscriptionLog'
 
@@ -68,7 +67,8 @@ export class AdminService implements IAdminService {
           const commission = pool * rate
           totalCommissions += commission
 
-          const problemTitle = typeof duel.problem === 'object' && duel.problem && 'title' in duel.problem ? (duel.problem as any).title : 'Unknown';
+          const problem = typeof duel.problem === 'object' && duel.problem ? duel.problem as Problem : null;
+          const problemTitle = problem ? problem.title : 'Unknown';
 
           recent.push({
             duelId: duel.id || duel._id?.toString() || '',
@@ -184,14 +184,17 @@ export class AdminService implements IAdminService {
       }
 
       // Handle ownership transfer or group deletion for groups owned by banned user
-      const ownedGroups = allGroups.filter((group: any) => (group.owner?._id?.toString?.() || group.owner?.toString?.()) === id)
+      const ownedGroups = allGroups.filter(group => {
+        const ownerId = typeof group.owner === 'string' ? group.owner : group.owner._id?.toString() || group.owner.id;
+        return ownerId === id;
+      })
       for (const group of ownedGroups) {
         // Members have already been updated by loop above (user removed)
 
-        const remainingMembers = group.members as any[]
+        const remainingMembers = group.members
         if (remainingMembers.length > 0) {
           const newOwner = remainingMembers[0]
-          const newOwnerId = newOwner._id?.toString?.() || newOwner.toString()
+          const newOwnerId = typeof newOwner === 'string' ? newOwner : newOwner._id?.toString() || newOwner.id
 
           await this._groups.update(group._id as string, { owner: newOwnerId })
         } else {
@@ -215,14 +218,18 @@ export class AdminService implements IAdminService {
     const duels = await this._duels.all()
     const flags = new Map<string, { count: number; paste: number; visibility: number; last: number }>()
     for (const duel of duels) {
-      const submissions = (duel as any).submissions || []
+      const submissions = duel.submissions || []
       if (submissions.length >= 2) {
         const submission1 = submissions[0]
         const submission2 = submissions[1]
         const close = Math.abs((submission1.submittedAt || 0) - (submission2.submittedAt || 0)) <= 120000
         const copied = submission1.codeHash && submission2.codeHash && submission1.codeHash === submission2.codeHash
         if (copied && close) {
-          const uids = [(submission1.userId || submission1.user?._id?.toString?.()), (submission2.userId || submission2.user?._id?.toString?.())].filter(Boolean) as string[]
+          const u1 = submission1.user;
+          const u2 = submission2.user;
+          const uid1 = typeof u1 === 'string' ? u1 : u1?._id?.toString() || u1?.id;
+          const uid2 = typeof u2 === 'string' ? u2 : u2?._id?.toString() || u2?.id;
+          const uids = [uid1, uid2].filter(Boolean) as string[]
           for (const uid of uids) {
             const prev = flags.get(uid) || { count: 0, paste: 0, visibility: 0, last: 0 }
             const last = Math.max(prev.last, (submission1.submittedAt || 0), (submission2.submittedAt || 0))
@@ -239,7 +246,7 @@ export class AdminService implements IAdminService {
     return out
   }
 
-  async clearFlags(userId: string) {
+  async clearFlags(_userId: string) {
     return true
   }
 
@@ -251,17 +258,20 @@ export class AdminService implements IAdminService {
   async cancelDuel(id: string) {
     const duel = await this._duels.getById(id)
     if (!duel) return false
-    const wager = (duel as any).wager || 0
+    const wager = duel.wager || 0
     if (wager > 0) {
-      const player1Id = (duel as any).player1?.user?.id || (duel as any).player1?.user?._id?.toString?.()
-      const player2Id = (duel as any).player2?.user?.id || (duel as any).player2?.user?._id?.toString?.()
+      const p1 = duel.player1.user;
+      const p2 = duel.player2.user;
+      const player1Id = typeof p1 === 'string' ? p1 : p1?._id?.toString() || p1?.id;
+      const player2Id = typeof p2 === 'string' ? p2 : p2?._id?.toString() || p2?.id;
       if (player1Id) await this._wallets.add(player1Id, wager, 'Duel cancel refund')
       if (player2Id) await this._wallets.add(player2Id, wager, 'Duel cancel refund')
     }
     await this._duels.update(id, { status: DuelStatus.Cancelled, winner: null })
     const updatedDuel = await this._duels.getById(id)
     if (updatedDuel) {
-      broadcastDuel(id, mapDuel(updatedDuel))
+      const dto = mapDuel(updatedDuel);
+      if (dto) broadcastDuel(id, dto)
     }
     return true
   }
@@ -270,7 +280,8 @@ export class AdminService implements IAdminService {
     try {
       const duel = await this._duelService.finish(id, winnerId)
       if (duel) {
-        broadcastDuel(id, mapDuel(duel))
+        const dto = mapDuel(duel);
+        if (dto) broadcastDuel(id, dto)
       }
       return true
     } catch {
@@ -283,30 +294,42 @@ export class AdminService implements IAdminService {
     const logs = await SubscriptionLogModel.find().populate('userId', 'username avatarUrl').populate('planId', 'name period').sort({ timestamp: -1 }).limit(100).lean()
 
     // Transform logs to match frontend expectations
-    const formattedLogs = logs.map((log: any) => {
-      let expiry = log.expiryDate;
-      if (!expiry && log.planId && log.planId.period) {
-        const start = new Date(log.timestamp);
-        if (log.planId.period === 'monthly') start.setMonth(start.getMonth() + 1);
-        else if (log.planId.period === 'yearly') start.setFullYear(start.getFullYear() + 1);
+    interface PopulatedLog {
+      _id: string;
+      userId?: { username: string; avatarUrl: string };
+      planId?: { name: string; period: string };
+      action: string;
+      timestamp: Date;
+      amount: number;
+      expiryDate?: Date;
+    }
+
+    const formattedLogs = logs.map((log) => {
+      // safe access using interface type
+      const logObj = log as unknown as PopulatedLog;
+      let expiry = logObj.expiryDate;
+      if (!expiry && logObj.planId && logObj.planId.period) {
+        const start = new Date(logObj.timestamp);
+        if (logObj.planId.period === 'monthly') start.setMonth(start.getMonth() + 1);
+        else if (logObj.planId.period === 'yearly') start.setFullYear(start.getFullYear() + 1);
         expiry = start;
       }
 
       return {
-        id: log._id.toString(),
+        id: logObj._id.toString(),
         user: {
-          name: log.userId?.username || 'Unknown',
-          avatarUrl: log.userId?.avatarUrl || 'https://via.placeholder.com/150'
+          name: logObj.userId?.username || 'Unknown',
+          avatarUrl: logObj.userId?.avatarUrl || 'https://via.placeholder.com/150'
         },
-        plan: { name: log.planId?.name || 'Unknown Plan' },
-        action: log.action,
-        timestamp: log.timestamp,
-        amount: log.amount,
+        plan: { name: logObj.planId?.name || 'Unknown Plan' },
+        action: logObj.action,
+        timestamp: logObj.timestamp,
+        amount: logObj.amount,
         expiryDate: expiry
       }
     })
 
-    const formattedPlans = plans.map((p: any) => ({
+    const formattedPlans = plans.map((p) => ({
       id: p._id.toString(),
       name: p.name,
       price: p.price,
@@ -317,15 +340,15 @@ export class AdminService implements IAdminService {
     return { plans: formattedPlans, logs: formattedLogs }
   }
 
-  async createPlan(data: any) {
+  async createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {
     const plan = await SubscriptionPlanModel.create(data)
-    return { ...plan.toObject(), id: plan._id.toString() }
+    return { ...plan.toObject(), _id: plan._id.toString(), id: plan._id.toString() } as unknown as SubscriptionPlan
   }
 
-  async updatePlan(id: string, data: any) {
+  async updatePlan(id: string, data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | null> {
     const plan = await SubscriptionPlanModel.findByIdAndUpdate(id, data, { new: true })
     if (!plan) return null;
-    return { ...plan.toObject(), id: plan._id.toString() }
+    return { ...plan.toObject(), _id: plan._id.toString(), id: plan._id.toString() } as unknown as SubscriptionPlan
   }
 
   async deletePlan(id: string) {

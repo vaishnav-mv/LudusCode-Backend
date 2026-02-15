@@ -18,7 +18,7 @@ export class WalletRepository implements IWalletRepository {
     }
 
     // wallet is definitely defined here
-    const w = wallet!;
+    const userWallet = wallet!;
 
     // Fetch recent transactions
     const transactions = await TransactionModel.find({ userId })
@@ -27,19 +27,19 @@ export class WalletRepository implements IWalletRepository {
       .lean();
 
     // Destructure to avoid returning ObjectId _id
-    const { _id, ...rest } = w.toObject ? w.toObject() : w;
+    const { _id, ...rest } = userWallet.toObject ? userWallet.toObject() : userWallet;
     return {
       ...rest,
       id: _id.toString(),
-      userId: w.userId.toString(),
-      transactions: transactions.map(t => {
-        const trans = t as any;
+      userId: userWallet.userId.toString(),
+      transactions: transactions.map(transaction => {
+        // transaction is LeanDocument<Transaction>
         return {
-          ...trans,
-          _id: trans._id.toString(),
-          id: trans._id.toString(),
-          timestamp: trans.createdAt
-        };
+          ...transaction,
+          _id: transaction._id.toString(),
+          id: transaction._id.toString(),
+          timestamp: transaction.createdAt
+        } as unknown as import('../types').Transaction;
       })
     }
   }

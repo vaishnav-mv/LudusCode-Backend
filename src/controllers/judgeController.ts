@@ -25,15 +25,15 @@ export class JudgeController {
         if (!problem) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
 
         // Find matching solution
-        const problemDocument = problem as any;
-        let solutionCode = problemDocument.solution?.code; // Fallback
 
-        if (problemDocument.solutions && problemDocument.solutions.length > 0) {
-            const match = problemDocument.solutions.find((solutionEntry: any) => solutionEntry.language.toLowerCase() === language.toLowerCase());
+        let solutionCode = problem.solution?.code; // Fallback
+
+        if (problem.solutions && problem.solutions.length > 0) {
+            const match = problem.solutions.find(solutionEntry => solutionEntry.language.toLowerCase() === language.toLowerCase());
             if (match) solutionCode = match.code;
         }
 
-        let testCasesToRun = (problem as any).testCases;
+        let testCasesToRun = problem.testCases || [];
         const { customInputs } = body;
 
         if (customInputs && Array.isArray(customInputs) && customInputs.length > 0) {
@@ -42,7 +42,7 @@ export class JudgeController {
                 const dummyTestCases = customInputs.map((input: string) => ({ input, output: 'null', isSample: false }));
                 const solutionResult = await this._service.execute(solutionCode, solutionCode, dummyTestCases, problem, language);
 
-                testCasesToRun = solutionResult.results.map((res: any, idx: number) => {
+                testCasesToRun = solutionResult.results.map((res, idx) => {
                     // When generating expected outputs, 'Wrong Answer' is expected because we use 'null' as dummy expected output.
                     // We only consider it a failure if the solution crashed (Runtime Error, etc.)
                     const isFailure = res.status !== 'Accepted' && res.status !== 'Wrong Answer';

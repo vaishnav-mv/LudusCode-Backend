@@ -19,7 +19,7 @@ export class ChatController {
     getMessages = async (req: Request, res: Response) => {
         const groupId = req.params.groupId;
         const messages = await this._service.getMessages(groupId);
-        res.json(messages.map(mapMessage));
+        res.json(messages.map(mapMessage).filter(Boolean));
     }
 
     /**
@@ -34,8 +34,11 @@ export class ChatController {
         const userId = body.userId;
         const sentMessage = await this._service.sendMessage(groupId, userId, body.text);
         const dto = mapMessage(sentMessage);
-        broadcastChat(groupId, dto);
-
-        res.json(dto);
+        if (dto) {
+            broadcastChat(groupId, dto);
+            res.json(dto);
+        } else {
+            res.status(500).json({ message: 'Error mapping message' });
+        }
     }
 }

@@ -61,8 +61,7 @@ export class AuthService implements IAuthService {
       isAdmin: false,
       isBanned: false,
       isPremium: false,
-      isVerified: false
-    } as any);
+    });
     const code = await this._otpService.create(email, 'register');
     logger.info({ message: 'OTP for registration', code })
     await this._emailService.sendOtp(email, code);
@@ -118,8 +117,8 @@ export class AuthService implements IAuthService {
 
   async refresh(refreshToken: string) {
     const payload = this._jwtService.verify(refreshToken);
-    if (typeof payload === 'string' || !('sub' in payload)) throw new Error(ResponseMessages.INVALID_TOKEN);
-    const user = await this._userRepo.getById((payload as any).sub);
+    if (typeof payload === 'string' || !payload.sub) throw new Error(ResponseMessages.INVALID_TOKEN);
+    const user = await this._userRepo.getById(payload.sub);
     if (!user) throw new Error(ResponseMessages.USER_NOT_FOUND);
     if (user.isBanned) throw new Error(ResponseMessages.USER_BANNED);
 

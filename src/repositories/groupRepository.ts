@@ -1,7 +1,7 @@
 import { singleton } from 'tsyringe'
 import { IGroupRepository } from '../interfaces/repositories'
 import { GroupModel } from '../models/Group'
-import { Model } from 'mongoose'
+import { Model, FilterQuery } from 'mongoose'
 import { Group } from '../types'
 import { BaseRepository } from './BaseRepository'
 
@@ -11,8 +11,8 @@ export class GroupRepository extends BaseRepository<Group> implements IGroupRepo
     super(GroupModel as unknown as Model<Group>)
   }
 
-  async all(skip: number = 0, limit: number = 0, filter: Record<string, unknown> = {}, sort: Record<string, unknown> = { createdAt: -1 }) {
-    const query = this.model.find(filter as any).sort(sort as any)
+  async all(skip: number = 0, limit: number = 0, filter: FilterQuery<Group> = {}, sort: Record<string, 1 | -1> | string = { createdAt: -1 }) {
+    const query = this.model.find(filter).sort(sort)
     if (limit > 0) query.skip(skip).limit(limit)
 
     const list = await query
@@ -22,7 +22,7 @@ export class GroupRepository extends BaseRepository<Group> implements IGroupRepo
       .populate('owner')
       .lean()
 
-    return list.map((group: any) => this.mapDoc(group)!)
+    return list.map((group) => this.mapDoc(group)!)
   }
 
   // Count inherited
@@ -58,7 +58,7 @@ export class GroupRepository extends BaseRepository<Group> implements IGroupRepo
 
     const group = await this.model.findOne({
       name: { $regex: `^${escapedName}$`, $options: 'i' }
-    } as any)
+    })
       .populate('members')
       .populate('pendingMembers')
       .populate('blockedMembers')

@@ -1,7 +1,7 @@
 import { singleton, inject } from 'tsyringe'
 import { IDuelRepository, IProblemRepository, IUserRepository, IWalletRepository } from '../interfaces/repositories'
 import { IDuelService, IJudgeService } from '../interfaces/services'
-import { Duel, DuelStatus, Difficulty, SubmissionStatus } from '../types'
+import { Duel, DuelStatus, Difficulty, SubmissionStatus, User } from '../types'
 import { createHash } from 'crypto'
 
 import { ResponseMessages } from '../constants'
@@ -68,7 +68,8 @@ export class DuelService implements IDuelService {
       winner = user || null;
 
       if (winner && duel.wager && duel.wager > 0) {
-        await this._wallets.add((winner as any)._id?.toString?.() || (winner as any).id, duel.wager * 2, 'Duel winnings');
+        const winnerId = winner.id || winner._id?.toString()
+        if (winnerId) await this._wallets.add(winnerId, duel.wager * 2, 'Duel winnings');
       }
     }
 
@@ -84,12 +85,7 @@ export class DuelService implements IDuelService {
     const resolvedId = playerId;
 
     const active = all.filter(duel => {
-      const player1 = (duel.player1?.user as any);
-      const player2 = (duel.player2?.user as any);
-
-      const p1Id = player1?._id?.toString() || player1?.id || (typeof player1 === 'string' ? player1 : null);
-      const p2Id = player2?._id?.toString() || player2?.id || (typeof player2 === 'string' ? player2 : null);
-
+      const { p1Id, p2Id } = this._getPlayerIds(duel);
       const isParticipant = p1Id === resolvedId || p2Id === resolvedId;
       return duel.status === DuelStatus.InProgress && isParticipant;
     });
@@ -101,9 +97,7 @@ export class DuelService implements IDuelService {
     const all = await this._duels.all();
     // Filter for duels where I am player2 AND status is Waiting
     const invites = all.filter(duel => {
-      const player2 = (duel.player2?.user as any);
-      const p2Id = player2?._id?.toString() || player2?.id || (typeof player2 === 'string' ? player2 : null);
-
+      const { p2Id } = this._getPlayerIds(duel);
       return p2Id === userId && duel.status === DuelStatus.Waiting;
     });
     return invites;
@@ -128,8 +122,8 @@ export class DuelService implements IDuelService {
 
     const duelPayload = {
       id: `duel-${Date.now()}`,
-      problem: (problem as any)._id || problem.id,
-      player1: { user: (player1User as any)._id || player1User.id, warnings: 0 },
+      problem: typeof problem === 'string' ? problem : (problem.id || problem._id!.toString()),
+      player1: { user: typeof player1User === 'string' ? player1User : (player1User.id || player1User._id!.toString()), warnings: 0 },
       player2: { user: null, warnings: 0 },
       status: DuelStatus.Waiting,
       startTime: Date.now(),
@@ -146,7 +140,10 @@ export class DuelService implements IDuelService {
     const player2UserId = playerId
 
     // Prevent self-join
-    const player1Id = (duel.player1.user as any)._id?.toString() || (duel.player1.user as any).id || duel.player1.user;
+    const player1Obj = duel.player1.user;
+    if (!player1Obj) throw new Error(ResponseMessages.DUEL_NOT_FOUND); // Should imply invalid duel state
+    const player1Id = typeof player1Obj === 'string' ? player1Obj : (player1Obj.id || player1Obj._id?.toString());
+    if (!player1Id) throw new Error(ResponseMessages.DUEL_NOT_FOUND);
     if (player1Id.toString() === player2UserId.toString()) {
       throw new Error(ResponseMessages.CANNOT_JOIN_OWN_DUEL);
     }
@@ -157,7 +154,7 @@ export class DuelService implements IDuelService {
     if (wager > 0) await this._wallets.add(player2UserId, -wager, 'Duel wager')
     // Atomic join
     const updatedDuel = await this._duels.attemptJoin(id, {
-      user: player2User._id?.toString() || player2User.id,
+      user: player2User.id || player2User._id?.toString() || '',
       warnings: 0
     });
 
@@ -175,7 +172,8 @@ export class DuelService implements IDuelService {
 
     // Log the join
     console.log(`[DuelService.join] Player ${player2UserId} joined duel ${id}. Status: InProgress`);
-    console.log(`[DuelService.join] Player 1: ${(updatedDuel as any).player1?.user?._id || (updatedDuel as any).player1?.user}`);
+    const { p1Id } = this._getPlayerIds(updatedDuel);
+    console.log(`[DuelService.join] Player 1: ${p1Id}`);
 
     return updatedDuel
   }
@@ -187,7 +185,7 @@ export class DuelService implements IDuelService {
   }
   async finish(id: string, winnerId?: string, finalOverallStatus?: string, finalUserCode?: string) {
     // 1. Determine the winner object
-    let winner: any = null;
+    let winner: User | null = null;
     if (winnerId) {
       const resolvedWinnerId = winnerId;
       const user = await this._users.getById(resolvedWinnerId);
@@ -217,31 +215,40 @@ export class DuelService implements IDuelService {
 
     // B. Transfer Winnings
     if (winner && finishedDuel.wager && finishedDuel.wager > 0) {
-      await this._wallets.add((winner as any)._id?.toString?.() || (winner as any).id, finishedDuel.wager * 2, 'Duel winnings');
+      const winnerId = winner.id || winner._id?.toString();
+      if (winnerId) await this._wallets.add(winnerId, finishedDuel.wager * 2, 'Duel winnings');
     }
 
     // C. ELO Calculation
     try {
       const duelForElo = finishedDuel; // We already have the updated duel
       if (duelForElo && duelForElo.winner) {
-        const player1Id = (duelForElo as any).player1?.user?._id?.toString?.() || (duelForElo as any).player1?.user?.id
-        const player2Id = (duelForElo as any).player2?.user?._id?.toString?.() || (duelForElo as any).player2?.user?.id
-        const absoluteWinnerId = (duelForElo as any).winner?._id?.toString?.() || (duelForElo as any).winner?.id
-        const absoluteLoserId = absoluteWinnerId === player1Id ? player2Id : player1Id
-        const winner = await this._users.getById(absoluteWinnerId)
-        const loser = await this._users.getById(absoluteLoserId)
-        if (winner && loser) {
-          const kFactor = 32
-          const expectedWinner = 1 / (1 + Math.pow(10, (((loser as any).elo || 1200) - ((winner as any).elo || 1200)) / 400))
-          const expectedLoser = 1 / (1 + Math.pow(10, (((winner as any).elo || 1200) - ((loser as any).elo || 1200)) / 400))
-          const newWinnerElo = Math.round(((winner as any).elo || 1200) + kFactor * (1 - expectedWinner))
-          const newLoserElo = Math.round(((loser as any).elo || 1200) + kFactor * (0 - expectedLoser))
+        const { p1Id, p2Id } = this._getPlayerIds(duelForElo);
+        // Helper to get ID from User | string
+        const getWinnerId = (u: User | string | undefined | null) => {
+          if (!u) return null;
+          return typeof u === 'string' ? u : (u.id || u._id?.toString() || null);
+        };
+        const absoluteWinnerId = getWinnerId(duelForElo.winner);
 
-          await this._users.update(absoluteWinnerId, { elo: newWinnerElo, duelsWon: ((winner as any).duelsWon || 0) + 1 })
-          await this._users.update(absoluteLoserId, { elo: newLoserElo, duelsLost: ((loser as any).duelsLost || 0) + 1 })
+        if (p1Id && p2Id && absoluteWinnerId) {
+          const absoluteLoserId = absoluteWinnerId === p1Id ? p2Id : p1Id
+          const winner = await this._users.getById(absoluteWinnerId)
+          const loser = await this._users.getById(absoluteLoserId)
+
+          if (winner && loser) {
+            const kFactor = 32
+            const expectedWinner = 1 / (1 + Math.pow(10, ((loser.elo || 1200) - (winner.elo || 1200)) / 400))
+            const expectedLoser = 1 / (1 + Math.pow(10, ((winner.elo || 1200) - (loser.elo || 1200)) / 400))
+            const newWinnerElo = Math.round((winner.elo || 1200) + kFactor * (1 - expectedWinner))
+            const newLoserElo = Math.round((loser.elo || 1200) + kFactor * (0 - expectedLoser))
+
+            await this._users.update(absoluteWinnerId, { elo: newWinnerElo, duelsWon: (winner.duelsWon || 0) + 1 })
+            await this._users.update(absoluteLoserId, { elo: newLoserElo, duelsLost: (loser.duelsLost || 0) + 1 })
+          }
         }
       }
-    } catch { }
+    } catch { /* empty */ }
 
     return this._duels.getById(id); // Return fresh copy
   }
@@ -267,8 +274,7 @@ export class DuelService implements IDuelService {
     // Refund both players' wagers (no one wins, no commission)
     const wager = duel.wager || 0;
     if (wager > 0) {
-      const p1Id = (duel.player1?.user as any)?._id?.toString?.() || (duel.player1?.user as any)?.id;
-      const p2Id = (duel.player2?.user as any)?._id?.toString?.() || (duel.player2?.user as any)?.id;
+      const { p1Id, p2Id } = this._getPlayerIds(duel);
       if (p1Id) await this._wallets.add(p1Id, wager, 'Duel draw refund');
       if (p2Id) await this._wallets.add(p2Id, wager, 'Duel draw refund');
     }
@@ -278,12 +284,16 @@ export class DuelService implements IDuelService {
   }
 
   // Helper to extract player IDs from a duel
-  private _getPlayerIds(duel: any): { p1Id: string | null, p2Id: string | null } {
-    const p1 = duel.player1?.user;
-    const p2 = duel.player2?.user;
-    const p1Id = p1?._id?.toString?.() || p1?.id || (typeof p1 === 'string' ? p1 : null);
-    const p2Id = p2?._id?.toString?.() || p2?.id || (typeof p2 === 'string' ? p2 : null);
-    return { p1Id, p2Id };
+  private _getPlayerIds(duel: Duel): { p1Id: string | null, p2Id: string | null } {
+    const getUserId = (u: User | string | undefined | null) => {
+      if (!u) return null;
+      if (typeof u === 'string') return u;
+      return u.id || u._id?.toString() || null;
+    }
+    return {
+      p1Id: getUserId(duel.player1?.user),
+      p2Id: getUserId(duel.player2?.user)
+    };
   }
 
   async submitSolution(id: string, playerId: string, userCode: string) {
@@ -307,8 +317,10 @@ export class DuelService implements IDuelService {
     }
 
     // Server-side Execution
-    const problem = (duel.problem as any);
-    const problemDoc = problem?._id ? problem : await this._problems.getById(problem?.toString() || duel.problem?.toString());
+    const problem = duel.problem;
+    const problemId = typeof problem === 'string' ? problem : (problem.id || problem._id?.toString());
+    const problemDoc = problemId ? await this._problems.getById(problemId) : null;
+
     if (!problemDoc) throw new Error("Problem not found for duel");
 
     const solutionCode = problemDoc.solution?.code || '';
@@ -317,20 +329,24 @@ export class DuelService implements IDuelService {
 
     // Execute!
     console.log('[DuelService] Executing user code against Piston...', { userId, problemId: problemDoc.id, language });
-    let result: any;
+    let result: import('../types').SubmissionResult; // Valid type
     try {
       result = await this._judge.execute(userCode, solutionCode, testCases, problemDoc, language);
       console.log('[DuelService] Execution successful:', result.overallStatus);
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('[DuelService] Execution failed:', e);
       throw e;
     }
 
-    const submissions = (duel as any).submissions || []
-    const cleanedSubmissions = submissions.filter((submission: any) => (submission.user?._id?.toString?.() || submission.userId) !== userId)
+    const submissions = duel.submissions || []
+    const cleanedSubmissions = submissions.filter((submission) => {
+      const sUserId = typeof submission.user === 'string' ? submission.user : (submission.user.id || submission.user._id?.toString());
+      return sUserId !== userId
+    })
+
     const pWarnings = p1Id === userId
-      ? ((duel as any).player1?.warnings || 0)
-      : ((duel as any).player2?.warnings || 0)
+      ? (duel.player1?.warnings || 0)
+      : (duel.player2?.warnings || 0)
 
     // Disqualified if warnings exceeded
     console.log('[DuelService] Saving submission. Warnings:', pWarnings);
@@ -340,16 +356,16 @@ export class DuelService implements IDuelService {
 
     // Save submission
     cleanedSubmissions.push({
-      userId: userId,
-      user: (userId as any),
+      userId: userId, // Legacy ?
+      user: userId,
       status: finalStatus,
       userCode,
       executionTime: result.executionTime,
       memoryUsage: result.memoryUsage || 0,
-      attempts: (result as any).attempts || 1,
+      attempts: result.attempts || 1,
       codeHash,
       submittedAt: Date.now()
-    })
+    } as unknown as import('../types').Submission)
 
     // Save submission
     await this._duels.update(id, { submissions: cleanedSubmissions })
@@ -372,7 +388,7 @@ export class DuelService implements IDuelService {
     const updatedDuel = await this._duels.getById(id);
     // Attach the submission result to the response so frontend knows what happened
     if (updatedDuel) {
-      (updatedDuel as any).lastSubmissionResult = {
+      updatedDuel.lastSubmissionResult = {
         overallStatus: finalStatus,
         executionTime: result.executionTime,
         memoryUsage: result.memoryUsage || 0,
@@ -426,7 +442,7 @@ export class DuelService implements IDuelService {
       }
 
       return cancelledDuel;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('[DuelService.cancel] Update Failed:', error);
       throw error;
     }

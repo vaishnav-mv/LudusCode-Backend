@@ -1,6 +1,8 @@
 import 'reflect-metadata'
 import './di/container' // Must be imported before app
 import app from './app'
+import { container } from 'tsyringe'
+import { StudySessionService } from './services/studySessionService'
 import { env } from './config/env'
 import mongoose from 'mongoose'
 import http from 'http'
@@ -23,8 +25,6 @@ async function bootstrap() {
     // Start Round Robin Timer Loop
     setInterval(async () => {
       try {
-        const { container } = require('tsyringe');
-        const { StudySessionService } = require('./services/studySessionService');
         const service = container.resolve(StudySessionService);
         await service.checkRoundRobinTimers();
       } catch (e) {

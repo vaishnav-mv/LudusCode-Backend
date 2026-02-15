@@ -1,14 +1,27 @@
-import { singleton, inject } from 'tsyringe'
+import { singleton } from 'tsyringe'
 import fetch from 'node-fetch'
 
-import { SubmissionResult, SubmissionStatus, TestCase } from '../types'
+import { SubmissionResult, SubmissionStatus, TestCase, Problem, TestCaseResult } from '../types'
 import { IJudgeService } from '../interfaces/services'
+
+interface PistonResponse {
+  run: {
+    stdout: string;
+    stderr: string;
+    code: number;
+    output: string;
+    signal: string | null;
+  };
+  language: string;
+  version: string;
+  message?: string;
+}
 
 @singleton()
 export class JudgeService implements IJudgeService {
   constructor() { }
 
-  async execute(userCode: string, solutionCode: string, testCases: TestCase[], problem?: any, language: string = 'javascript'): Promise<SubmissionResult> {
+  async execute(userCode: string, solutionCode: string, testCases: TestCase[], problem?: Problem, language: string = 'javascript'): Promise<SubmissionResult> {
     const languageMap: Record<string, { language: string, version: string }> = {
       'javascript': { language: 'javascript', version: '18.15.0' },
       'js': { language: 'javascript', version: '18.15.0' },
@@ -29,10 +42,10 @@ export class JudgeService implements IJudgeService {
       }
     }
 
-    const results: any[] = []
+    const results: TestCaseResult[] = []
     let passed = 0
-    let totalTime = 0
-    let maxMemory = 0
+    // const totalTime = 0
+    // const maxMemory = 0
 
     // Piston API URL (Default public API)
     // In production, this should be an env variable: process.env.PISTON_API_URL
@@ -106,7 +119,7 @@ except Exception as e:
           })
         });
 
-        const data: any = await response.json();
+        const data = await response.json() as PistonResponse;
 
         // Piston Error handling
         if (data.message) {
@@ -119,7 +132,7 @@ except Exception as e:
         const output = run.stdout ? run.stdout.trim() : '';
         const stderr = run.stderr ? run.stderr.trim() : '';
 
-        
+
         if (run.code !== 0 || stderr) {
           results.push({ testCase, status: SubmissionStatus.RuntimeError, userOutput: stderr || "Runtime Error" });
         } else {
@@ -127,12 +140,12 @@ except Exception as e:
           let expected = testCase.output;
           try {
             expected = JSON.stringify(JSON.parse(testCase.output));
-          } catch (e) { }
+          } catch { /* empty */ }
 
           let normalizedOutput = output;
           try {
             normalizedOutput = JSON.stringify(JSON.parse(output));
-          } catch (e) { }
+          } catch { /* empty */ }
 
           if (normalizedOutput === expected) {
             results.push({ testCase, status: SubmissionStatus.Accepted, userOutput: output });
@@ -142,8 +155,9 @@ except Exception as e:
           }
         }
 
-      } catch (e: any) {
-        results.push({ testCase, status: SubmissionStatus.RuntimeError, userOutput: e.message || "System Error" });
+      } catch (e: unknown) {
+        const msg = (e as Error).message || "System Error";
+        results.push({ testCase, status: SubmissionStatus.RuntimeError, userOutput: msg });
       }
     }
 
@@ -175,7 +189,7 @@ except Exception as e:
           files: [{ content: userCode }],
         })
       });
-      const data: any = await response.json();
+      const data = await response.json() as PistonResponse;
 
       const run = data.run;
       if (!run) return { overallStatus: SubmissionStatus.RuntimeError, results: [{ testCase: {} as TestCase, status: SubmissionStatus.RuntimeError, userOutput: "Piston Error" }], executionTime: 0, memoryUsage: 0 };
@@ -190,10 +204,11 @@ except Exception as e:
         memoryUsage: 0
       };
 
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const msg = (e as Error).message || "System Error";
       return {
         overallStatus: SubmissionStatus.RuntimeError,
-        results: [{ testCase: {} as TestCase, status: SubmissionStatus.RuntimeError, userOutput: e.message }],
+        results: [{ testCase: {} as TestCase, status: SubmissionStatus.RuntimeError, userOutput: msg }],
         executionTime: 0,
         memoryUsage: 0
       };

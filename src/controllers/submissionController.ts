@@ -2,6 +2,7 @@ import { singleton, inject } from 'tsyringe'
 import { Request, Response } from 'express'
 import { HttpStatus } from '../constants'
 import { ISubmissionService } from '../interfaces/services'
+import { getErrorMessage } from '../utils/errorUtils'
 
 
 @singleton()
@@ -26,8 +27,8 @@ export class SubmissionController {
 
             const submission = await this._service.createSubmission(userId, problemId, code, language, result);
             res.status(HttpStatus.CREATED).json(submission);
-        } catch (error: any) {
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message || 'Failed to create submission' });
+        } catch (error: unknown) {
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: getErrorMessage(error) });
         }
     }
 
@@ -43,8 +44,8 @@ export class SubmissionController {
             if (!userId) return res.status(HttpStatus.BAD_REQUEST).json({ message: "UserId required" });
             const submissions = await this._service.getUserSubmissions(userId);
             res.json(submissions);
-        } catch (error: any) {
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message || 'Failed to fetch submissions' });
+        } catch (error: unknown) {
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: getErrorMessage(error) });
         }
     }
 
@@ -60,8 +61,8 @@ export class SubmissionController {
             if (!userId) return res.status(HttpStatus.BAD_REQUEST).json({ message: "UserId required" });
             const solvedIds = await this._service.getSolvedProblemIds(userId);
             res.json(solvedIds);
-        } catch (error: any) {
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message || 'Failed to fetch solved problems' });
+        } catch (error: unknown) {
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: getErrorMessage(error) });
         }
     }
 }

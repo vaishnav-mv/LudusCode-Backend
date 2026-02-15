@@ -3,8 +3,10 @@ import { singleton, inject } from 'tsyringe'
 import { HttpStatus, ResponseMessages } from '../constants'
 import { broadcastDuel, broadcastDuelLobby, broadcastDuelInvite } from '../realtime/ws'
 import { IDuelService } from '../interfaces/services'
-import { CreateDuelDTO, UpdateDuelStateDTO, CreateOpenChallengeDTO, DuelPlayerActionDTO, SetSummaryDTO, FinishDuelDTO, SubmitDuelResultDTO } from '../dto/request/duel.request.dto'
+import { CreateDuelDTO, UpdateDuelStateDTO, CreateOpenChallengeDTO, SetSummaryDTO, FinishDuelDTO, SubmitDuelResultDTO } from '../dto/request/duel.request.dto'
 import { mapDuel } from '../utils/mapper'
+import { getErrorMessage } from '../utils/errorUtils'
+import { DuelStatus, Difficulty } from '../types'
 
 @singleton()
 export class DuelController {
@@ -20,20 +22,23 @@ export class DuelController {
     const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const body = req.body as CreateDuelDTO
-    const duel = await this._service.create(body.difficulty as any, body.wager, currentUser.sub, body.player2Id)
-    broadcastDuel(duel._id!, mapDuel(duel))
+    const userId = currentUser.sub || currentUser.id || currentUser._id?.toString() || '';
+    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    const duel = await this._service.create(body.difficulty as Difficulty, body.wager, userId, body.player2Id)
+    const dto = mapDuel(duel);
+    if (dto) broadcastDuel(duel._id!, dto)
 
     // Broadcast invite if it's a private duel
     if (body.player2Id) {
       broadcastDuelInvite(body.player2Id, {
-        duelId: duel._id,
+        duelId: duel._id?.toString() || duel.id || '',
         challengerName: currentUser.username,
         wager: body.wager,
         difficulty: body.difficulty
       })
     }
 
-    res.json(mapDuel(duel))
+    res.json(dto)
   }
 
   /**
@@ -58,10 +63,11 @@ export class DuelController {
    */
   updateDuelState = async (req: Request, res: Response) => {
     const body = req.body as UpdateDuelStateDTO
-    const duel = await this._service.updateState(req.params.id, body.status as any, body.winnerId)
+    const duel = await this._service.updateState(req.params.id, body.status as DuelStatus, body.winnerId)
     if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
-    broadcastDuel(duel._id!, mapDuel(duel))
-    res.json(mapDuel(duel))
+    const dto = mapDuel(duel);
+    if (dto) broadcastDuel(duel._id!, dto)
+    res.json(dto)
   }
 
   /**
@@ -72,7 +78,7 @@ export class DuelController {
    */
   listOpenDuels = async (req: Request, res: Response) => {
     const duels = await this._service.listOpen()
-    res.json(duels.map(mapDuel))
+    res.json(duels.map(mapDuel).filter(Boolean))
   }
 
   /**
@@ -84,8 +90,10 @@ export class DuelController {
   listInvites = async (req: Request, res: Response) => {
     const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
-    const duels = await this._service.listInvites(currentUser.sub)
-    res.json(duels.map(mapDuel))
+    const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
+    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    const duels = await this._service.listInvites(userId)
+    res.json(duels.map(mapDuel).filter(Boolean))
   }
 
   /**
@@ -98,10 +106,17 @@ export class DuelController {
     const currentUser = req.user
     if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     const body = req.body as CreateOpenChallengeDTO
-    const duel = await this._service.createOpen(body.difficulty as any, body.wager, currentUser.sub)
-    broadcastDuel(duel._id!, mapDuel(duel))
-    broadcastDuelLobby(mapDuel(duel))
-    res.json(mapDuel(duel))
+    const userId = currentUser.sub || currentUser.id || currentUser._id?.toString() || '';
+    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    const duel = await this._service.createOpen(body.difficulty as Difficulty, body.wager, userId)
+    const dto = mapDuel(duel);
+    if (dto) {
+      broadcastDuel(duel._id!, dto)
+      broadcastDuelLobby(dto)
+      res.json(dto)
+    } else {
+      res.status(500).json({ message: 'Error mapping duel' })
+    }
   }
 
   /**
@@ -112,15 +127,19 @@ export class DuelController {
    */
   joinDuel = async (req: Request, res: Response) => {
     const currentUser = req.user
-    if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
+    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
     // Remove body usage for playerId
-    const duel = await this._service.join(req.params.id, currentUser.sub)
+    const duel = await this._service.join(req.params.id, userId)
     if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
 
-    console.log('[DuelController] Join successful. Broadcasting update:', JSON.stringify(mapDuel(duel), null, 2));
-    broadcastDuel(req.params.id, mapDuel(duel))
-    broadcastDuelLobby(mapDuel(duel))
-    res.json(mapDuel(duel))
+    const dto = mapDuel(duel);
+    if (!dto) return res.status(500).json({ message: 'Error mapping duel' });
+
+    console.log('[DuelController] Join successful. Broadcasting update:', JSON.stringify(dto, null, 2));
+    broadcastDuel(req.params.id, dto)
+    broadcastDuelLobby(dto)
+    res.json(dto)
   }
 
   /**
@@ -133,8 +152,9 @@ export class DuelController {
     const body = req.body as SetSummaryDTO
     const duel = await this._service.setSummary(req.params.id, body.finalOverallStatus!, body.finalUserCode!)
     if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
-    broadcastDuel(req.params.id, mapDuel(duel))
-    res.json(mapDuel(duel))
+    const dto = mapDuel(duel);
+    if (dto) broadcastDuel(req.params.id, dto)
+    res.json(dto)
   }
 
   /**
@@ -147,8 +167,9 @@ export class DuelController {
     const body = req.body as FinishDuelDTO
     const duel = await this._service.finish(req.params.id, body.winnerId, body.finalOverallStatus, body.finalUserCode)
     if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
-    broadcastDuel(req.params.id, mapDuel(duel))
-    res.json(mapDuel(duel))
+    const dto = mapDuel(duel);
+    if (dto) broadcastDuel(req.params.id, dto)
+    res.json(dto)
   }
 
   /**
@@ -160,8 +181,8 @@ export class DuelController {
   getDuelSummary = async (req: Request, res: Response) => {
     const duel = await this._service.detail(req.params.id)
     if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
-    const result = (duel as any).finalOverallStatus ? { overallStatus: (duel as any).finalOverallStatus, results: [], executionTime: 0, memoryUsage: 0 } : undefined
-    res.json({ duel: mapDuel(duel), result, userCode: (duel as any).finalUserCode })
+    const result = duel.finalOverallStatus ? { overallStatus: duel.finalOverallStatus, results: [], executionTime: 0, memoryUsage: 0 } : undefined
+    res.json({ duel: mapDuel(duel), result, userCode: duel.finalUserCode })
   }
 
   /**
@@ -172,32 +193,34 @@ export class DuelController {
    */
   submitDuelResult = async (req: Request, res: Response) => {
     const currentUser = req.user
-    if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
-    const body = req.body as SubmitDuelResultDTO
+    const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
+    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
 
+    const body = req.body as SubmitDuelResultDTO
     const { userCode } = body;
     const duelId = req.params.id;
 
     try {
-      const updatedDuel = await this._service.submitSolution(duelId, currentUser.sub, userCode);
+      const updatedDuel = await this._service.submitSolution(duelId, userId, userCode);
       if (!updatedDuel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
 
       const mapped = mapDuel(updatedDuel);
       // Attach lastSubmissionResult if present (for wrong answer feedback)
-      const lastSubmissionResult = (updatedDuel as any).lastSubmissionResult || null;
+      const lastSubmissionResult = updatedDuel.lastSubmissionResult || null;
 
-      broadcastDuel(req.params.id, mapped)
+      if (mapped) broadcastDuel(req.params.id, mapped)
       res.json({ ...mapped, submissionResult: lastSubmissionResult })
-    } catch (e: any) {
+    } catch (e: unknown) {
       // Map known error messages to HTTP status codes
-      if (e.message === ResponseMessages.DUEL_ALREADY_FINISHED) {
-        return res.status(HttpStatus.BAD_REQUEST).json({ message: e.message });
+      const msg = getErrorMessage(e);
+      if (msg === ResponseMessages.DUEL_ALREADY_FINISHED) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ message: msg });
       }
-      if (e.message === ResponseMessages.NOT_A_PARTICIPANT) {
-        return res.status(HttpStatus.FORBIDDEN).json({ message: e.message });
+      if (msg === ResponseMessages.NOT_A_PARTICIPANT) {
+        return res.status(HttpStatus.FORBIDDEN).json({ message: msg });
       }
-      if (e.message === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
-        return res.status(HttpStatus.BAD_REQUEST).json({ message: e.message });
+      if (msg === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ message: msg });
       }
       throw e; // Re-throw unknown errors for global error handler
     }
@@ -217,11 +240,13 @@ export class DuelController {
       const duel = await this._service.finishDraw(req.params.id);
       if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
 
-      broadcastDuel(req.params.id, mapDuel(duel))
-      res.json(mapDuel(duel))
-    } catch (e: any) {
-      if (e.message === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
-        return res.status(HttpStatus.BAD_REQUEST).json({ message: e.message });
+      const dto = mapDuel(duel);
+      if (dto) broadcastDuel(req.params.id, dto)
+      res.json(dto)
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e);
+      if (msg === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ message: msg });
       }
       throw e;
     }
@@ -238,9 +263,9 @@ export class DuelController {
       const userId = req.user?.sub;
       if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED });
       const duels = await this._service.listActive(userId);
-      res.json(duels.map(mapDuel));
-    } catch (error: any) {
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message });
+      res.json(duels.map(mapDuel).filter(Boolean));
+    } catch (error: unknown) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: getErrorMessage(error) });
     }
   }
 
@@ -252,12 +277,18 @@ export class DuelController {
    */
   cancelDuel = async (req: Request, res: Response) => {
     const currentUser = req.user
-    if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
-    const duel = await this._service.cancel(req.params.id, currentUser.sub)
+    const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
+    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    const duel = await this._service.cancel(req.params.id, userId)
     if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
-    broadcastDuel(duel._id!, mapDuel(duel))
-    broadcastDuelLobby(mapDuel(duel))
-    res.json(mapDuel(duel))
+    const dto = mapDuel(duel);
+    if (dto) {
+      broadcastDuel(duel._id!, dto)
+      broadcastDuelLobby(dto)
+      res.json(dto)
+    } else {
+      res.status(500).json({ message: 'Error mapping duel' })
+    }
   }
   /**
    * @desc    Forfeit a duel
@@ -267,19 +298,22 @@ export class DuelController {
    */
   forfeitDuel = async (req: Request, res: Response) => {
     const currentUser = req.user
-    if (!currentUser) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
+    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
 
     try {
-      const duel = await this._service.forfeit(req.params.id, currentUser.sub)
+      const duel = await this._service.forfeit(req.params.id, userId)
       if (!duel) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
-      broadcastDuel(req.params.id, mapDuel(duel))
-      res.json(mapDuel(duel))
-    } catch (e: any) {
-      if (e.message === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
-        return res.status(HttpStatus.BAD_REQUEST).json({ message: e.message });
+      const dto = mapDuel(duel);
+      if (dto) broadcastDuel(req.params.id, dto)
+      res.json(dto)
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e);
+      if (msg === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
+        return res.status(HttpStatus.BAD_REQUEST).json({ message: msg });
       }
-      if (e.message === ResponseMessages.NOT_A_PARTICIPANT) {
-        return res.status(HttpStatus.FORBIDDEN).json({ message: e.message });
+      if (msg === ResponseMessages.NOT_A_PARTICIPANT) {
+        return res.status(HttpStatus.FORBIDDEN).json({ message: msg });
       }
       throw e;
     }

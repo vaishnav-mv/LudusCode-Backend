@@ -9,12 +9,13 @@ import { IProblemRepository } from '../interfaces/repositories'
 import { ChatMessageResponseDTO } from '../dto/response/chat.response.dto'
 import { DuelResponseDTO } from '../dto/response/duel.response.dto'
 import { CompetitionResponseDTO } from '../dto/response/competition.response.dto'
-import { StudySession, Problem, TestCase } from '../types'
+import { DuelInviteDTO } from '../dto/response/duel.invite.dto'
+import { StudySession, TestCase } from '../types'
 
 interface SignalData {
   type: 'offer' | 'answer' | 'candidate';
   sdp?: string;
-  candidate?: any; // WebRTC candidate structure
+  candidate?: Record<string, unknown>; // WebRTC candidate structure
 }
 
 interface DuelProgressData {
@@ -118,7 +119,7 @@ export const broadcastDuelLobby = (payload: DuelResponseDTO) => {
   }
 }
 
-export const broadcastDuelInvite = (userId: string, payload: any) => {
+export const broadcastDuelInvite = (userId: string, payload: DuelInviteDTO) => {
   if (io) {
     io.to(`user:${userId}`).emit('duel:invite', payload)
   }

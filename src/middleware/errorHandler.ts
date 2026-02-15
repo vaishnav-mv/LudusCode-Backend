@@ -5,7 +5,7 @@ import { singleton } from 'tsyringe'
 export class ErrorMiddleware {
   constructor() { }
 
-  public handle = (err: unknown, req: Request, res: Response, next: NextFunction) => {
+  public handle = (err: unknown, req: Request, res: Response, _next: NextFunction) => {
     const error = err as { status?: number, message?: string }
     const status = error.status || 500
     const message = error.message || 'Internal error'

@@ -1,11 +1,11 @@
 import { User, Group, Problem, Duel, DuelPlayer, Competition, ProblemSubmission, Wallet, StudySession, ChatMessage } from '../types';
 
 export interface IBaseRepository<T> {
-    all(skip?: number, limit?: number, filter?: any, sort?: any): Promise<T[]>;
-    count(filter?: any): Promise<number>;
+    all(skip?: number, limit?: number, filter?: Record<string, unknown>, sort?: Record<string, unknown> | string): Promise<T[]>;
+    count(filter?: Record<string, unknown>): Promise<number>;
     getById(id: string): Promise<T | undefined>;
     create(item: Partial<T>): Promise<T>;
-    update(id: string, partial: any): Promise<T | undefined>;
+    update(id: string, partial: Record<string, unknown>): Promise<T | undefined>;
     delete(id: string): Promise<boolean>;
 }
 
@@ -27,7 +27,7 @@ export interface IProblemRepository extends IBaseRepository<Problem> {
 
 export interface IDuelRepository extends IBaseRepository<Duel> {
     attemptJoin(id: string, player2Data: Partial<DuelPlayer>): Promise<Duel | null>;
-    attemptFinish(id: string, winner: any, finalStatus: string): Promise<Duel | null>;
+    attemptFinish(id: string, winner: User | string | null, finalStatus: string): Promise<Duel | null>;
     attemptCancel(id: string): Promise<Duel | null>;
 }
 
@@ -42,7 +42,7 @@ export interface ISubmissionRepository {
 }
 
 export interface IStudySessionRepository extends IBaseRepository<StudySession> {
-    listByGroup(groupId: string, skip: number, limit: number, options: { status?: string, sort?: string, q?: string }): Promise<{ sessions: StudySession[], total: number }>;
+    listByGroup(groupId: string, skip: number, limit: number, options: { status?: string, sort?: string, query?: string }): Promise<{ sessions: StudySession[], total: number }>;
     findActiveRoundRobin(): Promise<StudySession[]>;
 }
 

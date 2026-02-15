@@ -50,7 +50,7 @@ export class AdminController {
    * @res     { plan }
    */
   createPlan = async (req: Request, res: Response) => {
-    const plan = await (this._service as any).createPlan(req.body)
+    const plan = await this._service.createPlan(req.body)
     res.json(plan)
   }
 
@@ -61,7 +61,7 @@ export class AdminController {
    * @res     { plan }
    */
   updatePlan = async (req: Request, res: Response) => {
-    const updatedPlan = await (this._service as any).updatePlan(req.params.id, req.body)
+    const updatedPlan = await this._service.updatePlan(req.params.id, req.body)
     res.json(updatedPlan)
   }
 
@@ -72,7 +72,7 @@ export class AdminController {
    * @res     { ok: boolean }
    */
   deletePlan = async (req: Request, res: Response) => {
-    const success = await (this._service as any).deletePlan(req.params.id)
+    const success = await this._service.deletePlan(req.params.id)
     res.json({ ok: success })
   }
 
@@ -84,7 +84,7 @@ export class AdminController {
    */
   grantSubscription = async (req: Request, res: Response) => {
     const { username, planId } = req.body
-    const success = await (this._service as any).grantSubscription(username, planId)
+    const success = await this._service.grantSubscription(username, planId)
     res.json({ ok: success })
   }
 
@@ -95,7 +95,7 @@ export class AdminController {
    * @res     { ok: boolean }
    */
   cancelSubscription = async (req: Request, res: Response) => {
-    const success = await (this._service as any).cancelSubscription(req.params.userId)
+    const success = await this._service.cancelSubscription(req.params.userId)
     res.json({ ok: success })
   }
 
@@ -192,7 +192,7 @@ export class AdminController {
     if (!query) {
       return res.json([])
     }
-    const users = await (this._service as any).searchUsers(query)
+    const users = await this._service.searchUsers(query)
     res.json(users)
   }
 

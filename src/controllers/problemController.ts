@@ -3,6 +3,7 @@ import { singleton, inject } from 'tsyringe'
 import { HttpStatus, ResponseMessages } from '../constants'
 import { IProblemService } from '../interfaces/services'
 import { GenerateProblemDTO } from '../dto/request/problem.request.dto'
+import { getErrorMessage } from '../utils/errorUtils'
 
 @singleton()
 export class ProblemController {
@@ -17,7 +18,7 @@ export class ProblemController {
     approvedProblems = async (req: Request, res: Response) => {
         const { q, sort, difficulty, tags, page, limit } = req.query;
         const result = await this._service.list({
-            q: q as string,
+            query: q as string,
             sort: sort as string,
             difficulty: difficulty as string,
             tags: tags as string,
@@ -53,8 +54,8 @@ export class ProblemController {
             const { difficulty, topic } = body;
             const problem = await this._service.generate(difficulty, topic);
             res.json(problem);
-        } catch (error: any) {
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: error.message || 'Failed to generate problem' });
+        } catch (error: unknown) {
+            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: getErrorMessage(error) });
         }
     }
 
@@ -74,8 +75,8 @@ export class ProblemController {
             const problemData = { ...req.body, status };
             const problem = await this._service.create(problemData);
             res.status(HttpStatus.CREATED).json(problem);
-        } catch (error: any) {
-            res.status(HttpStatus.BAD_REQUEST).json({ message: error.message || 'Failed to create problem' });
+        } catch (error: unknown) {
+            res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(error) });
         }
     }
 }

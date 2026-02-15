@@ -2,5 +2,6 @@ export interface WalletResponseDTO {
     userId: string
     balance: number
     currency: string
-    transactions: any[]
+    transactions: Transaction[]
 }
+import { Transaction } from '../../types'

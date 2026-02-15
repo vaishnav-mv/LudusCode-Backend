@@ -19,11 +19,8 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
     }
 
     if (foundUser) {
-      // @ts-ignore
       const user = foundUser;
-      // @ts-ignore
       const rank = await this.model.countDocuments({ elo: { $gt: user.elo } }) + 1;
-      // @ts-ignore
       return { ...this.mapDoc(user), leaderboardRank: rank } as User;
     }
     return undefined;
@@ -40,7 +37,7 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
 
   async leaderboard(skip: number = 0, limit: number = 100) {
     const list = await this.model.find({ isAdmin: false }).sort({ elo: -1 }).skip(skip).limit(limit).lean();
-    return list.map((userDoc: any) => this.mapDoc(userDoc)!);
+    return list.map((userDoc) => this.mapDoc(userDoc)!);
   }
 
   async getByUsername(username: string) {
@@ -61,6 +58,6 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
         { isAdmin: false }
       ]
     }).limit(10).lean();
-    return list.map((userDoc: any) => this.mapDoc(userDoc)!);
+    return list.map((userDoc) => this.mapDoc(userDoc)!);
   }
 }

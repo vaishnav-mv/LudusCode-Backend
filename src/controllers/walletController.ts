@@ -1,10 +1,11 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
 
-import { HttpStatus, ResponseMessages } from '../constants'
+import { HttpStatus } from '../constants'
 import { IWalletService } from '../interfaces/services'
 import { DepositDTO, WithdrawDTO, WagerDTO, WinDTO } from '../dto/request/wallet.request.dto'
 import { mapWallet } from '../utils/mapper'
+import { getErrorMessage } from '../utils/errorUtils'
 
 @singleton()
 export class WalletController {
@@ -41,8 +42,8 @@ export class WalletController {
     try {
       const order = await this._service.createDepositOrder(userId, body.amount)
       res.json(order)
-    } catch (err: any) {
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: err.message })
+    } catch (err: unknown) {
+      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: getErrorMessage(err) })
     }
   }
 
@@ -53,16 +54,17 @@ export class WalletController {
    * @res     { ok: boolean }
    */
   verify = async (req: Request, res: Response) => {
-    const { userId, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+    const body = req.body as { userId: string, razorpay_order_id: string, razorpay_payment_id: string, razorpay_signature: string };
+    const { userId, razorpay_order_id: razorpayOrderId, razorpay_payment_id: razorpayPaymentId, razorpay_signature: razorpaySignature } = body;
 
     try {
-      const isValid = await this._service.verifyDeposit(userId, razorpay_order_id, razorpay_payment_id, razorpay_signature);
+      const isValid = await this._service.verifyDeposit(userId, razorpayOrderId, razorpayPaymentId, razorpaySignature);
       if (isValid) {
         res.json({ ok: true, message: "Payment verified successfully" });
       } else {
         res.status(HttpStatus.BAD_REQUEST).json({ message: "Invalid signature" });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Verification Error:", err);
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: "Verification failed" });
     }
@@ -85,9 +87,9 @@ export class WalletController {
         return res.status(HttpStatus.BAD_REQUEST).json({ message: "Insufficient funds" })
       }
       res.json({ ok: true })
-    } catch (err: any) {
-      console.error("Withdrawal Controller Error:", err.message);
-      return res.status(HttpStatus.BAD_REQUEST).json({ message: err.message })
+    } catch (err: unknown) {
+      console.error("Withdrawal Controller Error:", getErrorMessage(err));
+      return res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(err) })
     }
   }
 

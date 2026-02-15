@@ -21,7 +21,7 @@ export class StudySessionRepository extends BaseRepository<StudySession> impleme
         return this.mapDoc(session);
     }
 
-    async update(id: string, data: any) {
+    async update(id: string, data: Partial<StudySession>) {
         const session = await this.model.findByIdAndUpdate(id, { $set: data }, { new: true })
             .populate('participants.user')
             .populate('problems')
@@ -29,18 +29,18 @@ export class StudySessionRepository extends BaseRepository<StudySession> impleme
         return this.mapDoc(session);
     }
 
-    async listByGroup(groupId: string, skip: number, limit: number, options: { status?: string, sort?: string, q?: string } = {}) {
-        const query: any = { groupId };
+    async listByGroup(groupId: string, skip: number, limit: number, options: { status?: string, sort?: string, query?: string } = {}) {
+        const query: Record<string, unknown> = { groupId };
 
         if (options.status) {
             query.status = options.status;
         }
 
-        if (options.q) {
-            query.title = { $regex: options.q, $options: 'i' };
+        if (options.query) {
+            query['title'] = { $regex: options.query, $options: 'i' };
         }
 
-        let sort: any = { startTime: -1 };
+        let sort: Record<string, 1 | -1> = { startTime: -1 };
         if (options.sort === 'oldest') {
             sort = { startTime: 1 };
         } else if (options.sort === 'startTime') {
@@ -58,7 +58,7 @@ export class StudySessionRepository extends BaseRepository<StudySession> impleme
         ]);
 
         return {
-            sessions: sessions.map((s: any) => this.mapDoc(s)!),
+            sessions: sessions.map((session) => this.mapDoc(session)!),
             total
         };
     }
@@ -71,6 +71,6 @@ export class StudySessionRepository extends BaseRepository<StudySession> impleme
             status: StudySessionStatus.Active,
             mode: 'round_robin'
         }).lean();
-        return sessions.map((s: any) => this.mapDoc(s)!);
+        return sessions.map((session) => this.mapDoc(session)!);
     }
 }

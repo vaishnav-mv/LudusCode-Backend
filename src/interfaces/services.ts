@@ -1,8 +1,7 @@
-import { User, Group, Competition, CompetitionProblem, SubmissionResult, Duel, Wallet, Problem, PaginatedResponse, ChatMessage, StudySession, RazorpayOrder, JwtPayload } from '../types'
+import { User, Competition, CompetitionProblem, SubmissionResult, Duel, Wallet, Problem, PaginatedResponse, ChatMessage, StudySession, RazorpayOrder, JwtPayload, TestCase, SubscriptionPlan, Group } from '../types'
 import { SubmissionResponseDTO } from '../dto/response/submission.response.dto'
 import { UserResponseDTO } from '../dto/response/user.response.dto'
 import { GroupResponseDTO } from '../dto/response/group.response.dto'
-import { DuelResponseDTO } from '../dto/response/duel.response.dto'
 
 export interface IAuthService {
   login(email: string, password: string): Promise<{ user: User, tokens: { access: string, refresh: string }, cookie: { domain: string, secure: boolean } }>
@@ -25,7 +24,7 @@ export interface ISocialAuthService {
 export interface IUserService {
   profile(id: string): Promise<{
     user: UserResponseDTO | null;
-    recentDuels: any[];
+    recentDuels: Duel[];
     joinedGroups: GroupResponseDTO[];
     submissionStats: { total: number, accepted: number, acceptanceRate: number };
   } | null>
@@ -40,7 +39,7 @@ export interface IUserService {
 
 
 export interface GroupListParams {
-  q?: string;
+  query?: string;
   sort?: string;
   isPrivate?: string | boolean;
   page?: number;
@@ -123,6 +122,12 @@ export interface IAdminService {
     plans: { id: string, name: string, price: number, period: string, features: string[] }[],
     logs: { id: string, user: { name: string, avatarUrl: string }, plan: { name: string }, action: string, timestamp: Date | string, amount: number, expiryDate?: Date | string }[]
   }>
+  createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan>
+  updatePlan(id: string, data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | null>
+  deletePlan(id: string): Promise<boolean>
+  grantSubscription(username: string, planId: string): Promise<boolean>
+  cancelSubscription(userId: string): Promise<boolean>
+  searchUsers(query: string): Promise<User[]>
 }
 
 
@@ -132,12 +137,12 @@ export interface IChatService {
 }
 
 export interface IJudgeService {
-  execute(userCode: string, solutionCode: string, testCases: any[], problem?: any, language?: string): Promise<SubmissionResult>
+  execute(userCode: string, solutionCode: string, testCases: TestCase[], problem?: Problem, language?: string): Promise<SubmissionResult>
   executeScratchpad(userCode: string, language: string): Promise<SubmissionResult>
 }
 
 export interface ProblemListParams {
-  q?: string;
+  query?: string;
   sort?: string;
   difficulty?: string;
   tags?: string;
@@ -154,9 +159,9 @@ export interface IProblemService {
 }
 
 export interface IAiService {
-  hint(problem: any, userCode: string): Promise<string>
-  codeReview(problem: any, userCode: string): Promise<string>
-  performance(profile: any): Promise<string>
+  hint(problem: Problem, userCode: string): Promise<string>
+  codeReview(problem: Problem, userCode: string): Promise<string>
+  performance(data: { user: User, submissionStats: { total: number, accepted: number, acceptanceRate: number }, joinedGroups: Group[] }): Promise<string>
 
   explainConcept(concept: string): Promise<string>
   summarizeDiscussion(messages: string[]): Promise<string>
@@ -188,7 +193,7 @@ export interface IStudySessionService {
   join(sessionId: string, userId: string): Promise<StudySession | null>
   leave(sessionId: string, userId: string): Promise<StudySession | null>
   passTurn(sessionId: string, userId: string): Promise<StudySession | null>
-  list(groupId: string, page?: number, limit?: number, options?: { status?: string, sort?: string, q?: string }): Promise<{ sessions: StudySession[], total: number, page: number, totalPages: number }>
+  list(groupId: string, page?: number, limit?: number, options?: { status?: string, sort?: string, query?: string }): Promise<{ sessions: StudySession[], total: number, page: number, totalPages: number }>
   getById(id: string): Promise<StudySession | null>
   getByIdSecure(id: string, userId: string): Promise<StudySession | null>
 }
@@ -200,6 +205,6 @@ export interface ISubmissionService {
 }
 
 export interface ISubscriptionService {
-  getPlans(): Promise<any[]>
+  getPlans(): Promise<SubscriptionPlan[]>
   subscribe(userId: string, planId: string): Promise<{ success: boolean, action?: string, expiry?: Date, message?: string }>
 }

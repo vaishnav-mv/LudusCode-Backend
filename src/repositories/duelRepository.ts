@@ -12,7 +12,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
   }
 
   // Override to include population
-  async all(skip: number = 0, limit: number = 0, filter: any = {}) {
+  async all(skip: number = 0, limit: number = 0, filter: Record<string, unknown> = {}) {
     const query = this.model.find(filter).sort({ createdAt: -1 });
     if (limit > 0) query.skip(skip).limit(limit);
     const list = await query
@@ -21,10 +21,9 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
       .populate('player2.user')
       .populate('winner')
       .lean();
-    return list.map((duelDoc: any) => this.mapDoc(duelDoc)!);
+    return list.map((duelDoc) => this.mapDoc(duelDoc)!);
   }
 
-  // Count is inherited
 
   // Override to include population
   async getById(id: string) {
@@ -37,20 +36,20 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
     return this.mapDoc(duelDoc);
   }
 
-  async create(item: any) {
+  async create(item: Partial<Duel>) {
     const createdDuel = await this.model.create(item);
     // Return populated
-    return (await this.getById(createdDuel._id.toString())) as any;
+    return (await this.getById(createdDuel._id.toString())) as Duel;
   }
 
-  async update(id: string, partial: any) {
+  async update(id: string, partial: Record<string, unknown>) {
     await this.model.findByIdAndUpdate(id, partial);
     return this.getById(id);
   }
 
-  // Delete is inherited
+
   // Atomic join operation
-  async attemptJoin(id: string, player2Data: any) {
+  async attemptJoin(id: string, player2Data: { user: string | import('../types').User, warnings: number }) {
     const updatedDuel = await this.model.findOneAndUpdate(
       { _id: id, status: DuelStatus.Waiting },
       {
@@ -68,13 +67,13 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
       .populate('winner')
       .lean();
 
-    console.log('[DuelRepository] attemptJoin result:', updatedDuel ? 'Found' : 'Null', (updatedDuel as any)?.player2);
+    console.log('[DuelRepository] attemptJoin result:', updatedDuel ? 'Found' : 'Null', updatedDuel?.player2);
 
     const result = updatedDuel ? this.mapDoc(updatedDuel) : null;
     return result || null;
   }
 
-  async attemptFinish(id: string, winner: any, finalStatus: string) {
+  async attemptFinish(id: string, winner: string | import('../types').User | null, finalStatus: string) {
     const updatedDuel = await this.model.findOneAndUpdate(
       { _id: id, status: DuelStatus.InProgress },
       {

@@ -1,5 +1,6 @@
 import { singleton, inject } from 'tsyringe'
 import { Request, Response } from 'express'
+import { getErrorMessage } from '../utils/errorUtils'
 
 import { HttpStatus, ResponseMessages } from '../constants'
 import { IUserService, ICloudinaryService } from '../interfaces/services'
@@ -54,7 +55,7 @@ export class UserController {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 100;
         const users = await this._service.leaderboard(page, limit);
-        res.json(users.map(u => mapUser(u)));
+        res.json(users.map(user => mapUser(user)));
     }
 
     /**
@@ -68,16 +69,17 @@ export class UserController {
         const currentUser = req.user;
         if (!currentUser || (!currentUser.isAdmin && currentUser.sub !== userId)) return res.status(HttpStatus.FORBIDDEN).json({ message: ResponseMessages.FORBIDDEN });
 
-        let avatarUrl = req.body.avatarUrl;
+        const body = req.body as UpdateProfileRequestDTO & { avatarUrl?: string };
+
+        let avatarUrl = body.avatarUrl;
         if (req.file) {
             try {
                 avatarUrl = await this._cloudinaryService.uploadImage(req.file.path, 'avatars');
-            } catch (error) {
+            } catch {
                 return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: ResponseMessages.FAILED_UPLOAD });
             }
         }
 
-        const body = req.body as UpdateProfileRequestDTO;
         const updateData: Partial<User> = {};
         if (body.name) updateData.username = body.name;
         if (avatarUrl) updateData.avatarUrl = avatarUrl;
@@ -100,8 +102,8 @@ export class UserController {
         try {
             await this._service.changePassword(userId, oldPassword, newPassword);
             res.json({ message: 'Password updated successfully' });
-        } catch (e: any) {
-            res.status(HttpStatus.BAD_REQUEST).json({ message: e.message });
+        } catch (e: unknown) {
+            res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) });
         }
     }
 
@@ -117,6 +119,6 @@ export class UserController {
             return res.json([]);
         }
         const users = await this._service.search(query);
-        res.json(users.map(u => mapUser(u)));
+        res.json(users.map(user => mapUser(user)));
     }
 }

@@ -84,6 +84,7 @@ export interface User {
     createdAt?: Date | string;
     updatedAt?: Date | string;
     id?: string;
+    sub?: string; // for auth context
 }
 
 export interface SubscriptionPlan {
@@ -229,6 +230,7 @@ export interface Duel {
     submissions?: Submission[]; // The sample shows distinct structure, keeping any or generic
     finalOverallStatus?: SubmissionStatus; // from DTO
     finalUserCode?: string; // from DTO
+    lastSubmissionResult?: SubmissionResult; // Augmented in submitSolution response
     createdAt?: Date | string;
     updatedAt?: Date | string;
     id?: string;
@@ -314,24 +316,27 @@ export interface PaginatedResponse<T> {
     totalPages: number;
 }
 declare global {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
     namespace Express {
         interface Request {
-            user?: { sub: string, [key: string]: any }; // Minimally required for now, or full User if available
+            user?: User;
+            csrfToken(): string;
+            cookies: Record<string, string>;
         }
     }
 }
 export interface RazorpayOrder {
     id: string;
     entity: string;
-    amount: number;
-    amount_paid: number;
-    amount_due: number;
+    amount: number | string;
+    amount_paid: number | string;
+    amount_due: number | string;
     currency: string;
-    receipt: string;
+    receipt?: string;
     offer_id: string | null;
     status: string;
     attempts: number;
-    notes: any[];
+    notes: unknown[];
     created_at: number;
 }
 
@@ -339,5 +344,5 @@ export interface JwtPayload {
     sub?: string;
     iat?: number;
     exp?: number;
-    [key: string]: any;
+    [key: string]: unknown;
 }

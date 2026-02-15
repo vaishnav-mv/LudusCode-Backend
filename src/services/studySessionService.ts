@@ -1,6 +1,6 @@
 import { singleton, inject } from 'tsyringe'
 import { IStudySessionRepository, IUserRepository, IGroupRepository } from '../interfaces/repositories'
-import { StudySessionMode, StudySessionStatus, StudySession, Group, User } from '../types'
+import { StudySessionMode, StudySessionStatus, StudySession } from '../types'
 import { broadcastSession } from '../realtime/ws'
 
 import { IStudySessionService } from '../interfaces/services'
@@ -188,7 +188,7 @@ export class StudySessionService implements IStudySessionService {
         }
     }
 
-    async list(groupId: string, page: number = 1, limit: number = 20, options: { status?: string, sort?: string, q?: string } = {}) {
+    async list(groupId: string, page: number = 1, limit: number = 20, options: { status?: string, sort?: string, query?: string } = {}) {
         const skip = (page - 1) * limit;
         const { sessions, total } = await this._sessions.listByGroup(groupId, skip, limit, options);
 

@@ -5,6 +5,47 @@ import { IUserRepository } from '../interfaces/repositories'
 import { env } from '../config/env'
 import { ResponseMessages } from '../constants'
 import logger from '../utils/logger'
+import fetch, { Response } from 'node-fetch'
+
+interface GoogleTokens {
+    access_token: string;
+    expires_in: number;
+    scope: string;
+    token_type: string;
+    id_token: string;
+}
+
+interface GoogleUser {
+    id: string;
+    email: string;
+    verified_email: boolean;
+    name: string;
+    given_name: string;
+    family_name: string;
+    picture: string;
+    locale: string;
+}
+
+interface GithubTokens {
+    access_token: string;
+    token_type: string;
+    scope: string;
+}
+
+interface GithubUser {
+    login: string;
+    id: number;
+    avatar_url: string;
+    name: string;
+    email: string | null;
+}
+
+interface GithubEmail {
+    email: string;
+    primary: boolean;
+    verified: boolean;
+    visibility: string | null;
+}
 
 @singleton()
 export class SocialAuthService implements ISocialAuthService {
@@ -28,7 +69,7 @@ export class SocialAuthService implements ISocialAuthService {
     async handleGoogleCallback(code: string) {
         try {
             logger.info({ message: 'Starting Google Callback handling', codeFragment: code.substring(0, 10) + '...' });
-            const fetch = (await import('node-fetch')).default;
+
             logger.info('Fetching token from Google...');
 
             const tokenParams = new URLSearchParams({
@@ -40,11 +81,11 @@ export class SocialAuthService implements ISocialAuthService {
             });
             logger.debug({ message: 'Token Params prepared', params: tokenParams.toString().replace(env.GOOGLE_CLIENT_SECRET, '***') });
 
-            const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+            const tokenRes = (await fetch('https://oauth2.googleapis.com/token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body: tokenParams
-            })
+            })) as unknown as Response
 
             const tokensText = await tokenRes.text();
             logger.info({ message: 'Token response received', status: tokenRes.status, body: tokensText });
@@ -53,12 +94,12 @@ export class SocialAuthService implements ISocialAuthService {
                 throw new Error(`Failed to fetch token: ${tokenRes.status} ${tokensText}`);
             }
 
-            const tokens = JSON.parse(tokensText);
+            const tokens = JSON.parse(tokensText) as GoogleTokens;
 
             logger.info('Fetching user info...');
-            const infoRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+            const infoRes = (await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
                 headers: { Authorization: `Bearer ${tokens.access_token}` }
-            })
+            })) as unknown as Response
 
             const infoText = await infoRes.text();
             logger.info({ message: 'User Info response received', status: infoRes.status, body: infoText });
@@ -67,7 +108,7 @@ export class SocialAuthService implements ISocialAuthService {
                 throw new Error(`Failed to fetch user info: ${infoRes.status} ${infoText}`);
             }
 
-            const info = JSON.parse(infoText);
+            const info = JSON.parse(infoText) as GoogleUser;
             const email = info.email
             const username = info.name || email.split('@')[0]
 
@@ -86,21 +127,21 @@ export class SocialAuthService implements ISocialAuthService {
                     isBanned: false,
                     isPremium: false,
                     isVerified: true
-                } as any)
+                })
             } else {
                 logger.info({ message: 'User found', userId: user.id });
             }
 
-            if ((user as any).isBanned) {
+            if (user.isBanned) {
                 throw new Error(ResponseMessages.USER_BANNED)
             }
 
-            const access = this._jwtService.signAccess({ sub: (user as any)._id?.toString?.() || (user as any).id, isAdmin: !!(user as any).isAdmin })
-            const refresh = this._jwtService.signRefresh({ sub: (user as any)._id?.toString?.() || (user as any).id })
+            const access = this._jwtService.signAccess({ sub: user._id?.toString() || user.id || '', isAdmin: !!user.isAdmin })
+            const refresh = this._jwtService.signRefresh({ sub: user._id?.toString() || user.id || '' })
 
             logger.info('Google Auth success');
             return { user, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } }
-        } catch (e: any) {
+        } catch (e: unknown) {
             logger.error({ message: 'Error in handleGoogleCallback', error: e });
             throw e;
         }
@@ -116,21 +157,21 @@ export class SocialAuthService implements ISocialAuthService {
     }
 
     async handleGithubCallback(code: string) {
-        const fetch = (await import('node-fetch')).default;
-        const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+
+        const tokenRes = (await fetch('https://github.com/login/oauth/access_token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
             body: JSON.stringify({ code, client_id: env.GITHUB_CLIENT_ID, client_secret: env.GITHUB_CLIENT_SECRET, redirect_uri: env.GITHUB_REDIRECT_URI })
-        })
-        const tokens = (await tokenRes.json()) as any
-        const infoRes = await fetch('https://api.github.com/user', {
+        })) as unknown as Response
+        const tokens = (await tokenRes.json()) as GithubTokens
+        const infoRes = (await fetch('https://api.github.com/user', {
             headers: { Authorization: `Bearer ${tokens.access_token}`, 'User-Agent': 'luduscode' }
-        })
-        const info = (await infoRes.json()) as any
-        const emailRes = await fetch('https://api.github.com/user/emails', {
+        })) as unknown as Response
+        const info = (await infoRes.json()) as GithubUser
+        const emailRes = (await fetch('https://api.github.com/user/emails', {
             headers: { Authorization: `Bearer ${tokens.access_token}`, 'User-Agent': 'luduscode' }
-        })
-        const emails = (await emailRes.json()) as any[]
+        })) as unknown as Response
+        const emails = (await emailRes.json()) as GithubEmail[]
         const primary = emails?.find(emailEntry => emailEntry.primary)?.email || emails?.[0]?.email || `${info.login}@users.noreply.github.com`
         const username = info.name || info.login
 
@@ -147,15 +188,15 @@ export class SocialAuthService implements ISocialAuthService {
                 isBanned: false,
                 isPremium: false,
                 isVerified: true
-            } as any)
+            })
         }
 
-        if ((user as any).isBanned) {
+        if (user.isBanned) {
             throw new Error(ResponseMessages.USER_BANNED)
         }
 
-        const access = this._jwtService.signAccess({ sub: (user as any)._id?.toString?.() || (user as any).id, isAdmin: !!(user as any).isAdmin })
-        const refresh = this._jwtService.signRefresh({ sub: (user as any)._id?.toString?.() || (user as any).id })
+        const access = this._jwtService.signAccess({ sub: user._id?.toString() || user.id || '', isAdmin: !!user.isAdmin })
+        const refresh = this._jwtService.signRefresh({ sub: user._id?.toString() || user.id || '' })
 
         return { user, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } }
     }
