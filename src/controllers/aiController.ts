@@ -2,17 +2,16 @@ import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
 import { HttpStatus, ResponseMessages } from '../constants'
 import { IAiService } from '../interfaces/services'
-import { IProblemRepository, IUserRepository, IGroupRepository } from '../interfaces/repositories'
+
+
 import { HintDTO, CodeReviewDTO, PerformanceDTO } from '../dto/request/ai.request.dto'
 import { getErrorMessage } from '../utils/errorUtils'
+import { ApiResponse } from '../utils/ApiResponse'
 
 @singleton()
 export class AiController {
     constructor(
-        @inject("IAiService") private _service: IAiService,
-        @inject("IProblemRepository") private _problemRepo: IProblemRepository,
-        @inject("IUserRepository") private _userRepo: IUserRepository,
-        @inject("IGroupRepository") private _groupRepo: IGroupRepository
+        @inject("IAiService") private _service: IAiService
     ) { }
 
     /**
@@ -25,12 +24,12 @@ export class AiController {
         try {
             const body = req.body as HintDTO
             const { problemId, userCode } = body;
-            const problem = await this._problemRepo.getById(problemId);
-            if (!problem) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
-            const hintText = await this._service.hint(problem, userCode);
-            res.json({ hint: hintText });
+            const hintText = await this._service.hint(problemId, userCode);
+            return ApiResponse.success(res, { hint: hintText })
         } catch (e: unknown) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
+            const msg = getErrorMessage(e);
+            if (msg === "Problem not found") return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
+            return ApiResponse.error(res, msg, HttpStatus.NOT_IMPLEMENTED)
         }
     }
 
@@ -44,12 +43,12 @@ export class AiController {
         try {
             const body = req.body as CodeReviewDTO
             const { problemId, userCode } = body;
-            const problem = await this._problemRepo.getById(problemId);
-            if (!problem) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
-            const review = await this._service.codeReview(problem, userCode);
-            res.json({ review: review });
+            const review = await this._service.codeReview(problemId, userCode);
+            return ApiResponse.success(res, { review: review })
         } catch (e: unknown) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
+            const msg = getErrorMessage(e);
+            if (msg === "Problem not found") return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
+            return ApiResponse.error(res, msg, HttpStatus.NOT_IMPLEMENTED)
         }
     }
 
@@ -63,21 +62,12 @@ export class AiController {
         try {
             const body = req.body as PerformanceDTO
             const { userId } = body;
-            const profile = await this._userRepo.getById(userId);
-            if (!profile) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
-            const joinedGroups = (await this._groupRepo.all()).filter(group => (group.members || []).some(member => {
-                const memberId = typeof member === 'string' ? member : member._id?.toString() || member.id;
-                return memberId === userId;
-            }));
-            const submissionStats = {
-                total: profile.duelsWon + profile.duelsLost,
-                accepted: profile.duelsWon,
-                acceptanceRate: (profile.duelsWon + profile.duelsLost) > 0 ? (profile.duelsWon / (profile.duelsWon + profile.duelsLost)) * 100 : 0
-            };
-            const analysis = await this._service.performance({ user: profile, submissionStats, joinedGroups });
-            res.json({ analysis });
+            const analysis = await this._service.performance(userId);
+            return ApiResponse.success(res, { analysis })
         } catch (e: unknown) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
+            const msg = getErrorMessage(e);
+            if (msg === "User not found") return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
+            return ApiResponse.error(res, msg, HttpStatus.NOT_IMPLEMENTED)
         }
     }
 
@@ -91,9 +81,9 @@ export class AiController {
         try {
             const { concept } = req.body;
             const explanation = await this._service.explainConcept(concept);
-            res.json({ explanation });
+            return ApiResponse.success(res, { explanation })
         } catch (e: unknown) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.NOT_IMPLEMENTED)
         }
     }
 
@@ -107,9 +97,9 @@ export class AiController {
         try {
             const { messages } = req.body;
             const summary = await this._service.summarizeDiscussion(messages);
-            res.json({ summary });
+            return ApiResponse.success(res, { summary })
         } catch (e: unknown) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.NOT_IMPLEMENTED)
         }
     }
 
@@ -123,10 +113,9 @@ export class AiController {
         try {
             const { difficulty, topic } = req.body;
             const problem = await this._service.generateProblem(difficulty, topic);
-            res.json(problem);
+            return ApiResponse.success(res, problem)
         } catch (e: unknown) {
-            res.status(HttpStatus.NOT_IMPLEMENTED).json({ message: getErrorMessage(e) });
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.NOT_IMPLEMENTED)
         }
     }
 }
-

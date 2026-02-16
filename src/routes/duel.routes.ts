@@ -24,7 +24,7 @@ export class DuelRoutes {
         this.router.get('/active', auth, (req, res, next) => this._controller.listActiveDuels(req, res).catch(next))
         this.router.post('/open', auth, validate(CreateOpenChallengeSchema), (req, res, next) => this._controller.createOpenChallenge(req, res).catch(next))
         this.router.get('/:id', (req, res, next) => this._controller.duelDetail(req, res).catch(next))
-        this.router.get('/:id/summary', (req, res, next) => this._controller.getDuelSummary(req, res).catch(next))
+        this.router.get('/:id/summary', auth, (req, res, next) => this._controller.getDuelSummary(req, res).catch(next))
         this.router.post('/:id/summary', validate(SetSummarySchema), (req, res, next) => this._controller.setDuelSummary(req, res).catch(next))
         this.router.post('/:id/finish', validate(FinishDuelSchema), (req, res, next) => this._controller.finishDuel(req, res).catch(next))
         this.router.post('/:id/submit', auth, validate(SubmitDuelResultSchema), (req, res, next) => this._controller.submitDuelResult(req, res).catch(next))

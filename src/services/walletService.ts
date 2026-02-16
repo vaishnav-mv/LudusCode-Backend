@@ -6,17 +6,14 @@ import { IWalletService } from '../interfaces/services'
 import { env } from '../config/env'
 import { RazorpayOrder } from '../types'
 
+import { IPaymentProvider } from '../interfaces/providers'
+
 @singleton()
 export class WalletService implements IWalletService {
-    private _razorpay: Razorpay
-
-    constructor(@inject("IWalletRepository") private _wallets: IWalletRepository) {
-        // Initialize Razorpay with env vars (or defaults for safety)
-        this._razorpay = new Razorpay({
-            key_id: env.RAZORPAY_KEY_ID || 'rzp_test_123',
-            key_secret: env.RAZORPAY_KEY_SECRET || 'secret'
-        })
-    }
+    constructor(
+        @inject("IWalletRepository") private _wallets: IWalletRepository,
+        @inject("IPaymentProvider") private _paymentProvider: IPaymentProvider
+    ) { }
 
 
     async get(userId: string) {
@@ -24,31 +21,15 @@ export class WalletService implements IWalletService {
     }
 
     async createDepositOrder(userId: string, amount: number) {
-        const options = {
-            amount: amount * 100, // amount in paisa
-            currency: "INR",
-            receipt: `receipt_${Date.now()}_${userId.substring(0, 5)}`
-        };
-        try {
-            const order = await this._razorpay.orders.create(options);
-            return order as unknown as RazorpayOrder;
-        } catch (error: unknown) {
-            console.error("Razorpay Error:", error);
-            throw new Error("Failed to create payment order");
-        }
+        const receipt = `receipt_${Date.now()}_${userId.substring(0, 5)}`;
+        return this._paymentProvider.createOrder(amount, "INR", receipt);
     }
 
     async verifyDeposit(userId: string, orderId: string, paymentId: string, signature: string) {
-        const secret = env.RAZORPAY_KEY_SECRET || 'secret';
-        const generatedSignature = crypto
-            .createHmac('sha256', secret)
-            .update(orderId + "|" + paymentId)
-            .digest('hex');
-
-        if (generatedSignature === signature) {
+        if (this._paymentProvider.verifySignature(orderId, paymentId, signature)) {
             // Signature valid, proceed to deposit
             // For simplicity/MVP as per plan: just fetch the payment details to get AMOUNT
-            const payment = await this._razorpay.payments.fetch(paymentId);
+            const payment = await this._paymentProvider.fetchPayment(paymentId);
             const amountInRupees = (payment.amount as number) / 100;
 
             await this._wallets.deposit(userId, amountInRupees, `Deposit via Razorpay (Tx: ${paymentId})`);

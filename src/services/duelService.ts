@@ -1,7 +1,7 @@
 import { singleton, inject } from 'tsyringe'
 import { IDuelRepository, IProblemRepository, IUserRepository, IWalletRepository } from '../interfaces/repositories'
-import { IDuelService, IJudgeService } from '../interfaces/services'
-import { Duel, DuelStatus, Difficulty, SubmissionStatus, User } from '../types'
+import { IDuelService } from '../interfaces/services'
+import { Duel, DuelStatus, Difficulty, SubmissionStatus, User, SubmissionResult } from '../types'
 import { createHash } from 'crypto'
 
 import { ResponseMessages } from '../constants'
@@ -13,7 +13,6 @@ export class DuelService implements IDuelService {
     @inject("IProblemRepository") private _problems: IProblemRepository,
     @inject("IUserRepository") private _users: IUserRepository,
     @inject("IWalletRepository") private _wallets: IWalletRepository,
-    @inject("IJudgeService") private _judge: IJudgeService
   ) { }
 
   async create(difficulty: Difficulty, wager: number, player1Id: string, player2Id: string) {
@@ -296,14 +295,14 @@ export class DuelService implements IDuelService {
     };
   }
 
-  async submitSolution(id: string, playerId: string, userCode: string) {
+  async processSubmission(id: string, userId: string, userCode: string, result: SubmissionResult) {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
 
     // --- GUARD: Duel must be in progress ---
     if (duel.status === DuelStatus.Finished) {
-      console.log(`[DuelService.submitSolution] Duel ${id} already finished. Returning as-is.`);
-      return duel; // Idempotent: return the finished duel
+      console.log(`[DuelService.processSubmission] Duel ${id} already finished. Returning as-is.`);
+      return duel; // Idempotent
     }
     if (duel.status !== DuelStatus.InProgress) {
       throw new Error(ResponseMessages.DUEL_NOT_IN_PROGRESS);
@@ -311,31 +310,8 @@ export class DuelService implements IDuelService {
 
     // --- GUARD: Player must be a participant ---
     const { p1Id, p2Id } = this._getPlayerIds(duel);
-    const userId = playerId;
     if (userId !== p1Id && userId !== p2Id) {
       throw new Error(ResponseMessages.NOT_A_PARTICIPANT);
-    }
-
-    // Server-side Execution
-    const problem = duel.problem;
-    const problemId = typeof problem === 'string' ? problem : (problem.id || problem._id?.toString());
-    const problemDoc = problemId ? await this._problems.getById(problemId) : null;
-
-    if (!problemDoc) throw new Error("Problem not found for duel");
-
-    const solutionCode = problemDoc.solution?.code || '';
-    const testCases = problemDoc.testCases || [];
-    const language = problemDoc.solution?.language || 'javascript';
-
-    // Execute!
-    console.log('[DuelService] Executing user code against Piston...', { userId, problemId: problemDoc.id, language });
-    let result: import('../types').SubmissionResult; // Valid type
-    try {
-      result = await this._judge.execute(userCode, solutionCode, testCases, problemDoc, language);
-      console.log('[DuelService] Execution successful:', result.overallStatus);
-    } catch (e: unknown) {
-      console.error('[DuelService] Execution failed:', e);
-      throw e;
     }
 
     const submissions = duel.submissions || []

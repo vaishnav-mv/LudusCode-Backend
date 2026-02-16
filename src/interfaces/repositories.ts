@@ -53,7 +53,38 @@ export interface IWalletRepository {
     add(userId: string, amount: number, description: string): Promise<void>;
 }
 
+
 export interface IChatRepository {
     getByGroup(groupId: string): Promise<ChatMessage[]>;
     add(groupId: string, userId: string, text: string, timestamp: string): Promise<ChatMessage>;
+}
+
+export interface IAiRepository {
+    hint(problem: Problem, userCode: string): Promise<string>
+    codeReview(problem: Problem, userCode: string): Promise<string>
+    performance(data: { user: User, submissionStats: { total: number, accepted: number, acceptanceRate: number }, joinedGroups: Group[] }): Promise<string>
+
+    explainConcept(concept: string): Promise<string>
+    summarizeDiscussion(messages: string[]): Promise<string>
+    generateProblem(difficulty: string, topic: string): Promise<Problem>
+}
+
+
+export interface IEmailRepository {
+    sendOtp(email: string, code: string): Promise<boolean>
+}
+
+export interface ICloudinaryRepository {
+    uploadImage(filePath: string, folder?: string): Promise<string>
+}
+
+export interface ExecutionResult {
+    stdout: string;
+    stderr: string;
+    code: number | null;
+    error?: string;
+}
+
+export interface ICodeExecutionRepository {
+    execute(language: string, code: string, timeoutMs?: number): Promise<ExecutionResult>
 }

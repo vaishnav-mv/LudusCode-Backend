@@ -1,6 +1,6 @@
 import { singleton, inject } from 'tsyringe'
 import { IProblemRepository } from '../interfaces/repositories'
-import { IProblemService, ProblemListParams } from '../interfaces/services'
+import { IProblemService, IAiService, ProblemListParams } from '../interfaces/services'
 import { mapProblem } from '../utils/mapper'
 import { Problem, PaginatedResponse } from '../types'
 
@@ -8,7 +8,7 @@ import { Problem, PaginatedResponse } from '../types'
 export class ProblemService implements IProblemService {
   constructor(
     @inject("IProblemRepository") private _repo: IProblemRepository,
-    @inject("IAiService") private _ai: import('../interfaces/services').IAiService
+    @inject("IAiService") private _ai: IAiService
   ) { }
 
   async list(params: ProblemListParams = {}): Promise<PaginatedResponse<Problem>> {

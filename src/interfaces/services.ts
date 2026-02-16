@@ -3,6 +3,17 @@ import { SubmissionResponseDTO } from '../dto/response/submission.response.dto'
 import { UserResponseDTO } from '../dto/response/user.response.dto'
 import { GroupResponseDTO } from '../dto/response/group.response.dto'
 
+export interface IJwtService {
+  signAccess(payload: object): string
+  signRefresh(payload: object): string
+  verify(token: string): JwtPayload | string
+}
+
+export interface IPasswordService {
+  hash(password: string): string // Sync for now as bcrypt.hashSync was used
+  compare(password: string, hash: string): boolean
+}
+
 export interface IAuthService {
   login(email: string, password: string): Promise<{ user: User, tokens: { access: string, refresh: string }, cookie: { domain: string, secure: boolean } }>
   adminLogin(email: string, password: string): Promise<{ user: User, tokens: { access: string, refresh: string }, cookie: { domain: string, secure: boolean } }>
@@ -12,6 +23,7 @@ export interface IAuthService {
   refresh(refreshToken: string): Promise<{ access: string }>
   forgotPassword(email: string): Promise<boolean>
   resetPassword(email: string, code: string, newPassword: string): Promise<boolean>
+  getMe(userId: string): Promise<User>
 }
 
 export interface ISocialAuthService {
@@ -81,7 +93,7 @@ export interface IDuelService {
   setSummary(id: string, finalOverallStatus: string, finalUserCode: string): Promise<Duel | undefined>
   finish(id: string, winnerId?: string, finalOverallStatus?: string, finalUserCode?: string): Promise<Duel | undefined>
   finishDraw(id: string): Promise<Duel | undefined>
-  submitSolution(id: string, playerId: string, userCode: string): Promise<Duel | undefined>
+  processSubmission(id: string, userId: string, userCode: string, result: SubmissionResult): Promise<Duel | null | undefined>
   cancel(id: string, playerId: string): Promise<Duel | undefined>
   forfeit(id: string, playerId: string): Promise<Duel | undefined>
 }
@@ -117,7 +129,7 @@ export interface IAdminService {
   clearFlags(userId: string): Promise<boolean>
   monitoredDuels(): Promise<Duel[]>
   cancelDuel(id: string): Promise<boolean>
-  forceDuelResult(id: string, winnerId: string): Promise<boolean>
+  cancelDuel(id: string): Promise<boolean>
   subscriptionData(): Promise<{
     plans: { id: string, name: string, price: number, period: string, features: string[] }[],
     logs: { id: string, user: { name: string, avatarUrl: string }, plan: { name: string }, action: string, timestamp: Date | string, amount: number, expiryDate?: Date | string }[]
@@ -137,7 +149,7 @@ export interface IChatService {
 }
 
 export interface IJudgeService {
-  execute(userCode: string, solutionCode: string, testCases: TestCase[], problem?: Problem, language?: string): Promise<SubmissionResult>
+  execute(problemId: string, userCode: string, language: string, customInputs?: string[]): Promise<SubmissionResult>
   executeScratchpad(userCode: string, language: string): Promise<SubmissionResult>
 }
 
@@ -159,32 +171,13 @@ export interface IProblemService {
 }
 
 export interface IAiService {
-  hint(problem: Problem, userCode: string): Promise<string>
-  codeReview(problem: Problem, userCode: string): Promise<string>
-  performance(data: { user: User, submissionStats: { total: number, accepted: number, acceptanceRate: number }, joinedGroups: Group[] }): Promise<string>
+  hint(problemId: string, userCode: string): Promise<string>
+  codeReview(problemId: string, userCode: string): Promise<string>
+  performance(userId: string): Promise<string>
 
   explainConcept(concept: string): Promise<string>
   summarizeDiscussion(messages: string[]): Promise<string>
   generateProblem(difficulty: string, topic: string): Promise<Problem>
-}
-
-export interface IJwtService {
-  signAccess(payload: object): string
-  signRefresh(payload: object): string
-  verify(token: string): string | JwtPayload
-}
-
-export interface IOtpService {
-  create(email: string, purpose: string): Promise<string>
-  verify(email: string, code: string, purpose: string): Promise<boolean>
-}
-
-export interface IEmailService {
-  sendOtp(email: string, code: string): Promise<boolean>
-}
-
-export interface ICloudinaryService {
-  uploadImage(filePath: string, folder?: string): Promise<string>
 }
 
 export interface IStudySessionService {

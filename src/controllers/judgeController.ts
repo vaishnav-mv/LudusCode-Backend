@@ -2,14 +2,13 @@ import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
 import { HttpStatus, ResponseMessages } from '../constants'
 import { IJudgeService } from '../interfaces/services'
-import { IProblemRepository } from '../interfaces/repositories'
 import { ExecuteDTO } from '../dto/request/judge.request.dto'
+import { ApiResponse } from '../utils/ApiResponse'
 
 @singleton()
 export class JudgeController {
     constructor(
-        @inject("IJudgeService") private _service: IJudgeService,
-        @inject("IProblemRepository") private _problemRepo: IProblemRepository
+        @inject("IJudgeService") private _service: IJudgeService
     ) { }
 
     /**
@@ -20,53 +19,15 @@ export class JudgeController {
      */
     execute = async (req: Request, res: Response) => {
         const body = req.body as ExecuteDTO
-        const { problemId, userCode, language } = body;
-        const problem = await this._problemRepo.getById(problemId);
-        if (!problem) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
+        const { problemId, userCode, language, customInputs } = body;
 
-        // Find matching solution
-
-        let solutionCode = problem.solution?.code; // Fallback
-
-        if (problem.solutions && problem.solutions.length > 0) {
-            const match = problem.solutions.find(solutionEntry => solutionEntry.language.toLowerCase() === language.toLowerCase());
-            if (match) solutionCode = match.code;
+        try {
+            const executionResult = await this._service.execute(problemId, userCode, language, customInputs);
+            return ApiResponse.success(res, executionResult)
+        } catch (e: unknown) {
+            const msg = (e as Error).message;
+            if (msg === "Problem not found") return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
+            return ApiResponse.error(res, msg || "System Error", HttpStatus.INTERNAL_SERVER_ERROR)
         }
-
-        let testCasesToRun = problem.testCases || [];
-        const { customInputs } = body;
-
-        if (customInputs && Array.isArray(customInputs) && customInputs.length > 0) {
-            if (solutionCode) {
-                // Run solution code to generate expected outputs
-                const dummyTestCases = customInputs.map((input: string) => ({ input, output: 'null', isSample: false }));
-                const solutionResult = await this._service.execute(solutionCode, solutionCode, dummyTestCases, problem, language);
-
-                testCasesToRun = solutionResult.results.map((res, idx) => {
-                    // When generating expected outputs, 'Wrong Answer' is expected because we use 'null' as dummy expected output.
-                    // We only consider it a failure if the solution crashed (Runtime Error, etc.)
-                    const isFailure = res.status !== 'Accepted' && res.status !== 'Wrong Answer';
-
-                    if (isFailure) {
-                        return {
-                            input: customInputs[idx],
-                            output: JSON.stringify(`System Error: Official solution failed - ${res.userOutput}`),
-                            isSample: false
-                        };
-                    }
-                    return {
-                        input: customInputs[idx],
-                        output: res.userOutput, // This is the expected output (JSON stringified)
-                        isSample: false
-                    }
-                });
-            } else {
-                // Should define behavior if no solution code available? 
-            }
-        }
-
-        const executionResult = await this._service.execute(userCode, solutionCode || '', testCasesToRun, problem, language);
-        res.json(executionResult);
     }
 }
-

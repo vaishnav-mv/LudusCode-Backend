@@ -346,3 +346,17 @@ export interface JwtPayload {
     exp?: number;
     [key: string]: unknown;
 }
+
+export interface GenerationConfig {
+    temperature?: number;
+    responseMimeType?: string;
+    responseSchema?: object;
+}
+
+export interface GenerativeModel {
+    generateContent(prompt: string): Promise<{ response: { text: () => string } }>;
+}
+
+export interface GoogleGenAIInstance {
+    getGenerativeModel(config: { model: string, generationConfig?: GenerationConfig }): GenerativeModel;
+}

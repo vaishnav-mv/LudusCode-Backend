@@ -49,6 +49,26 @@ export const mapProblem = (problem: Partial<Problem> | null | undefined) => {
     };
 };
 
+export const mapDuelProblem = (problem: Partial<Problem> | null | undefined) => {
+    if (!problem) return null;
+    return {
+        id: problem._id?.toString() || problem.id || '',
+        title: problem.title || '',
+        description: problem.description || '',
+        difficulty: problem.difficulty || Difficulty.Easy,
+        constraints: problem.constraints || [],
+        inputFormat: problem.inputFormat || '',
+        outputFormat: problem.outputFormat || '',
+        testCases: problem.testCases || [],
+        // SECURITY FIX: Do not expose full solution code to frontend
+        solution: problem.solution ? { language: problem.solution.language, code: '' } : undefined,
+        solutions: [], // Hide all other solutions
+        starterCode: problem.starterCode,
+        functionName: problem.functionName,
+        status: problem.status || ProblemStatus.Pending
+    };
+};
+
 export const mapGroup = (group: Partial<Group> | null | undefined): GroupResponseDTO | null => {
     if (!group) return null;
     return {
@@ -110,7 +130,7 @@ export const mapDuel = (duel: Partial<Duel> | null | undefined): DuelResponseDTO
     if (!duel) return null;
     return {
         id: duel._id?.toString() || duel.id || '',
-        problem: mapProblem(duel.problem as Partial<Problem>)!,
+        problem: mapDuelProblem(duel.problem as Partial<Problem>)!,
         player1: { user: mapUser(duel.player1?.user as Partial<User>), warnings: duel.player1?.warnings || 0 },
         player2: { user: mapUser(duel.player2?.user as Partial<User>), warnings: duel.player2?.warnings || 0 },
         status: duel.status || 'Waiting',

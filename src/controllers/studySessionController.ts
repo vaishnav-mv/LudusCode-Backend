@@ -2,6 +2,8 @@ import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
 import { IStudySessionService } from '../interfaces/services'
 import { getErrorMessage } from '../utils/errorUtils'
+import { ApiResponse } from '../utils/ApiResponse'
+import { HttpStatus } from '../constants'
 
 @singleton()
 export class StudySessionController {
@@ -18,11 +20,11 @@ export class StudySessionController {
     create = async (req: Request, res: Response) => {
         try {
             const userId = req.user?.sub
-            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+            if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.create({ ...req.body, userId })
-            res.status(201).json(session)
+            return ApiResponse.success(res, session, "Session created", HttpStatus.CREATED)
         } catch (e: unknown) {
-            res.status(400).json({ message: getErrorMessage(e) })
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -36,11 +38,11 @@ export class StudySessionController {
         try {
             const { id } = req.params
             const userId = req.user?.sub
-            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+            if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.update(id, userId, req.body)
-            res.json(session)
+            return ApiResponse.success(res, session)
         } catch (e: unknown) {
-            res.status(400).json({ message: getErrorMessage(e) })
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -61,9 +63,9 @@ export class StudySessionController {
                 parseInt(limit),
                 { status, sort, query: q }
             )
-            res.json(sessions)
+            return ApiResponse.success(res, sessions)
         } catch (e: unknown) {
-            res.status(400).json({ message: getErrorMessage(e) })
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -77,11 +79,11 @@ export class StudySessionController {
         try {
             const { id } = req.params
             const userId = req.user?.sub
-            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+            if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.join(id, userId)
-            res.json(session)
+            return ApiResponse.success(res, session)
         } catch (e: unknown) {
-            res.status(400).json({ message: getErrorMessage(e) })
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -95,11 +97,11 @@ export class StudySessionController {
         try {
             const { id } = req.params
             const userId = req.user?.sub
-            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+            if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.leave(id, userId)
-            res.json(session)
+            return ApiResponse.success(res, session)
         } catch (e: unknown) {
-            res.status(400).json({ message: getErrorMessage(e) })
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -113,17 +115,17 @@ export class StudySessionController {
         try {
             const { id } = req.params
             const userId = req.user?.sub
-            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+            if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             // We verify access inside the service
             const session = await this._service.getByIdSecure(id, userId);
-            if (!session) return res.status(404).json({ message: 'Session not found' });
-            res.json(session)
+            if (!session) return ApiResponse.error(res, 'Session not found', HttpStatus.NOT_FOUND)
+            return ApiResponse.success(res, session)
         } catch (e: unknown) {
             const msg = getErrorMessage(e);
             if (msg.includes('authorized') || msg.includes('member')) {
-                return res.status(403).json({ message: msg });
+                return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
             }
-            res.status(400).json({ message: msg })
+            return ApiResponse.error(res, msg, HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -137,11 +139,11 @@ export class StudySessionController {
         try {
             const { id } = req.params
             const userId = req.user?.sub
-            if (!userId) return res.status(401).json({ message: 'Unauthorized' })
+            if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.passTurn(id, userId)
-            res.json(session)
+            return ApiResponse.success(res, session)
         } catch (e: unknown) {
-            res.status(400).json({ message: getErrorMessage(e) })
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
         }
     }
 }

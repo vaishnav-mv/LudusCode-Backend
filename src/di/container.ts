@@ -5,10 +5,17 @@ import { container } from 'tsyringe'
 import {
     IAuthService, IUserService, IGroupService, IDuelService,
     IProblemService, IWalletService, IChatService,
-    IAiService, IAdminService, IJudgeService,
-    IJwtService, IOtpService, IEmailService, ICloudinaryService,
+    IAdminService, IJudgeService,
+    IAiService,
     ISocialAuthService, IStudySessionService, ISubmissionService, ISubscriptionService
 } from '../interfaces/services'
+
+// Interfaces (Providers)
+import {
+    IJwtProvider, IPasswordProvider, IEmailProvider, ICloudinaryProvider,
+    ICodeExecutionProvider, IAiProvider,
+    IOtpProvider, IPaymentProvider, IOAuthProvider
+} from '../interfaces/providers'
 
 // Interfaces (Repositories)
 import {
@@ -27,6 +34,17 @@ import { WalletRepository } from '../repositories/walletRepository'
 import { ChatRepository } from '../repositories/chatRepository'
 import { SubmissionRepository } from '../repositories/submissionRepository'
 
+// Providers
+import { EmailProvider } from '../providers/emailProvider'
+import { CloudinaryProvider } from '../providers/cloudinaryProvider'
+import { CodeExecutionProvider } from '../providers/codeExecutionProvider'
+import { AiProvider } from '../providers/aiProvider'
+import { JwtProvider } from '../providers/jwtProvider'
+import { PasswordProvider } from '../providers/passwordProvider'
+import { OtpProvider } from '../providers/otpProvider'
+import { PaymentProvider } from '../providers/paymentProvider'
+import { OAuthProvider } from '../providers/oauthProvider'
+
 // Services
 import { AuthService } from '../services/authService'
 import { UserService } from '../services/userService'
@@ -43,12 +61,6 @@ import { SocialAuthService } from '../services/socialAuthService'
 import { SubmissionService } from '../services/submissionService'
 import { SubscriptionService } from '../services/subscriptionService'
 
-// Helpers
-import { JwtService } from '../services/jwtService'
-import { OtpService } from '../services/otpService'
-import { EmailService } from '../services/emailService'
-import { CloudinaryService } from '../services/cloudinaryService'
-
 // Register Repositories
 container.registerSingleton<IUserRepository>("IUserRepository", UserRepository)
 container.registerSingleton<IGroupRepository>("IGroupRepository", GroupRepository)
@@ -58,6 +70,17 @@ container.registerSingleton<IStudySessionRepository>("IStudySessionRepository", 
 container.registerSingleton<IWalletRepository>("IWalletRepository", WalletRepository)
 container.registerSingleton<IChatRepository>("IChatRepository", ChatRepository)
 container.registerSingleton<ISubmissionRepository>("ISubmissionRepository", SubmissionRepository)
+
+// Register Providers
+container.registerSingleton<IEmailProvider>("IEmailProvider", EmailProvider)
+container.registerSingleton<ICloudinaryProvider>("ICloudinaryProvider", CloudinaryProvider)
+container.registerSingleton<ICodeExecutionProvider>("ICodeExecutionProvider", CodeExecutionProvider)
+container.registerSingleton<IAiProvider>("IAiProvider", AiProvider)
+container.registerSingleton<IJwtProvider>("IJwtProvider", JwtProvider)
+container.registerSingleton<IPasswordProvider>("IPasswordProvider", PasswordProvider)
+container.registerSingleton<IOtpProvider>("IOtpProvider", OtpProvider)
+container.registerSingleton<IPaymentProvider>("IPaymentProvider", PaymentProvider)
+container.registerSingleton<IOAuthProvider>("IOAuthProvider", OAuthProvider)
 
 // Register Services
 container.registerSingleton<IAuthService>("IAuthService", AuthService)
@@ -70,15 +93,11 @@ container.registerSingleton<IProblemService>("IProblemService", ProblemService)
 container.registerSingleton<IWalletService>("IWalletService", WalletService)
 container.registerSingleton<IChatService>("IChatService", ChatService)
 container.registerSingleton<IAiService>("IAiService", AiService)
+
 container.registerSingleton<IAdminService>("IAdminService", AdminService)
 container.registerSingleton<IJudgeService>("IJudgeService", JudgeService)
 container.registerSingleton<ISubmissionService>("ISubmissionService", SubmissionService)
 container.registerSingleton<ISubscriptionService>("ISubscriptionService", SubscriptionService)
 
-// Register Helpers
-container.registerSingleton<IJwtService>("IJwtService", JwtService)
-container.registerSingleton<IOtpService>("IOtpService", OtpService)
-container.registerSingleton<IEmailService>("IEmailService", EmailService)
-container.registerSingleton<ICloudinaryService>("ICloudinaryService", CloudinaryService)
 
 export default container

@@ -1,13 +1,16 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
 
-import { IAdminService } from '../interfaces/services'
+import { HttpStatus } from '../constants'
+import { ApiResponse } from '../utils/ApiResponse'
+import { IAdminService, IDuelService } from '../interfaces/services'
 import { ForceDuelResultDTO } from '../dto/request/admin.request.dto'
 
 @singleton()
 export class AdminController {
   constructor(
-    @inject("IAdminService") private _service: IAdminService
+    @inject("IAdminService") private _service: IAdminService,
+    @inject("IDuelService") private _duelService: IDuelService
   ) { }
 
   /**
@@ -18,7 +21,7 @@ export class AdminController {
    */
   dashboardStats = async (req: Request, res: Response) => {
     const stats = await this._service.dashboardStats()
-    res.json(stats)
+    return ApiResponse.success(res, stats)
   }
 
   /**
@@ -29,7 +32,7 @@ export class AdminController {
    */
   financials = async (req: Request, res: Response) => {
     const financialData = await this._service.financials()
-    res.json(financialData)
+    return ApiResponse.success(res, financialData)
   }
 
   /**
@@ -40,7 +43,7 @@ export class AdminController {
    */
   subscriptionData = async (req: Request, res: Response) => {
     const subscriptionData = await this._service.subscriptionData()
-    res.json(subscriptionData)
+    return ApiResponse.success(res, subscriptionData)
   }
 
   /**
@@ -51,7 +54,7 @@ export class AdminController {
    */
   createPlan = async (req: Request, res: Response) => {
     const plan = await this._service.createPlan(req.body)
-    res.json(plan)
+    return ApiResponse.success(res, plan)
   }
 
   /**
@@ -62,7 +65,7 @@ export class AdminController {
    */
   updatePlan = async (req: Request, res: Response) => {
     const updatedPlan = await this._service.updatePlan(req.params.id, req.body)
-    res.json(updatedPlan)
+    return ApiResponse.success(res, updatedPlan)
   }
 
   /**
@@ -73,7 +76,7 @@ export class AdminController {
    */
   deletePlan = async (req: Request, res: Response) => {
     const success = await this._service.deletePlan(req.params.id)
-    res.json({ ok: success })
+    return ApiResponse.success(res, { ok: success })
   }
 
   /**
@@ -85,7 +88,7 @@ export class AdminController {
   grantSubscription = async (req: Request, res: Response) => {
     const { username, planId } = req.body
     const success = await this._service.grantSubscription(username, planId)
-    res.json({ ok: success })
+    return ApiResponse.success(res, { ok: success })
   }
 
   /**
@@ -96,7 +99,7 @@ export class AdminController {
    */
   cancelSubscription = async (req: Request, res: Response) => {
     const success = await this._service.cancelSubscription(req.params.userId)
-    res.json({ ok: success })
+    return ApiResponse.success(res, { ok: success })
   }
 
   /**
@@ -107,7 +110,7 @@ export class AdminController {
    */
   pendingProblems = async (req: Request, res: Response) => {
     const pending = await this._service.pendingProblems()
-    res.json(pending)
+    return ApiResponse.success(res, pending)
   }
 
   /**
@@ -118,7 +121,7 @@ export class AdminController {
    */
   approveProblem = async (req: Request, res: Response) => {
     const ok = await this._service.approveProblem(req.params.id)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -129,7 +132,7 @@ export class AdminController {
    */
   rejectProblem = async (req: Request, res: Response) => {
     const ok = await this._service.rejectProblem(req.params.id)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -142,7 +145,7 @@ export class AdminController {
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 50
     const result = await this._service.allProblems(page, limit)
-    res.json(result)
+    return ApiResponse.success(res, result)
   }
 
   /**
@@ -156,7 +159,7 @@ export class AdminController {
     const limit = parseInt(req.query.limit as string) || 50
     const query = req.query.q as string
     const result = await this._service.allUsers(page, limit, query)
-    res.json(result)
+    return ApiResponse.success(res, result)
   }
 
   /**
@@ -167,7 +170,7 @@ export class AdminController {
    */
   banUser = async (req: Request, res: Response) => {
     const ok = await this._service.banUser(req.params.id)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -178,7 +181,7 @@ export class AdminController {
    */
   unbanUser = async (req: Request, res: Response) => {
     const ok = await this._service.unbanUser(req.params.id)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -190,10 +193,10 @@ export class AdminController {
   searchUsers = async (req: Request, res: Response) => {
     const query = req.query.q as string
     if (!query) {
-      return res.json([])
+      return ApiResponse.success(res, [])
     }
     const users = await this._service.searchUsers(query)
-    res.json(users)
+    return ApiResponse.success(res, users)
   }
 
   /**
@@ -204,7 +207,7 @@ export class AdminController {
    */
   flaggedActivities = async (req: Request, res: Response) => {
     const flagged = await this._service.flaggedActivities()
-    res.json(flagged)
+    return ApiResponse.success(res, flagged)
   }
 
   /**
@@ -215,7 +218,7 @@ export class AdminController {
    */
   clearFlags = async (req: Request, res: Response) => {
     const ok = await this._service.clearFlags(req.params.id)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -226,7 +229,7 @@ export class AdminController {
    */
   monitoredDuels = async (req: Request, res: Response) => {
     const duels = await this._service.monitoredDuels()
-    res.json(duels)
+    return ApiResponse.success(res, duels)
   }
 
   /**
@@ -237,7 +240,7 @@ export class AdminController {
    */
   cancelDuel = async (req: Request, res: Response) => {
     const ok = await this._service.cancelDuel(req.params.id)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -248,7 +251,11 @@ export class AdminController {
    */
   forceDuelResult = async (req: Request, res: Response) => {
     const body = req.body as ForceDuelResultDTO
-    const ok = await this._service.forceDuelResult(req.params.id, body.winnerId)
-    res.json({ ok })
+    try {
+      const result = await this._duelService.finish(req.params.id, body.winnerId);
+      return ApiResponse.success(res, { ok: !!result })
+    } catch {
+      return ApiResponse.error(res, "Failed to force result", HttpStatus.INTERNAL_SERVER_ERROR, { ok: false })
+    }
   }
 }

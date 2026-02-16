@@ -5,6 +5,8 @@ import { broadcastChat } from '../realtime/ws'
 import { IChatService } from '../interfaces/services'
 import { SendMessageDTO } from '../dto/request/chat.request.dto'
 import { mapMessage } from '../utils/mapper'
+import { ApiResponse } from '../utils/ApiResponse'
+import { HttpStatus } from '../constants'
 
 @singleton()
 export class ChatController {
@@ -19,7 +21,7 @@ export class ChatController {
     getMessages = async (req: Request, res: Response) => {
         const groupId = req.params.groupId;
         const messages = await this._service.getMessages(groupId);
-        res.json(messages.map(mapMessage).filter(Boolean));
+        return ApiResponse.success(res, messages.map(mapMessage).filter(Boolean))
     }
 
     /**
@@ -36,9 +38,9 @@ export class ChatController {
         const dto = mapMessage(sentMessage);
         if (dto) {
             broadcastChat(groupId, dto);
-            res.json(dto);
+            return ApiResponse.success(res, dto)
         } else {
-            res.status(500).json({ message: 'Error mapping message' });
+            return ApiResponse.error(res, 'Error mapping message', HttpStatus.INTERNAL_SERVER_ERROR)
         }
     }
 }

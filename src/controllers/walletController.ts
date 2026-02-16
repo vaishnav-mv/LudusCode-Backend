@@ -1,7 +1,8 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
 
-import { HttpStatus } from '../constants'
+import { HttpStatus, ResponseMessages } from '../constants'
+import { ApiResponse } from '../utils/ApiResponse'
 import { IWalletService } from '../interfaces/services'
 import { DepositDTO, WithdrawDTO, WagerDTO, WinDTO } from '../dto/request/wallet.request.dto'
 import { mapWallet } from '../utils/mapper'
@@ -21,7 +22,7 @@ export class WalletController {
     const userId = req.params.userId
     console.log(`[WalletController] Get wallet for userId: ${userId} (param: ${req.params.userId})`);
     const wallet = await this._service.get(userId)
-    res.json(wallet ? mapWallet(wallet) : null)
+    return ApiResponse.success(res, wallet ? mapWallet(wallet) : null)
   }
 
   /**
@@ -36,14 +37,14 @@ export class WalletController {
 
     // Validate amount (e.g. min deposit)
     if (body.amount < 1) {
-      return res.status(HttpStatus.BAD_REQUEST).json({ message: "Minimum deposit is ₹1" })
+      return ApiResponse.error(res, "Minimum deposit is ₹1", HttpStatus.BAD_REQUEST)
     }
 
     try {
       const order = await this._service.createDepositOrder(userId, body.amount)
-      res.json(order)
+      return ApiResponse.success(res, order)
     } catch (err: unknown) {
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: getErrorMessage(err) })
+      return ApiResponse.error(res, getErrorMessage(err), HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
@@ -60,13 +61,13 @@ export class WalletController {
     try {
       const isValid = await this._service.verifyDeposit(userId, razorpayOrderId, razorpayPaymentId, razorpaySignature);
       if (isValid) {
-        res.json({ ok: true, message: "Payment verified successfully" });
+        return ApiResponse.success(res, { ok: true, message: "Payment verified successfully" })
       } else {
-        res.status(HttpStatus.BAD_REQUEST).json({ message: "Invalid signature" });
+        return ApiResponse.error(res, "Invalid signature", HttpStatus.BAD_REQUEST)
       }
     } catch (err: unknown) {
       console.error("Verification Error:", err);
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: "Verification failed" });
+      return ApiResponse.error(res, "Verification failed", HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
@@ -84,12 +85,12 @@ export class WalletController {
     try {
       const ok = await this._service.withdraw(userId, body.amount, body.vpa, "Test User", "test@ludus.com", "9000090000")
       if (!ok) {
-        return res.status(HttpStatus.BAD_REQUEST).json({ message: "Insufficient funds" })
+        return ApiResponse.error(res, "Insufficient funds", HttpStatus.BAD_REQUEST)
       }
-      res.json({ ok: true })
+      return ApiResponse.success(res, { ok: true })
     } catch (err: unknown) {
       console.error("Withdrawal Controller Error:", getErrorMessage(err));
-      return res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(err) })
+      return ApiResponse.error(res, getErrorMessage(err), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -103,7 +104,7 @@ export class WalletController {
     const body = req.body as WagerDTO
     const userId = body.userId
     await this._service.wager(userId, body.amount, body.description)
-    res.json({ ok: true })
+    return ApiResponse.success(res, { ok: true })
   }
 
   /**
@@ -116,6 +117,6 @@ export class WalletController {
     const body = req.body as WinDTO
     const userId = body.userId
     await this._service.win(userId, body.amount, body.description)
-    res.json({ ok: true })
+    return ApiResponse.success(res, { ok: true })
   }
 }

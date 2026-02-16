@@ -72,8 +72,10 @@ export const initRealtime = (server: HttpServer) => {
         // Using first test case as a sample run if sample exists, else use first
         const sampleCases = (problem.testCases || []).filter((tc: TestCase) => tc.isSample);
         const casesToRun = sampleCases.length > 0 ? sampleCases : [(problem.testCases || [])[0]];
+        const customInputs = casesToRun.map(tc => tc.input);
+        const lang = language || 'javascript'; // judgeService needs string
 
-        const result = await judgeService.execute(code, problem.solution?.code || '', casesToRun, problem, language);
+        const result = await judgeService.execute(problem.id!, code, lang, customInputs);
 
         // Broadcast result to everyone (so they see the output of the run)
         io.to(`session:${sessionId}`).emit('execution_result', { result, runBy: socket.id });

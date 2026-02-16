@@ -3,7 +3,9 @@ import { Request, Response } from 'express'
 import { getErrorMessage } from '../utils/errorUtils'
 
 import { HttpStatus, ResponseMessages } from '../constants'
-import { IUserService, ICloudinaryService } from '../interfaces/services'
+import { ApiResponse } from '../utils/ApiResponse'
+import { IUserService } from '../interfaces/services'
+import { ICloudinaryProvider } from '../interfaces/providers'
 import { UpdateProfileRequestDTO, ChangePasswordRequestDTO } from '../dto/request/user.request.dto'
 import { mapUser } from '../utils/mapper'
 import { User } from '../types'
@@ -12,7 +14,7 @@ import { User } from '../types'
 export class UserController {
     constructor(
         @inject("IUserService") private _service: IUserService,
-        @inject("ICloudinaryService") private _cloudinaryService: ICloudinaryService
+        @inject("ICloudinaryProvider") private _cloudinaryRepo: ICloudinaryProvider
     ) { }
 
     /**
@@ -24,8 +26,8 @@ export class UserController {
     profile = async (req: Request, res: Response) => {
         const userId = req.params.id;
         const userProfile = await this._service.profile(userId);
-        if (!userProfile) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
-        res.json(userProfile);
+        if (!userProfile) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
+        return ApiResponse.success(res, userProfile);
     }
 
     /**
@@ -37,12 +39,12 @@ export class UserController {
     setPremium = async (req: Request, res: Response) => {
         const currentUser = req.user;
         if (!currentUser || !currentUser.isAdmin) {
-            return res.status(HttpStatus.FORBIDDEN).json({ message: ResponseMessages.FORBIDDEN });
+            return ApiResponse.error(res, ResponseMessages.FORBIDDEN, HttpStatus.FORBIDDEN);
         }
         const userId = req.params.id;
         const updatedUser = await this._service.setPremium(userId);
-        if (!updatedUser) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
-        res.json(updatedUser);
+        if (!updatedUser) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
+        return ApiResponse.success(res, updatedUser);
     }
 
     /**
@@ -55,7 +57,7 @@ export class UserController {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 100;
         const users = await this._service.leaderboard(page, limit);
-        res.json(users.map(user => mapUser(user)));
+        return ApiResponse.success(res, users.map(user => mapUser(user)));
     }
 
     /**
@@ -67,16 +69,16 @@ export class UserController {
     updateProfile = async (req: Request, res: Response) => {
         const userId = req.params.id;
         const currentUser = req.user;
-        if (!currentUser || (!currentUser.isAdmin && currentUser.sub !== userId)) return res.status(HttpStatus.FORBIDDEN).json({ message: ResponseMessages.FORBIDDEN });
+        if (!currentUser || (!currentUser.isAdmin && currentUser.sub !== userId)) return ApiResponse.error(res, ResponseMessages.FORBIDDEN, HttpStatus.FORBIDDEN);
 
         const body = req.body as UpdateProfileRequestDTO & { avatarUrl?: string };
 
         let avatarUrl = body.avatarUrl;
         if (req.file) {
             try {
-                avatarUrl = await this._cloudinaryService.uploadImage(req.file.path, 'avatars');
+                avatarUrl = await this._cloudinaryRepo.uploadImage(req.file.path, 'avatars');
             } catch {
-                return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: ResponseMessages.FAILED_UPLOAD });
+                return ApiResponse.error(res, ResponseMessages.FAILED_UPLOAD, HttpStatus.INTERNAL_SERVER_ERROR);
             }
         }
 
@@ -85,8 +87,8 @@ export class UserController {
         if (avatarUrl) updateData.avatarUrl = avatarUrl;
 
         const updatedUser = await this._service.updateProfile(userId, updateData);
-        if (!updatedUser) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
-        res.json({ user: mapUser(updatedUser) });
+        if (!updatedUser) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
+        return ApiResponse.success(res, { user: mapUser(updatedUser) });
     }
 
     /**
@@ -97,13 +99,13 @@ export class UserController {
      */
     changePassword = async (req: Request, res: Response) => {
         const userId = req.user?.sub;
-        if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED });
+        if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
         const { oldPassword, newPassword } = req.body as ChangePasswordRequestDTO;
         try {
             await this._service.changePassword(userId, oldPassword, newPassword);
-            res.json({ message: 'Password updated successfully' });
+            return ApiResponse.success(res, null, 'Password updated successfully');
         } catch (e: unknown) {
-            res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) });
+            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -116,9 +118,9 @@ export class UserController {
     searchUsers = async (req: Request, res: Response) => {
         const query = req.query.q as string;
         if (!query || query.length < 2) {
-            return res.json([]);
+            return ApiResponse.success(res, []);
         }
         const users = await this._service.search(query);
-        res.json(users.map(user => mapUser(user)));
+        return ApiResponse.success(res, users.map(user => mapUser(user)));
     }
 }

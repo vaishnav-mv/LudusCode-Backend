@@ -1,130 +1,58 @@
-import { GoogleGenAI } from '@google/genai'
-import { env } from '../config/env'
-import { singleton } from 'tsyringe'
+import { singleton, inject } from 'tsyringe'
 import { IAiService } from '../interfaces/services'
-import { ResponseMessages } from '../constants'
+import { IProblemRepository, IUserRepository, IGroupRepository } from '../interfaces/repositories'
+import { IAiProvider } from '../interfaces/providers'
 import { Problem, User, Group } from '../types'
-
-// Minimal typing for GoogleGenAI to avoid 'any'
-interface GenerationConfig {
-  temperature?: number;
-  responseMimeType?: string;
-  responseSchema?: object;
-}
-
-interface GenerativeModel {
-  generateContent(prompt: string): Promise<{ response: { text: () => string } }>;
-}
-
-interface GoogleGenAIInstance {
-  getGenerativeModel(config: { model: string, generationConfig?: GenerationConfig }): GenerativeModel;
-}
-
-const ai: GoogleGenAI | null = env.GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: env.GOOGLE_API_KEY }) : null;
 
 @singleton()
 export class AiService implements IAiService {
-  private get ai(): GoogleGenAIInstance | null {
-    return (ai as unknown) as GoogleGenAIInstance | null;
-  }
+    constructor(
+        @inject("IAiProvider") private _provider: IAiProvider,
+        @inject("IProblemRepository") private _problemRepo: IProblemRepository,
+        @inject("IUserRepository") private _userRepo: IUserRepository,
+        @inject("IGroupRepository") private _groupRepo: IGroupRepository
+    ) { }
 
-  async hint(problem: Problem, userCode: string) {
-    if (!this.ai) throw new Error(ResponseMessages.AI_UNAVAILABLE);
-    const prompt = `Provide a concise hint for problem ${problem.title}. User code:\n${userCode}`;
-    const model = this.ai.getGenerativeModel({ model: 'gemini-1.5-flash', generationConfig: { temperature: 0.6 } });
-    const result = await model.generateContent(prompt);
-    return (result.response.text() || '').trim();
-  }
+    async hint(problemId: string, userCode: string): Promise<string> {
+        const problem = await this._problemRepo.getById(problemId);
+        if (!problem) throw new Error("Problem not found");
+        return this._provider.hint(problem, userCode);
+    }
 
-  async codeReview(problem: Problem, userCode: string) {
-    if (!this.ai) throw new Error(ResponseMessages.AI_UNAVAILABLE);
-    const prompt = `Code review for problem ${problem.title}. Code:\n${userCode}`;
-    const model = this.ai.getGenerativeModel({ model: 'gemini-1.5-pro', generationConfig: { temperature: 0.4 } });
-    const result = await model.generateContent(prompt);
-    return (result.response.text() || '').trim();
-  }
+    async codeReview(problemId: string, userCode: string): Promise<string> {
+        const problem = await this._problemRepo.getById(problemId);
+        if (!problem) throw new Error("Problem not found");
+        return this._provider.codeReview(problem, userCode);
+    }
 
-  async performance(profile: { user: User, submissionStats: { total: number, accepted: number, acceptanceRate: number }, joinedGroups: Group[] }) {
-    if (!this.ai) throw new Error(ResponseMessages.AI_UNAVAILABLE);
-    const prompt = `Analyze performance for user ${profile.user.username} with win rate ${profile.submissionStats.acceptanceRate.toFixed(1)}%`;
-    const model = this.ai.getGenerativeModel({ model: 'gemini-1.5-pro', generationConfig: { temperature: 0.5 } });
-    const result = await model.generateContent(prompt);
-    return (result.response.text() || '').trim();
-  }
+    async performance(userId: string): Promise<string> {
+        const profile = await this._userRepo.getById(userId);
+        if (!profile) throw new Error("User not found");
 
+        const allGroups = await this._groupRepo.all();
+        const joinedGroups = allGroups.filter((group: Group) => (group.members || []).some((member: User | string) => {
+            const memberId = typeof member === 'string' ? member : member._id?.toString() || member.id;
+            return memberId === userId;
+        }));
 
+        const submissionStats = {
+            total: profile.duelsWon + profile.duelsLost,
+            accepted: profile.duelsWon,
+            acceptanceRate: (profile.duelsWon + profile.duelsLost) > 0 ? (profile.duelsWon / (profile.duelsWon + profile.duelsLost)) * 100 : 0
+        };
 
-  async generateProblem(difficulty: string, topic: string) {
-    if (!this.ai) throw new Error(ResponseMessages.AI_UNAVAILABLE);
-    const prompt = `Generate a new, unique, and interesting competitive programming problem.
-        Difficulty: ${difficulty}
-        Topic: ${topic}
-        
-        Ensure the problem description is engaging and clear. Provide at least 5 diverse test cases, including edge cases. Two of the test cases must be sample cases visible to the user. The solution should be optimal.`;
+        return this._provider.performance({ user: profile, submissionStats, joinedGroups });
+    }
 
-    const schema = {
-      type: 'OBJECT',
-      properties: {
-        title: { type: 'STRING' },
-        description: { type: 'STRING' },
-        difficulty: { type: 'STRING', enum: ['Easy', 'Medium', 'Hard'] },
-        constraints: { type: 'ARRAY', items: { type: 'STRING' } },
-        inputFormat: { type: 'STRING' },
-        outputFormat: { type: 'STRING' },
-        testCases: {
-          type: 'ARRAY',
-          items: {
-            type: 'OBJECT',
-            properties: {
-              input: { type: 'STRING' },
-              output: { type: 'STRING' },
-              isSample: { type: 'BOOLEAN' }
-            },
-            required: ['input', 'output', 'isSample']
-          }
-        },
-        solution: {
-          type: 'OBJECT',
-          properties: {
-            language: { type: 'STRING' },
-            code: { type: 'STRING' }
-          },
-          required: ['language', 'code']
-        }
-      },
-      required: ['title', 'description', 'difficulty', 'constraints', 'inputFormat', 'outputFormat', 'testCases', 'solution']
-    };
+    async explainConcept(concept: string): Promise<string> {
+        return this._provider.explainConcept(concept);
+    }
 
-    const model = this.ai.getGenerativeModel({
-      model: 'gemini-1.5-pro',
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: schema,
-        temperature: 0.8
-      }
-    });
+    async summarizeDiscussion(messages: string[]): Promise<string> {
+        return this._provider.summarizeDiscussion(messages);
+    }
 
-    const result = await model.generateContent(prompt);
-
-    const text = (result.response.text() || '').trim();
-    const problem = JSON.parse(text);
-    return { ...problem, id: new Date().toISOString(), status: 'Pending' } as Problem;
-  }
-
-  async explainConcept(concept: string) {
-    if (!this.ai) throw new Error(ResponseMessages.AI_UNAVAILABLE);
-    const prompt = `Explain the following programming concept in a clear, beginner-friendly way: ${concept}`;
-    const model = this.ai.getGenerativeModel({ model: 'gemini-1.5-flash', generationConfig: { temperature: 0.7 } });
-    const result = await model.generateContent(prompt);
-    return (result.response.text() || '').trim();
-  }
-
-  async summarizeDiscussion(messages: string[]) {
-    if (!this.ai) throw new Error(ResponseMessages.AI_UNAVAILABLE);
-    const prompt = `Summarize the following discussion points into key takeaways:\n${messages.join('\n')}`;
-    const model = this.ai.getGenerativeModel({ model: 'gemini-1.5-flash', generationConfig: { temperature: 0.5 } });
-    const result = await model.generateContent(prompt);
-    return (result.response.text() || '').trim();
-  }
-
+    async generateProblem(difficulty: string, topic: string): Promise<Problem> {
+        return this._provider.generateProblem(difficulty, topic);
+    }
 }

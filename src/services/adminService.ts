@@ -3,7 +3,7 @@ import { singleton, inject } from 'tsyringe'
 import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository, IWalletRepository } from '../interfaces/repositories'
 import { broadcastDuel } from '../realtime/ws'
 import { mapDuel } from '../utils/mapper'
-import { IAdminService, IJudgeService, IDuelService } from '../interfaces/services'
+import { IAdminService } from '../interfaces/services'
 import { DuelStatus, ProblemStatus, User, SubscriptionPlan, Problem } from '../types'
 import { SubscriptionPlanModel } from '../models/SubscriptionPlan'
 import { SubscriptionLogModel } from '../models/SubscriptionLog'
@@ -15,9 +15,7 @@ export class AdminService implements IAdminService {
     @inject("IProblemRepository") private _problems: IProblemRepository,
     @inject("IDuelRepository") private _duels: IDuelRepository,
     @inject("IGroupRepository") private _groups: IGroupRepository,
-    @inject("IJudgeService") private _judge: IJudgeService,
-    @inject("IWalletRepository") private _wallets: IWalletRepository,
-    @inject("IDuelService") private _duelService: IDuelService
+    @inject("IWalletRepository") private _wallets: IWalletRepository
   ) { }
 
   async dashboardStats() {
@@ -276,18 +274,6 @@ export class AdminService implements IAdminService {
     return true
   }
 
-  async forceDuelResult(id: string, winnerId: string) {
-    try {
-      const duel = await this._duelService.finish(id, winnerId)
-      if (duel) {
-        const dto = mapDuel(duel);
-        if (dto) broadcastDuel(id, dto)
-      }
-      return true
-    } catch {
-      return false
-    }
-  }
 
   async subscriptionData() {
     const plans = await SubscriptionPlanModel.find().lean()

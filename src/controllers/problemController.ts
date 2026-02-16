@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
 import { HttpStatus, ResponseMessages } from '../constants'
+import { ApiResponse } from '../utils/ApiResponse'
 import { IProblemService } from '../interfaces/services'
 import { GenerateProblemDTO } from '../dto/request/problem.request.dto'
 import { getErrorMessage } from '../utils/errorUtils'
@@ -27,7 +28,7 @@ export class ProblemController {
             limit: limit ? parseInt(limit as string) : undefined
         });
         console.log(`[ProblemController] Approved problems count: ${result.data.length} of ${result.total}`);
-        res.json(result);
+        return ApiResponse.success(res, result)
     }
 
     /**
@@ -38,8 +39,8 @@ export class ProblemController {
      */
     dailyProblem = async (req: Request, res: Response) => {
         const problem = await this._service.daily();
-        if (!problem) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND });
-        res.json(problem);
+        if (!problem) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
+        return ApiResponse.success(res, problem)
     }
 
     /**
@@ -53,9 +54,9 @@ export class ProblemController {
             const body = req.body as GenerateProblemDTO
             const { difficulty, topic } = body;
             const problem = await this._service.generate(difficulty, topic);
-            res.json(problem);
+            return ApiResponse.success(res, problem)
         } catch (error: unknown) {
-            res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: getErrorMessage(error) });
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.INTERNAL_SERVER_ERROR)
         }
     }
 
@@ -74,10 +75,9 @@ export class ProblemController {
             }
             const problemData = { ...req.body, status };
             const problem = await this._service.create(problemData);
-            res.status(HttpStatus.CREATED).json(problem);
+            return ApiResponse.success(res, problem, 'Problem created', HttpStatus.CREATED)
         } catch (error: unknown) {
-            res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(error) });
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
         }
     }
 }
-

@@ -1,13 +1,13 @@
 import { Request, Response, NextFunction } from 'express'
 import { singleton, inject } from 'tsyringe'
-import { IJwtService } from '../interfaces/services'
 import { IUserRepository } from '../interfaces/repositories'
+import { IJwtProvider } from '../interfaces/providers'
 
 @singleton()
 export class AuthMiddleware {
   constructor(
-    @inject("IJwtService") private _jwt: IJwtService,
-    @inject("IUserRepository") private _userRepo: IUserRepository
+    @inject("IUserRepository") private _userRepo: IUserRepository,
+    @inject("IJwtProvider") private _jwtProvider: IJwtProvider
   ) { }
 
   public auth = async (req: Request, res: Response, next: NextFunction) => {
@@ -21,7 +21,7 @@ export class AuthMiddleware {
     }
 
     try {
-      const payload = this._jwt.verify(token)
+      const payload = this._jwtProvider.verify(token)
 
       if (typeof payload === 'string' || typeof payload.sub !== 'string') {
         return res.status(401).json({ message: 'Unauthorized' })

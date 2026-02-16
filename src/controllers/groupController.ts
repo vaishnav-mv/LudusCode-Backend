@@ -1,6 +1,7 @@
 import { singleton, inject } from 'tsyringe'
 import { Request, Response } from 'express'
 import { HttpStatus, ResponseMessages } from '../constants'
+import { ApiResponse } from '../utils/ApiResponse'
 import { IGroupService } from '../interfaces/services'
 import { CreateGroupDTO, UpdateGroupDTO, GroupMemberActionDTO, AddMemberDTO } from '../dto/request/group.request.dto'
 import { getErrorMessage } from '../utils/errorUtils'
@@ -20,7 +21,7 @@ export class GroupController {
     const body = req.body as CreateGroupDTO
     // Fix: Ensure description is a string
     const createdGroup = await this._service.create(body.name, body.description || '', body.topics || [], currentUser?.sub as string, !!body.isPrivate)
-    res.json(createdGroup)
+    return ApiResponse.success(res, createdGroup, 'Group created', HttpStatus.CREATED)
   }
 
   /**
@@ -37,14 +38,14 @@ export class GroupController {
         name: body.name,
         description: body.description
       })
-      if (!updated) return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.GROUP_NOT_FOUND })
-      res.json(updated)
+      if (!updated) return ApiResponse.error(res, ResponseMessages.GROUP_NOT_FOUND, HttpStatus.NOT_FOUND)
+      return ApiResponse.success(res, updated)
     } catch (e: unknown) {
       const msg = getErrorMessage(e)
       if (msg.includes('Forbidden')) {
-        return res.status(HttpStatus.FORBIDDEN).json({ message: msg })
+        return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
       }
-      res.status(HttpStatus.BAD_REQUEST).json({ message: msg })
+      return ApiResponse.error(res, msg, HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -66,10 +67,10 @@ export class GroupController {
         limit: limit ? parseInt(limit as string) : undefined
       })
       console.log(`[GroupController] Listing groups. Found: ${result.data.length} of ${result.total}`);
-      res.json(result);
+      return ApiResponse.success(res, result)
     } catch (err: unknown) {
       console.error('GroupController: Error listing groups:', err);
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: ResponseMessages.INTERNAL_ERROR });
+      return ApiResponse.error(res, ResponseMessages.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
@@ -82,9 +83,9 @@ export class GroupController {
   groupDetail = async (req: Request, res: Response) => {
     const group = await this._service.detail(req.params.id)
     if (!group) {
-      return res.status(HttpStatus.NOT_FOUND).json({ message: ResponseMessages.NOT_FOUND })
+      return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
     }
-    res.json(group)
+    return ApiResponse.success(res, group)
   }
 
   /**
@@ -97,11 +98,11 @@ export class GroupController {
     try {
       const currentUser = req.user
       const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-      if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+      if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
       const ok = await this._service.join(req.params.id, userId)
-      res.json({ ok })
+      return ApiResponse.success(res, { ok })
     } catch (e: unknown) {
-      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
+      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -114,10 +115,10 @@ export class GroupController {
   leaveGroup = async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     // const body = req.body as GroupMemberActionDTO
     const ok = await this._service.leave(req.params.id, userId)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -129,10 +130,10 @@ export class GroupController {
   approveGroupJoin = async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.approveJoin(req.params.id, body.userId, userId)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -144,10 +145,10 @@ export class GroupController {
   rejectGroupJoin = async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.rejectJoin(req.params.id, body.userId, userId)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -159,10 +160,10 @@ export class GroupController {
   kickGroupMember = async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.kickMember(req.params.id, body.userId, userId)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -174,9 +175,9 @@ export class GroupController {
   deleteGroup = async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const ok = await this._service.delete(req.params.id, userId)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -188,10 +189,10 @@ export class GroupController {
   blockGroupMember = async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-    if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+    if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.blockMember(req.params.id, body.userId, userId)
-    res.json({ ok })
+    return ApiResponse.success(res, { ok })
   }
 
   /**
@@ -204,16 +205,16 @@ export class GroupController {
     try {
       const currentUser = req.user
       const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-      if (!userId) return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+      if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
       const body = req.body as AddMemberDTO
       const ok = await this._service.addMember(req.params.id, body.userId, userId)
-      res.json({ ok })
+      return ApiResponse.success(res, { ok })
     } catch (e: unknown) {
       const msg = getErrorMessage(e)
       if (msg.includes('Forbidden')) {
-        return res.status(HttpStatus.FORBIDDEN).json({ message: msg })
+        return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
       }
-      res.status(HttpStatus.BAD_REQUEST).json({ message: msg })
+      return ApiResponse.error(res, msg, HttpStatus.BAD_REQUEST)
     }
   }
 }

@@ -3,8 +3,8 @@ import { singleton, inject } from 'tsyringe'
 import { env } from '../config/env'
 import logger from '../utils/logger'
 import { HttpStatus, ResponseMessages } from '../constants'
-import { IAuthService, IJwtService, ISocialAuthService } from '../interfaces/services'
-import { IUserRepository } from '../interfaces/repositories'
+import { ApiResponse } from '../utils/ApiResponse'
+import { IAuthService, ISocialAuthService } from '../interfaces/services'
 import {
   LoginRequestDTO, RegisterRequestDTO, VerifyOtpRequestDTO,
   ResendOtpRequestDTO, ForgotPasswordRequestDTO, ResetPasswordRequestDTO
@@ -15,9 +15,7 @@ import { getErrorMessage } from '../utils/errorUtils'
 export class AuthController {
   constructor(
     @inject("IAuthService") private _service: IAuthService,
-    @inject("ISocialAuthService") private _socialService: ISocialAuthService,
-    @inject("IUserRepository") private _userRepo: IUserRepository,
-    @inject("IJwtService") private _jwtService: IJwtService
+    @inject("ISocialAuthService") private _socialService: ISocialAuthService
   ) { }
 
   /**
@@ -31,9 +29,9 @@ export class AuthController {
     try {
       const loginResult = await this._service.login(email, password)
       this.setCookies(res, loginResult)
-      res.json({ user: loginResult.user })
+      return ApiResponse.success(res, { user: loginResult.user }, 'Login successful')
     } catch (e: unknown) {
-      this.handleError(res, e)
+      return this.handleError(res, e)
     }
   }
 
@@ -48,9 +46,9 @@ export class AuthController {
     try {
       const loginResult = await this._service.adminLogin(email, password)
       this.setCookies(res, loginResult)
-      res.json({ user: loginResult.user })
+      return ApiResponse.success(res, { user: loginResult.user }, 'Admin login successful')
     } catch (e: unknown) {
-      this.handleError(res, e)
+      return this.handleError(res, e)
     }
   }
 
@@ -64,10 +62,10 @@ export class AuthController {
     const { username, email, password } = req.body as RegisterRequestDTO
     try {
       const registrationResult = await this._service.register(username, email, password)
-      res.json(registrationResult)
+      return ApiResponse.success(res, registrationResult, 'Registration successful', HttpStatus.CREATED)
     } catch (e: unknown) {
       logger.error({ message: 'Registration error', error: e })
-      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
+      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -83,12 +81,12 @@ export class AuthController {
       const otpResult = await this._service.verifyOtp(email, code)
       if (otpResult.tokens) {
         this.setCookies(res, otpResult)
-        res.json({ ok: true, user: otpResult.user })
+        return ApiResponse.success(res, { user: otpResult.user }, 'OTP Verified')
       } else {
-        res.json({ ok: true })
+        return ApiResponse.success(res, null, 'OTP Verified')
       }
     } catch (e: unknown) {
-      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
+      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -102,9 +100,9 @@ export class AuthController {
     const { email } = req.body as ResendOtpRequestDTO
     try {
       await this._service.resendVerificationOtp(email)
-      res.json({ ok: true })
+      return ApiResponse.success(res, null, 'OTP Resent')
     } catch (e: unknown) {
-      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
+      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -118,9 +116,9 @@ export class AuthController {
     const { email } = req.body as ForgotPasswordRequestDTO
     try {
       await this._service.forgotPassword(email)
-      res.json({ ok: true })
+      return ApiResponse.success(res, null, 'Password reset OTP sent')
     } catch (e: unknown) {
-      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
+      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -134,9 +132,9 @@ export class AuthController {
     const { email, code, newPassword } = req.body as ResetPasswordRequestDTO
     try {
       await this._service.resetPassword(email, code, newPassword)
-      res.json({ ok: true })
+      return ApiResponse.success(res, null, 'Password reset successful')
     } catch (e: unknown) {
-      res.status(HttpStatus.BAD_REQUEST).json({ message: getErrorMessage(e) })
+      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -150,7 +148,7 @@ export class AuthController {
     try {
       const tokenString = req.cookies['refresh_token']
       if (!tokenString) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+        return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
       }
       const refreshResult = await this._service.refresh(tokenString)
       res.cookie('access_token', refreshResult.access, {
@@ -160,9 +158,9 @@ export class AuthController {
         sameSite: 'lax',
         maxAge: 15 * 60 * 1000
       })
-      res.json({ ok: true })
+      return ApiResponse.success(res, null, 'Token refreshed')
     } catch {
-      res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+      return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     }
   }
 
@@ -175,7 +173,7 @@ export class AuthController {
   logout = async (req: Request, res: Response) => {
     res.clearCookie('access_token', { domain: env.COOKIE_DOMAIN })
     res.clearCookie('refresh_token', { domain: env.COOKIE_DOMAIN })
-    res.json({ ok: true })
+    return ApiResponse.success(res, null, 'Logged out')
   }
 
   /**
@@ -188,18 +186,17 @@ export class AuthController {
     try {
       const currentAuth = req.user
       if (!currentAuth?.sub) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+        return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
       }
-      const user = await this._userRepo.getById(currentAuth.sub as string)
-      if (!user) {
-        return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+      const user = await this._service.getMe(currentAuth.sub as string)
+      return ApiResponse.success(res, { user })
+    } catch (e: unknown) {
+      // getMe throws if user not found or banned, map to appropriate response
+      const msg = getErrorMessage(e);
+      if (msg === ResponseMessages.USER_BANNED) {
+        return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
       }
-      if (user.isBanned) {
-        return res.status(HttpStatus.FORBIDDEN).json({ message: ResponseMessages.USER_BANNED })
-      }
-      res.json({ user })
-    } catch {
-      return res.status(HttpStatus.UNAUTHORIZED).json({ message: ResponseMessages.UNAUTHORIZED })
+      return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     }
   }
 
@@ -224,7 +221,7 @@ export class AuthController {
     try {
       const code = req.query.code as string
       if (!code) {
-        return res.status(HttpStatus.BAD_REQUEST).json({ message: ResponseMessages.MISSING_CODE })
+        return ApiResponse.error(res, ResponseMessages.MISSING_CODE, HttpStatus.BAD_REQUEST)
       }
 
       const result = await this._socialService.handleGoogleCallback(code);
@@ -234,11 +231,7 @@ export class AuthController {
       res.redirect(env.FRONTEND_URL)
     } catch (e: unknown) {
       logger.error({ message: 'Google OAuth error', error: e })
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
-        message: ResponseMessages.OAUTH_ERROR,
-        details: getErrorMessage(e),
-        // stack: e.stack
-      })
+      return ApiResponse.error(res, ResponseMessages.OAUTH_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, { details: getErrorMessage(e) })
     }
   }
 
@@ -263,7 +256,7 @@ export class AuthController {
     try {
       const code = req.query.code as string
       if (!code) {
-        return res.status(HttpStatus.BAD_REQUEST).json({ message: ResponseMessages.MISSING_CODE })
+        return ApiResponse.error(res, ResponseMessages.MISSING_CODE, HttpStatus.BAD_REQUEST)
       }
 
       const result = await this._socialService.handleGithubCallback(code);
@@ -273,7 +266,7 @@ export class AuthController {
       res.redirect(env.FRONTEND_URL)
     } catch (e: unknown) {
       logger.error({ message: 'GitHub OAuth error', error: e })
-      res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ message: ResponseMessages.OAUTH_ERROR })
+      return ApiResponse.error(res, ResponseMessages.OAUTH_ERROR, HttpStatus.INTERNAL_SERVER_ERROR)
     }
   }
 
@@ -300,9 +293,9 @@ export class AuthController {
     logger.error({ message: 'Auth error', error: e })
     const msg = getErrorMessage(e)
     if (msg === ResponseMessages.USER_BANNED) {
-      res.status(HttpStatus.FORBIDDEN).json({ message: msg })
+      return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
     } else {
-      res.status(HttpStatus.UNAUTHORIZED).json({ message: msg })
+      return ApiResponse.error(res, msg, HttpStatus.UNAUTHORIZED)
     }
   }
 }
