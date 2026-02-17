@@ -145,13 +145,13 @@ except Exception as e:
             try {
               // Parse JSON and sort keys recursively to ensure {"a":1, "b":2} === {"b":2, "a":1}
               const obj = JSON.parse(str);
-              const sortKeys = (o: any): any => {
+              const sortKeys = (o: unknown): unknown => {
                 if (Array.isArray(o)) {
                   return o.map(sortKeys);
                 } else if (o !== null && typeof o === 'object') {
-                  const sorted: any = {};
-                  Object.keys(o).sort().forEach(key => {
-                    sorted[key] = sortKeys(o[key]);
+                  const sorted: Record<string, unknown> = {};
+                  Object.keys(o as Record<string, unknown>).sort().forEach(key => {
+                    sorted[key] = sortKeys((o as Record<string, unknown>)[key]);
                   });
                   return sorted;
                 }

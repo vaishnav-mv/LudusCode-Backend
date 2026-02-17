@@ -5,7 +5,7 @@ import { IUserRepository } from '../interfaces/repositories'
 import { env } from '../config/env'
 import { ResponseMessages } from '../constants'
 import logger from '../utils/logger'
-import { GoogleTokens, GoogleUser, GithubTokens, GithubUser, GithubEmail } from '../types/auth'
+
 
 @singleton()
 export class SocialAuthService implements ISocialAuthService {

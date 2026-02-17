@@ -1,4 +1,4 @@
-import { User, Competition, CompetitionProblem, SubmissionResult, Duel, Wallet, Problem, PaginatedResponse, ChatMessage, StudySession, RazorpayOrder, JwtPayload, TestCase, SubscriptionPlan, Group } from '../types'
+import { User, Competition, CompetitionProblem, SubmissionResult, Duel, Wallet, Problem, PaginatedResponse, ChatMessage, StudySession, RazorpayOrder, JwtPayload, SubscriptionPlan, Transaction } from '../types'
 import { SubmissionResponseDTO } from '../dto/response/submission.response.dto'
 import { UserResponseDTO } from '../dto/response/user.response.dto'
 import { GroupResponseDTO } from '../dto/response/group.response.dto'
@@ -41,7 +41,7 @@ export interface IUserService {
     submissionStats: { total: number, accepted: number, acceptanceRate: number };
   } | null>
   setPremium(id: string): Promise<User | null>
-  leaderboard(page?: number, limit?: number): Promise<User[]>
+  leaderboard(page: number, limit: number): Promise<{ users: User[], total: number, page: number, totalPages: number }>
   updateProfile(id: string, data: Partial<User>): Promise<User | null>
   changePassword(id: string, oldPass: string, newPass: string): Promise<void>
   search(query: string): Promise<User[]>
@@ -106,17 +106,21 @@ export interface IWalletService {
   withdraw(userId: string, amount: number, vpa: string, name?: string, email?: string, phone?: string): Promise<boolean>
   wager(userId: string, amount: number, description: string): Promise<void>
   win(userId: string, amount: number, description: string): Promise<void>
+  getTransactions(userId: string, page: number, limit: number): Promise<{ transactions: Transaction[], total: number, page: number, totalPages: number }>
 }
 
 export interface IAdminService {
   dashboardStats(): Promise<{ totalUsers: number, activeDuels: number, totalProblems: number, totalRevenue: number }>
-  financials(): Promise<{
+  financials(page?: number, limit?: number): Promise<{
     totalRevenue: number;
     totalWagered: number;
     totalCommissions: number;
     totalDuelsWithWagers: number;
     commissionsByDay: { date: string, amount: number }[];
     recentCommissions: { duelId: string; problemTitle: string; winnerName: string; wager: number; commission: number; timestamp: number }[];
+    total: number;
+    page: number;
+    totalPages: number;
   }>
   pendingProblems(): Promise<Problem[]>
   approveProblem(id: string): Promise<boolean>
@@ -125,14 +129,17 @@ export interface IAdminService {
   allUsers(page?: number, limit?: number, query?: string): Promise<{ users: User[], total: number, page: number, totalPages: number }>
   banUser(id: string): Promise<boolean>
   unbanUser(id: string): Promise<boolean>
-  flaggedActivities(): Promise<{ _id?: string, user: User, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[]>
+  flaggedActivities(page?: number, limit?: number): Promise<{ data: { _id?: string, user: User, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[], total: number, page: number, totalPages: number }>
   clearFlags(userId: string): Promise<boolean>
-  monitoredDuels(): Promise<Duel[]>
+  monitoredDuels(page?: number, limit?: number): Promise<{ duels: Duel[], total: number, page: number, totalPages: number }>
   cancelDuel(id: string): Promise<boolean>
   cancelDuel(id: string): Promise<boolean>
-  subscriptionData(): Promise<{
+  subscriptionData(page?: number, limit?: number): Promise<{
     plans: { id: string, name: string, price: number, period: string, features: string[] }[],
-    logs: { id: string, user: { name: string, avatarUrl: string }, plan: { name: string }, action: string, timestamp: Date | string, amount: number, expiryDate?: Date | string }[]
+    logs: { id: string, user: { name: string, avatarUrl: string }, plan: { name: string }, action: string, timestamp: Date | string, amount: number, expiryDate?: Date | string }[],
+    total: number;
+    page: number;
+    totalPages: number;
   }>
   createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan>
   updatePlan(id: string, data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | null>
@@ -167,6 +174,7 @@ export interface IProblemService {
   list(params?: ProblemListParams): Promise<PaginatedResponse<Problem>>
   daily(): Promise<Problem | undefined>
   create(data: Partial<Problem>): Promise<Problem>
+  update(id: string, data: Partial<Problem>): Promise<Problem | null>
   generate(difficulty: string, topic: string): Promise<Problem>
 }
 

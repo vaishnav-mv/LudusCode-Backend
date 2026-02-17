@@ -67,9 +67,14 @@ export class UserService implements IUserService {
     return updated !== undefined ? updated : null;
   }
 
-  async leaderboard(page: number = 1, limit: number = 100): Promise<User[]> {
-    const list = await this._userRepo.leaderboard((page - 1) * limit, limit);
-    return list.map((user, index) => ({ ...user, leaderboardRank: (page - 1) * limit + index + 1 }));
+  async leaderboard(page: number = 1, limit: number = 100): Promise<{ users: User[], total: number, page: number, totalPages: number }> {
+    const { users, total } = await this._userRepo.leaderboard((page - 1) * limit, limit);
+    return {
+      users: users.map((user, index) => ({ ...user, leaderboardRank: (page - 1) * limit + index + 1 })),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   async updateProfile(id: string, data: Partial<User>): Promise<User | null> {

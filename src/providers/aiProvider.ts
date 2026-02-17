@@ -3,7 +3,7 @@ import { env } from '../config/env'
 import { singleton } from 'tsyringe'
 import { IAiProvider } from '../interfaces/providers'
 import { ResponseMessages } from '../constants'
-import { Problem, User, Group, GenerationConfig, GoogleGenAIInstance } from '../types'
+import { Problem, User, Group, GoogleGenAIInstance } from '../types'
 
 const ai: GoogleGenAI | null = env.GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: env.GOOGLE_API_KEY }) : null;
 

@@ -3,7 +3,7 @@ import { env } from '../config/env'
 import fetch, { Response } from 'node-fetch'
 import { GoogleTokens, GoogleUser, GithubTokens, GithubUser, GithubEmail } from '../types/auth'
 import { IOAuthProvider } from '../interfaces/providers'
-import logger from '../utils/logger'
+
 
 @singleton()
 export class OAuthProvider implements IOAuthProvider {
@@ -19,7 +19,7 @@ export class OAuthProvider implements IOAuthProvider {
         return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
     }
 
-    async getGoogleUser(code: string): Promise<{ email: string, name: string, picture: string, original: any }> {
+    async getGoogleUser(code: string): Promise<{ email: string, name: string, picture: string, original: object }> {
         const tokenParams = new URLSearchParams({
             code,
             client_id: env.GOOGLE_CLIENT_ID,
@@ -68,7 +68,7 @@ export class OAuthProvider implements IOAuthProvider {
         return `https://github.com/login/oauth/authorize?${params.toString()}`
     }
 
-    async getGithubUser(code: string): Promise<{ email: string, name: string, picture: string, original: any }> {
+    async getGithubUser(code: string): Promise<{ email: string, name: string, picture: string, original: object }> {
         const tokenRes = (await fetch('https://github.com/login/oauth/access_token', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Accept: 'application/json' },

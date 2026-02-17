@@ -18,6 +18,7 @@ export class WalletRoutes {
     }
 
     private setupRoutes() {
+        this.router.get('/:userId/transactions', auth, (req, res, next) => this._controller.getTransactions(req, res).catch(next))
         this.router.get('/:userId', auth, (req, res, next) => this._controller.getWallet(req, res).catch(next))
         this.router.post('/deposit', auth, validate(DepositSchema), (req, res, next) => this._controller.deposit(req, res).catch(next))
         this.router.post('/verify', auth, validate(VerifySchema), (req, res, next) => this._controller.verify(req, res).catch(next))

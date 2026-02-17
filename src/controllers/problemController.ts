@@ -73,9 +73,31 @@ export class ProblemController {
             if (user && user.isAdmin && req.body.status === 'Approved') {
                 status = 'Approved';
             }
+            // Allow manual "Pending" also if we want
+            if (user && user.isAdmin && req.body.status === 'Pending') {
+                status = 'Pending';
+            }
             const problemData = { ...req.body, status };
             const problem = await this._service.create(problemData);
             return ApiResponse.success(res, problem, 'Problem created', HttpStatus.CREATED)
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
+        }
+    }
+
+    /**
+     * @desc    Update a problem
+     * @route   PUT /api/problems/:id
+     * @req     body: { ...updates }
+     * @res     { problem }
+     */
+    updateProblem = async (req: Request, res: Response) => {
+        try {
+            const { id } = req.params;
+            const updates = req.body;
+            const updated = await this._service.update(id, updates);
+            if (!updated) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
+            return ApiResponse.success(res, updated, 'Problem updated')
         } catch (error: unknown) {
             return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
         }

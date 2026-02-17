@@ -41,7 +41,7 @@ export class PaymentProvider implements IPaymentProvider {
         return generatedSignature === signature;
     }
 
-    async fetchPayment(paymentId: string): Promise<any> {
+    async fetchPayment(paymentId: string): Promise<object> {
         return this._razorpay.payments.fetch(paymentId);
     }
 }

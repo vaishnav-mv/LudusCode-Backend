@@ -57,6 +57,11 @@ export class ProblemService implements IProblemService {
     return dto;
   }
 
+  async update(id: string, data: Partial<Problem>) {
+    const problem = await this._repo.update(id, data);
+    return problem ? mapProblem(problem) : null;
+  }
+
   async generate(difficulty: string, topic: string) {
     return this._ai.generateProblem(difficulty, topic);
   }

@@ -37,7 +37,7 @@ export class AdminService implements IAdminService {
     return { totalUsers: allUsers.length, activeDuels, totalProblems: (await this._problems.all()).length, totalRevenue }
   }
 
-  async financials() {
+  async financials(page: number = 1, limit: number = 50) {
     const allDuels = await this._duels.all()
 
     interface FinancialRecord {
@@ -86,13 +86,22 @@ export class AdminService implements IAdminService {
       .map(([date, amount]) => ({ date, amount }))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 
+    // Memory Pagination
+    const sortedRecent = recent.sort((a, b) => b.timestamp - a.timestamp)
+    const total = sortedRecent.length
+    const skip = (page - 1) * limit
+    const paginatedRecent = sortedRecent.slice(skip, skip + limit)
+
     return {
       totalRevenue: totalCommissions,
       totalWagered,
       totalCommissions,
       totalDuelsWithWagers: allDuels.filter(duel => duel.wager && duel.wager > 0).length,
       commissionsByDay,
-      recentCommissions: recent.sort((a, b) => b.timestamp - a.timestamp)
+      recentCommissions: paginatedRecent,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
     }
   }
 
@@ -141,8 +150,16 @@ export class AdminService implements IAdminService {
     const users = await this._users.all(skip, limit, filter)
     const total = await this._users.count(filter)
 
+    // Compute leaderboard rank for each user
+    const usersWithRank = await Promise.all(
+      users.map(async (user) => {
+        const rank = await this._users.getRank(user.elo ?? 0)
+        return { ...user, leaderboardRank: rank }
+      })
+    )
+
     return {
-      users: users,
+      users: usersWithRank,
       total,
       page,
       totalPages: Math.ceil(total / limit)
@@ -212,7 +229,7 @@ export class AdminService implements IAdminService {
     return this._users.search(query);
   }
 
-  async flaggedActivities() {
+  async flaggedActivities(page: number = 1, limit: number = 50) {
     const duels = await this._duels.all()
     const flags = new Map<string, { count: number; paste: number; visibility: number; last: number }>()
     for (const duel of duels) {
@@ -241,16 +258,34 @@ export class AdminService implements IAdminService {
       const user = await this._users.getById(uid)
       if (user) out.push({ user: user, totalWarnings: flagData.count, lastOffense: new Date(flagData.last || Date.now()).toISOString(), breakdown: { paste: flagData.paste, visibility: flagData.visibility } })
     }
-    return out
+
+    // Memory Pagination
+    const total = out.length
+    const skip = (page - 1) * limit
+    const paginatedOut = out.slice(skip, skip + limit)
+
+    return {
+      data: paginatedOut,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    }
   }
 
   async clearFlags(_userId: string) {
     return true
   }
 
-  async monitoredDuels() {
-    const recentDuels = await this._duels.all(0, 50)
-    return recentDuels
+  async monitoredDuels(page: number = 1, limit: number = 50) {
+    const skip = (page - 1) * limit
+    const recentDuels = await this._duels.all(skip, limit)
+    const total = await this._duels.count() // Assuming count method exists or I need to add it
+    return {
+      duels: recentDuels,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    }
   }
 
   async cancelDuel(id: string) {
@@ -275,9 +310,17 @@ export class AdminService implements IAdminService {
   }
 
 
-  async subscriptionData() {
+  async subscriptionData(page: number = 1, limit: number = 50) {
+    const skip = (page - 1) * limit
     const plans = await SubscriptionPlanModel.find().lean()
-    const logs = await SubscriptionLogModel.find().populate('userId', 'username avatarUrl').populate('planId', 'name period').sort({ timestamp: -1 }).limit(100).lean()
+    const totalLogs = await SubscriptionLogModel.countDocuments()
+    const logs = await SubscriptionLogModel.find()
+      .populate('userId', 'username avatarUrl')
+      .populate('planId', 'name period')
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean()
 
     // Transform logs to match frontend expectations
     interface PopulatedLog {
@@ -323,7 +366,13 @@ export class AdminService implements IAdminService {
       features: p.features
     }))
 
-    return { plans: formattedPlans, logs: formattedLogs }
+    return {
+      plans: formattedPlans,
+      logs: formattedLogs,
+      total: totalLogs,
+      page,
+      totalPages: Math.ceil(totalLogs / limit)
+    }
   }
 
   async createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {

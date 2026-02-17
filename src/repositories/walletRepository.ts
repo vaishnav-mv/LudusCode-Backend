@@ -114,4 +114,25 @@ export class WalletRepository implements IWalletRepository {
       });
     }
   }
+
+
+  async getTransactions(userId: string, skip: number, limit: number) {
+    const transactions = await TransactionModel.find({ userId })
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const total = await TransactionModel.countDocuments({ userId });
+
+    return {
+      transactions: transactions.map(transaction => ({
+        ...transaction,
+        _id: transaction._id.toString(),
+        id: transaction._id.toString(),
+        timestamp: transaction.createdAt
+      } as unknown as import('../types').Transaction)),
+      total
+    };
+  }
 }

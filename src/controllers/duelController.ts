@@ -1,5 +1,6 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
+import * as fs from 'fs'
 import { HttpStatus, ResponseMessages } from '../constants'
 import { ApiResponse } from '../utils/ApiResponse'
 import { broadcastDuel, broadcastDuelLobby, broadcastDuelInvite } from '../realtime/ws'
@@ -198,8 +199,8 @@ export class DuelController {
       if (typeof s.user === 'string') {
         sUserId = s.user;
       } else if (s.user && typeof s.user === 'object') {
-        if ('id' in s.user) sUserId = (s.user as any).id;
-        else if ('_id' in s.user) sUserId = (s.user as any)._id.toString();
+        if ('id' in s.user) sUserId = (s.user as unknown as { id: string }).id;
+        else if ('_id' in s.user) sUserId = String((s.user as unknown as { _id: unknown })._id);
         else sUserId = s.user.toString(); // Raw ObjectId
       }
       return sUserId?.toString() === userId?.toString();
@@ -220,7 +221,7 @@ export class DuelController {
     FinalUserCode: ${duel.finalUserCode ? 'Yes' : 'No'}
     --------------------------------------------------
     `;
-    try { require('fs').appendFileSync('e:/LudusCode/back-end/logs/debug_cortex.log', debugLog); } catch (e) {
+    try { fs.appendFileSync('e:/LudusCode/back-end/logs/debug_cortex.log', debugLog); } catch (e) {
       console.error('Failed to write debug log:', e);
     }
 

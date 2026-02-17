@@ -1,4 +1,4 @@
-import { User, Group, Problem, Duel, DuelPlayer, Competition, ProblemSubmission, Wallet, StudySession, ChatMessage } from '../types';
+import { User, Group, Problem, Duel, DuelPlayer, Competition, ProblemSubmission, Wallet, StudySession, ChatMessage, Transaction } from '../types';
 
 export interface IBaseRepository<T> {
     all(skip?: number, limit?: number, filter?: Record<string, unknown>, sort?: Record<string, unknown> | string): Promise<T[]>;
@@ -12,7 +12,7 @@ export interface IBaseRepository<T> {
 export interface IUserRepository extends IBaseRepository<User> {
     getByEmail(email: string): Promise<User | undefined>;
     getByUsername(username: string): Promise<User | undefined>;
-    leaderboard(skip?: number, limit?: number): Promise<User[]>;
+    leaderboard(skip?: number, limit?: number): Promise<{ users: User[], total: number }>;
     search(query: string): Promise<User[]>;
     getRank(elo: number): Promise<number>;
 }
@@ -51,6 +51,7 @@ export interface IWalletRepository {
     deposit(userId: string, amount: number, description: string): Promise<void>;
     withdraw(userId: string, amount: number, description: string): Promise<boolean>;
     add(userId: string, amount: number, description: string): Promise<void>;
+    getTransactions(userId: string, skip: number, limit: number): Promise<{ transactions: Transaction[], total: number }>;
 }
 
 

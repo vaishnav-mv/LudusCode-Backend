@@ -31,7 +31,9 @@ export class AdminController {
    * @res     { totalRevenue, commissionsByDay }
    */
   financials = async (req: Request, res: Response) => {
-    const financialData = await this._service.financials()
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 50
+    const financialData = await this._service.financials(page, limit)
     return ApiResponse.success(res, financialData)
   }
 
@@ -39,12 +41,16 @@ export class AdminController {
    * @desc    Get subscription data
    * @route   GET /api/admin/subscriptions
    * @req     -
-   * @res     { plans, logs }
+   * @res     { plans, logs, total, page, totalPages }
    */
   subscriptionData = async (req: Request, res: Response) => {
-    const subscriptionData = await this._service.subscriptionData()
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 50
+    const subscriptionData = await this._service.subscriptionData(page, limit)
     return ApiResponse.success(res, subscriptionData)
   }
+
+
 
   /**
    * @desc    Create a subscription plan
@@ -206,7 +212,9 @@ export class AdminController {
    * @res     [FlaggedUser]
    */
   flaggedActivities = async (req: Request, res: Response) => {
-    const flagged = await this._service.flaggedActivities()
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 50
+    const flagged = await this._service.flaggedActivities(page, limit)
     return ApiResponse.success(res, flagged)
   }
 
@@ -228,8 +236,10 @@ export class AdminController {
    * @res     [Duel]
    */
   monitoredDuels = async (req: Request, res: Response) => {
-    const duels = await this._service.monitoredDuels()
-    return ApiResponse.success(res, duels)
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 50
+    const result = await this._service.monitoredDuels(page, limit)
+    return ApiResponse.success(res, result)
   }
 
   /**

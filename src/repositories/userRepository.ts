@@ -32,17 +32,31 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
 
   async getByEmail(email: string) {
     const foundUser = await this.model.findOne({ email: email.toLowerCase() }).lean();
-    return this.mapDoc(foundUser);
+    if (foundUser) {
+      const user = foundUser;
+      const rank = await this.model.countDocuments({ elo: { $gt: user.elo } }) + 1;
+      return { ...this.mapDoc(user), leaderboardRank: rank } as User;
+    }
+    return undefined;
   }
 
   async leaderboard(skip: number = 0, limit: number = 100) {
     const list = await this.model.find({ isAdmin: false }).sort({ elo: -1 }).skip(skip).limit(limit).lean();
-    return list.map((userDoc) => this.mapDoc(userDoc)!);
+    const total = await this.model.countDocuments({ isAdmin: false });
+    return {
+      users: list.map((userDoc) => this.mapDoc(userDoc)!),
+      total
+    };
   }
 
   async getByUsername(username: string) {
     const foundUser = await this.model.findOne({ username }).lean();
-    return this.mapDoc(foundUser);
+    if (foundUser) {
+      const user = foundUser;
+      const rank = await this.model.countDocuments({ elo: { $gt: user.elo } }) + 1;
+      return { ...this.mapDoc(user), leaderboardRank: rank } as User;
+    }
+    return undefined;
   }
 
   async search(query: string) {

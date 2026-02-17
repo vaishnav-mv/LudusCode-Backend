@@ -1,11 +1,6 @@
 import { singleton, inject } from 'tsyringe'
-import Razorpay from 'razorpay'
-import crypto from 'crypto'
 import { IWalletRepository } from '../interfaces/repositories'
 import { IWalletService } from '../interfaces/services'
-import { env } from '../config/env'
-import { RazorpayOrder } from '../types'
-
 import { IPaymentProvider } from '../interfaces/providers'
 
 @singleton()
@@ -29,8 +24,8 @@ export class WalletService implements IWalletService {
         if (this._paymentProvider.verifySignature(orderId, paymentId, signature)) {
             // Signature valid, proceed to deposit
             // For simplicity/MVP as per plan: just fetch the payment details to get AMOUNT
-            const payment = await this._paymentProvider.fetchPayment(paymentId);
-            const amountInRupees = (payment.amount as number) / 100;
+            const payment = await this._paymentProvider.fetchPayment(paymentId) as { amount: number };
+            const amountInRupees = payment.amount / 100;
 
             await this._wallets.deposit(userId, amountInRupees, `Deposit via Razorpay (Tx: ${paymentId})`);
             return true;
@@ -72,5 +67,16 @@ export class WalletService implements IWalletService {
 
     async win(userId: string, amount: number, description: string) {
         await this._wallets.add(userId, amount, description);
+    }
+
+    async getTransactions(userId: string, page: number, limit: number) {
+        const skip = (page - 1) * limit;
+        const { transactions, total } = await this._wallets.getTransactions(userId, skip, limit);
+        return {
+            transactions,
+            total,
+            page,
+            totalPages: Math.ceil(total / limit)
+        };
     }
 }

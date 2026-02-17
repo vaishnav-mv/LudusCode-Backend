@@ -56,8 +56,11 @@ export class UserController {
     leaderboard = async (req: Request, res: Response) => {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 100;
-        const users = await this._service.leaderboard(page, limit);
-        return ApiResponse.success(res, users.map(user => mapUser(user)));
+        const result = await this._service.leaderboard(page, limit);
+        return ApiResponse.success(res, {
+            ...result,
+            users: result.users.map(user => mapUser(user))
+        });
     }
 
     /**

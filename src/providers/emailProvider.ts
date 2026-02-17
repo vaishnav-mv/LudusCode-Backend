@@ -1,8 +1,6 @@
 import { singleton } from 'tsyringe'
 import { IEmailProvider } from '../interfaces/providers'
-import { env } from '../config/env'
-import logger from '../utils/logger'
-import nodemailer from 'nodemailer'
+
 
 @singleton()
 export class EmailProvider implements IEmailProvider {

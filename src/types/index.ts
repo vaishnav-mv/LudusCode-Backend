@@ -62,7 +62,7 @@ export enum ParticipantProblemStatus {
 export enum ProblemStatus {
     Pending = 'Pending',
     Approved = 'Approved',
-    Custom = 'Custom' // or Rejected? Model said Pending, Approved, Custom
+    Custom = 'Custom' 
 }
 
 export interface User {

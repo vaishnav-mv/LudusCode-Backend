@@ -22,7 +22,7 @@ export class CodeExecutionProvider implements ICodeExecutionProvider {
         const lang = language.toLowerCase();
         let extension = '';
         let cmd = '';
-        let args: string[] = [];
+
 
         if (lang === 'javascript' || lang === 'js') {
             extension = 'js';
@@ -40,8 +40,8 @@ export class CodeExecutionProvider implements ICodeExecutionProvider {
         try {
             await fs.promises.writeFile(filepath, code);
             return await this.spawnProcess(cmd, [filepath], timeoutMs);
-        } catch (error: any) {
-            return { stdout: '', stderr: error.message || 'System Error', code: 1 };
+        } catch (error: unknown) {
+            return { stdout: '', stderr: (error instanceof Error ? error.message : String(error)) || 'System Error', code: 1 };
         } finally {
             // Cleanup
             if (fs.existsSync(filepath)) {

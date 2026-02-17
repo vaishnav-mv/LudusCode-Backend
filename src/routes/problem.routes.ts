@@ -23,6 +23,7 @@ export class ProblemRoutes {
         this.router.get('/daily', (req, res, next) => this._controller.dailyProblem(req, res).catch(next))
         this.router.post('/', auth, (req, res, next) => this._controller.createProblem(req, res).catch(next))
         this.router.post('/generate', auth, requireAdmin, validate(GenerateProblemSchema), (req, res, next) => this._controller.generateProblem(req, res).catch(next))
+        this.router.put('/:id', auth, requireAdmin, (req, res, next) => this._controller.updateProblem(req, res).catch(next))
     }
 }
 

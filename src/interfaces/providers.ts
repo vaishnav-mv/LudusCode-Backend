@@ -42,12 +42,12 @@ export interface IOtpProvider {
 export interface IPaymentProvider {
     createOrder(amount: number, currency: string, receipt: string): Promise<import('../types').RazorpayOrder>
     verifySignature(orderId: string, paymentId: string, signature: string): boolean
-    fetchPayment(paymentId: string): Promise<any>
+    fetchPayment(paymentId: string): Promise<object>
 }
 
 export interface IOAuthProvider {
     getGoogleAuthUrl(): string
-    getGoogleUser(code: string): Promise<{ email: string, name: string, picture: string, original: any }>
+    getGoogleUser(code: string): Promise<{ email: string, name: string, picture: string, original: object }>
     getGithubAuthUrl(): string
-    getGithubUser(code: string): Promise<{ email: string, name: string, picture: string, original: any }>
+    getGithubUser(code: string): Promise<{ email: string, name: string, picture: string, original: object }>
 }

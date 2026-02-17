@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
 
-import { HttpStatus, ResponseMessages } from '../constants'
+import { HttpStatus } from '../constants'
 import { ApiResponse } from '../utils/ApiResponse'
 import { IWalletService } from '../interfaces/services'
 import { DepositDTO, WithdrawDTO, WagerDTO, WinDTO } from '../dto/request/wallet.request.dto'
@@ -23,6 +23,20 @@ export class WalletController {
     console.log(`[WalletController] Get wallet for userId: ${userId} (param: ${req.params.userId})`);
     const wallet = await this._service.get(userId)
     return ApiResponse.success(res, wallet ? mapWallet(wallet) : null)
+  }
+
+  /**
+   * @desc    Get wallet transactions (paginated)
+   * @route   GET /api/wallet/:userId/transactions
+   * @req     params: { userId }, query: { page, limit }
+   * @res     { transactions, total, page, totalPages }
+   */
+  getTransactions = async (req: Request, res: Response) => {
+    const userId = req.params.userId
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 20
+    const result = await this._service.getTransactions(userId, page, limit)
+    return ApiResponse.success(res, result)
   }
 
   /**
