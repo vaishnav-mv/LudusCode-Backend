@@ -62,7 +62,7 @@ export enum ParticipantProblemStatus {
 export enum ProblemStatus {
     Pending = 'Pending',
     Approved = 'Approved',
-    Custom = 'Custom' 
+    Custom = 'Custom'
 }
 
 export interface User {
@@ -347,16 +347,4 @@ export interface JwtPayload {
     [key: string]: unknown;
 }
 
-export interface GenerationConfig {
-    temperature?: number;
-    responseMimeType?: string;
-    responseSchema?: object;
-}
 
-export interface GenerativeModel {
-    generateContent(prompt: string): Promise<{ response: { text: () => string } }>;
-}
-
-export interface GoogleGenAIInstance {
-    getGenerativeModel(config: { model: string, generationConfig?: GenerationConfig }): GenerativeModel;
-}

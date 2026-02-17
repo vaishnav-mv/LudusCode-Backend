@@ -56,7 +56,18 @@ export class ProblemController {
             const problem = await this._service.generate(difficulty, topic);
             return ApiResponse.success(res, problem)
         } catch (error: unknown) {
-            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.INTERNAL_SERVER_ERROR)
+            const msg = getErrorMessage(error);
+            // Parse Google AI API errors for user-friendly messages
+            if (msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
+                return ApiResponse.error(res, 'AI rate limit exceeded. Please wait a moment and try again.', HttpStatus.TOO_MANY_REQUESTS);
+            }
+            if (msg.includes('NOT_FOUND') || msg.includes('not found for API version')) {
+                return ApiResponse.error(res, 'The AI model is currently unavailable. Please try again later.', HttpStatus.SERVICE_UNAVAILABLE);
+            }
+            if (msg.includes('PERMISSION_DENIED') || msg.includes('API key')) {
+                return ApiResponse.error(res, 'AI service is not properly configured. Please contact the administrator.', HttpStatus.FORBIDDEN);
+            }
+            return ApiResponse.error(res, 'Failed to generate problem. Please try again.', HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
