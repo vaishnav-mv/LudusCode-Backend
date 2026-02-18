@@ -85,8 +85,8 @@ export class AuthController {
       } else {
         return ApiResponse.success(res, null, 'OTP Verified')
       }
-    } catch (e: unknown) {
-      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+    } catch (error: unknown) {
+      return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -101,8 +101,8 @@ export class AuthController {
     try {
       await this._service.resendVerificationOtp(email)
       return ApiResponse.success(res, null, 'OTP Resent')
-    } catch (e: unknown) {
-      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+    } catch (error: unknown) {
+      return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -117,8 +117,8 @@ export class AuthController {
     try {
       await this._service.forgotPassword(email)
       return ApiResponse.success(res, null, 'Password reset OTP sent')
-    } catch (e: unknown) {
-      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+    } catch (error: unknown) {
+      return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -133,8 +133,8 @@ export class AuthController {
     try {
       await this._service.resetPassword(email, code, newPassword)
       return ApiResponse.success(res, null, 'Password reset successful')
-    } catch (e: unknown) {
-      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+    } catch (error: unknown) {
+      return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
     }
   }
 
@@ -190,9 +190,9 @@ export class AuthController {
       }
       const user = await this._service.getMe(currentAuth.sub as string)
       return ApiResponse.success(res, { user })
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       // getMe throws if user not found or banned, map to appropriate response
-      const msg = getErrorMessage(e);
+      const msg = getErrorMessage(error);
       if (msg === ResponseMessages.USER_BANNED) {
         return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
       }
@@ -229,9 +229,9 @@ export class AuthController {
       res.cookie('access_token', result.tokens.access, { httpOnly: true, secure: env.COOKIE_SECURE, domain: env.COOKIE_DOMAIN, sameSite: 'lax', maxAge: 15 * 60 * 1000 })
       res.cookie('refresh_token', result.tokens.refresh, { httpOnly: true, secure: env.COOKIE_SECURE, domain: env.COOKIE_DOMAIN, sameSite: 'lax', maxAge: 7 * 24 * 60 * 60 * 1000 })
       res.redirect(env.FRONTEND_URL)
-    } catch (e: unknown) {
-      logger.error({ message: 'Google OAuth error', error: e })
-      return ApiResponse.error(res, ResponseMessages.OAUTH_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, { details: getErrorMessage(e) })
+    } catch (error: unknown) {
+      logger.error({ message: 'Google OAuth error', error: error })
+      return ApiResponse.error(res, ResponseMessages.OAUTH_ERROR, HttpStatus.INTERNAL_SERVER_ERROR, { details: getErrorMessage(error) })
     }
   }
 

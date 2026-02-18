@@ -23,8 +23,8 @@ export class StudySessionController {
             if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.create({ ...req.body, userId })
             return ApiResponse.success(res, session, "Session created", HttpStatus.CREATED)
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -41,8 +41,8 @@ export class StudySessionController {
             if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.update(id, userId, req.body)
             return ApiResponse.success(res, session)
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -64,8 +64,8 @@ export class StudySessionController {
                 { status, sort, query: q }
             )
             return ApiResponse.success(res, sessions)
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -82,8 +82,8 @@ export class StudySessionController {
             if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.join(id, userId)
             return ApiResponse.success(res, session)
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -100,8 +100,8 @@ export class StudySessionController {
             if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.leave(id, userId)
             return ApiResponse.success(res, session)
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -120,8 +120,8 @@ export class StudySessionController {
             const session = await this._service.getByIdSecure(id, userId);
             if (!session) return ApiResponse.error(res, 'Session not found', HttpStatus.NOT_FOUND)
             return ApiResponse.success(res, session)
-        } catch (e: unknown) {
-            const msg = getErrorMessage(e);
+        } catch (error: unknown) {
+            const msg = getErrorMessage(error);
             if (msg.includes('authorized') || msg.includes('member')) {
                 return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
             }
@@ -142,8 +142,8 @@ export class StudySessionController {
             if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
             const session = await this._service.passTurn(id, userId)
             return ApiResponse.success(res, session)
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
         }
     }
 }

@@ -40,8 +40,8 @@ export class GroupController {
       })
       if (!updated) return ApiResponse.error(res, ResponseMessages.GROUP_NOT_FOUND, HttpStatus.NOT_FOUND)
       return ApiResponse.success(res, updated)
-    } catch (e: unknown) {
-      const msg = getErrorMessage(e)
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error)
       if (msg.includes('Forbidden')) {
         return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
       }
@@ -209,8 +209,8 @@ export class GroupController {
       const body = req.body as AddMemberDTO
       const ok = await this._service.addMember(req.params.id, body.userId, userId)
       return ApiResponse.success(res, { ok })
-    } catch (e: unknown) {
-      const msg = getErrorMessage(e)
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error)
       if (msg.includes('Forbidden')) {
         return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
       }

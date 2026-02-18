@@ -30,7 +30,7 @@ export class SubmissionService implements ISubmissionService {
 
     async getUserSubmissions(userId: string) {
         const submissions = await this._submissionRepo.findByUser(userId);
-        return submissions.map(doc => mapSubmission(doc)).filter((s) => s !== null) as import('../dto/response/submission.response.dto').SubmissionResponseDTO[];
+        return submissions.map(doc => mapSubmission(doc)).filter((submission) => submission !== null) as import('../dto/response/submission.response.dto').SubmissionResponseDTO[];
     }
 
     async getSolvedProblemIds(userId: string) {

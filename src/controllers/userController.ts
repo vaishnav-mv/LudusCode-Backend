@@ -107,8 +107,8 @@ export class UserController {
         try {
             await this._service.changePassword(userId, oldPassword, newPassword);
             return ApiResponse.success(res, null, 'Password updated successfully');
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST);
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST);
         }
     }
 

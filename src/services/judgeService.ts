@@ -18,7 +18,7 @@ export class JudgeService implements IJudgeService {
 
     let solutionCode = problem.solution?.code;
     if (problem.solutions && problem.solutions.length > 0) {
-      const match = problem.solutions.find((s: { language: string, code: string }) => s.language.toLowerCase() === language.toLowerCase());
+      const match = problem.solutions.find((solution: { language: string, code: string }) => solution.language.toLowerCase() === language.toLowerCase());
       if (match) solutionCode = match.code;
     }
 
@@ -126,8 +126,8 @@ try:
         print(json.dumps(solution(input_val)))
     else:
         print("No function found")
-except Exception as e:
-    print(str(e), file=sys.stderr)
+except Exception as error:
+    print(str(error), file=sys.stderr)
 `
         }
 
@@ -145,17 +145,17 @@ except Exception as e:
             try {
               // Parse JSON and sort keys recursively to ensure {"a":1, "b":2} === {"b":2, "a":1}
               const obj = JSON.parse(str);
-              const sortKeys = (o: unknown): unknown => {
-                if (Array.isArray(o)) {
-                  return o.map(sortKeys);
-                } else if (o !== null && typeof o === 'object') {
+              const sortKeys = (obj: unknown): unknown => {
+                if (Array.isArray(obj)) {
+                  return obj.map(sortKeys);
+                } else if (obj !== null && typeof obj === 'object') {
                   const sorted: Record<string, unknown> = {};
-                  Object.keys(o as Record<string, unknown>).sort().forEach(key => {
-                    sorted[key] = sortKeys((o as Record<string, unknown>)[key]);
+                  Object.keys(obj as Record<string, unknown>).sort().forEach(key => {
+                    sorted[key] = sortKeys((obj as Record<string, unknown>)[key]);
                   });
                   return sorted;
                 }
-                return o;
+                return obj;
               };
               return JSON.stringify(sortKeys(obj));
             } catch {
@@ -174,8 +174,8 @@ except Exception as e:
           }
         }
 
-      } catch (e: unknown) {
-        const msg = (e as Error).message || "System Error";
+      } catch (error: unknown) {
+        const msg = (error as Error).message || "System Error";
         results.push({ testCase, status: SubmissionStatus.RuntimeError, userOutput: msg });
       }
     }
@@ -210,8 +210,8 @@ except Exception as e:
         memoryUsage: 0
       };
 
-    } catch (e: unknown) {
-      const msg = (e as Error).message || "System Error";
+    } catch (error: unknown) {
+      const msg = (error as Error).message || "System Error";
       return {
         overallStatus: SubmissionStatus.RuntimeError,
         results: [{ testCase: {} as TestCase, status: SubmissionStatus.RuntimeError, userOutput: msg }],

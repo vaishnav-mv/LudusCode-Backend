@@ -221,8 +221,8 @@ export class DuelController {
     FinalUserCode: ${duel.finalUserCode ? 'Yes' : 'No'}
     --------------------------------------------------
     `;
-    try { fs.appendFileSync('e:/LudusCode/back-end/logs/debug_cortex.log', debugLog); } catch (e) {
-      console.error('Failed to write debug log:', e);
+    try { fs.appendFileSync('e:/LudusCode/back-end/logs/debug_cortex.log', debugLog); } catch (error) {
+      console.error('Failed to write debug log:', error);
     }
 
 
@@ -304,9 +304,9 @@ export class DuelController {
 
       if (mapped) broadcastDuel(req.params.id, mapped)
       return ApiResponse.success(res, { ...mapped, submissionResult: lastSubmissionResult })
-    } catch (e: unknown) {
+    } catch (error: unknown) {
       // Map known error messages to HTTP status codes
-      const msg = getErrorMessage(e);
+      const msg = getErrorMessage(error);
       if (msg === ResponseMessages.DUEL_ALREADY_FINISHED) {
         return ApiResponse.error(res, msg, HttpStatus.BAD_REQUEST)
       }
@@ -316,7 +316,7 @@ export class DuelController {
       if (msg === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
         return ApiResponse.error(res, msg, HttpStatus.BAD_REQUEST)
       }
-      throw e; // Re-throw unknown errors for global error handler
+      throw error; // Re-throw unknown errors for global error handler
     }
   }
 
@@ -337,12 +337,12 @@ export class DuelController {
       const dto = mapDuel(duel);
       if (dto) broadcastDuel(req.params.id, dto)
       return ApiResponse.success(res, dto)
-    } catch (e: unknown) {
-      const msg = getErrorMessage(e);
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error);
       if (msg === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
         return ApiResponse.error(res, msg, HttpStatus.BAD_REQUEST)
       }
-      throw e;
+      throw error;
     }
   }
 
@@ -401,15 +401,15 @@ export class DuelController {
       const dto = mapDuel(duel);
       if (dto) broadcastDuel(req.params.id, dto)
       return ApiResponse.success(res, dto)
-    } catch (e: unknown) {
-      const msg = getErrorMessage(e);
+    } catch (error: unknown) {
+      const msg = getErrorMessage(error);
       if (msg === ResponseMessages.DUEL_NOT_IN_PROGRESS) {
         return ApiResponse.error(res, msg, HttpStatus.BAD_REQUEST)
       }
       if (msg === ResponseMessages.NOT_A_PARTICIPANT) {
         return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
       }
-      throw e;
+      throw error;
     }
   }
 }

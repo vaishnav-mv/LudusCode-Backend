@@ -56,7 +56,7 @@ export class GroupService implements IGroupService {
         const groups = await this._groups.all(skip, limit, finalFilter, sortOption);
         const total = await this._groups.count(finalFilter);
         return {
-            data: groups.map(g => mapGroup(g)).filter((g) => g !== null),
+            data: groups.map(group => mapGroup(group)).filter((group) => group !== null),
             total,
             page,
             totalPages: Math.ceil(total / limit)
@@ -142,36 +142,36 @@ export class GroupService implements IGroupService {
     }
 
     async approveJoin(groupId: string, userId: string, requesterId: string) {
-
+        console.log(`[GroupService] approveJoin: groupId=${groupId}, userId=${userId}, requesterId=${requesterId}`);
         const resolvedGroupId = groupId;
         const resolvedUserId = userId; // User to approve
-
+        console.log(`[GroupService] Resolved IDs: group=${resolvedGroupId}, user=${resolvedUserId}`);
 
         const group = await this._groups.getById(resolvedGroupId);
         if (!group) {
-
+            console.log('[GroupService] Group not found');
             return false;
         }
 
         if (!group.pendingMembers) {
-
+            console.log('[GroupService] No pendingMembers array');
             return false;
         }
 
-
+        console.log('[GroupService] Pending members count:', group.pendingMembers.length);
         const pendingIndex = group.pendingMembers.findIndex((member) => {
             const id = this.getId(member as User | string);
-
+            // console.log(`Checking member: ${id} vs ${resolvedUserId}`);
             return id === resolvedUserId;
         });
 
         if (pendingIndex === -1) {
-
+            console.log('[GroupService] User not found in pendingMembers');
             return false;
         }
 
         const userToApprove = group.pendingMembers[pendingIndex];
-
+        console.log('[GroupService] Found user to approve:', this.getId(userToApprove as User | string));
 
         group.pendingMembers.splice(pendingIndex, 1);
         group.members.push(userToApprove);
@@ -179,13 +179,13 @@ export class GroupService implements IGroupService {
         const memberIds = group.members.map((member) => this.getId(member as User | string)).filter(Boolean);
         const pendingMemberIds = group.pendingMembers.map((member) => this.getId(member as User | string)).filter(Boolean);
 
-
+        console.log(`[GroupService] Updating group. Members: ${memberIds.length}, Pending: ${pendingMemberIds.length}`);
         await this._groups.update(resolvedGroupId, { members: memberIds, pendingMembers: pendingMemberIds });
         return true;
     }
 
     async rejectJoin(groupId: string, userId: string, _requesterId: string) {
-
+        console.log(`[GroupService] rejectJoin: groupId=${groupId}, userId=${userId}`);
         const resolvedGroupId = groupId;
         const resolvedUserId = userId;
 
@@ -193,9 +193,9 @@ export class GroupService implements IGroupService {
         if (!group) return false;
 
         if (!group.pendingMembers) return false;
-        const pendingIndex = group.pendingMembers.findIndex((m) => this.getId(m as User | string) === resolvedUserId);
+        const pendingIndex = group.pendingMembers.findIndex((member) => this.getId(member as User | string) === resolvedUserId);
         if (pendingIndex === -1) {
-
+            console.log('[GroupService] Reject: User not found in pending');
             return false;
         }
 

@@ -36,7 +36,7 @@ export class ProblemService implements IProblemService {
     const problems = await this._repo.all(skip, limit, filter, sortOption);
     const total = await this._repo.count(filter);
     return {
-      data: problems.map(p => mapProblem(p)).filter(p => p !== null) as Problem[],
+      data: problems.map(problem => mapProblem(problem)).filter(problem => problem !== null) as Problem[],
       total,
       page,
       totalPages: Math.ceil(total / limit)

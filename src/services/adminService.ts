@@ -254,9 +254,9 @@ export class AdminService implements IAdminService {
       }
 
       // Check DB warnings (Real-time enforcement)
-      const checkPlayer = (p: DuelPlayer) => {
-        if (p.user && p.warnings > 0) {
-          const uid = typeof p.user === 'string' ? p.user : p.user.id || p.user._id?.toString();
+      const checkPlayer = (player: DuelPlayer) => {
+        if (player.user && player.warnings > 0) {
+          const uid = typeof player.user === 'string' ? player.user : player.user.id || player.user._id?.toString();
           if (uid) {
             const prev = flags.get(uid) || { count: 0, paste: 0, visibility: 0, last: 0 }
             const duelTime = new Date(duel.updatedAt || duel.startTime || Date.now()).getTime();
@@ -265,10 +265,10 @@ export class AdminService implements IAdminService {
             // Avoid double counting if we run this loop over same user multiple times? 
             // The flags map is keyed by User ID. We are aggregating across ALL duels.
             // So we add this duel's warnings to the user's total.
-            const breakdown = p.warningsBreakdown || { paste: 0, visibility: 0 }
+            const breakdown = player.warningsBreakdown || { paste: 0, visibility: 0 }
 
             flags.set(uid, {
-              count: prev.count + p.warnings,
+              count: prev.count + player.warnings,
               paste: prev.paste + (breakdown.paste || 0),
               visibility: prev.visibility + (breakdown.visibility || 0),
               last
@@ -380,12 +380,12 @@ export class AdminService implements IAdminService {
       }
     })
 
-    const formattedPlans = plans.map((p) => ({
-      id: p._id.toString(),
-      name: p.name,
-      price: p.price,
-      period: p.period,
-      features: p.features
+    const formattedPlans = plans.map((plan) => ({
+      id: plan._id.toString(),
+      name: plan.name,
+      price: plan.price,
+      period: plan.period,
+      features: plan.features
     }))
 
     return {

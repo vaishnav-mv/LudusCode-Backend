@@ -45,8 +45,8 @@ export class AiController {
             const { problemId, userCode } = body;
             const review = await this._service.codeReview(problemId, userCode);
             return ApiResponse.success(res, { review: review })
-        } catch (e: unknown) {
-            const msg = getErrorMessage(e);
+        } catch (error: unknown) {
+            const msg = getErrorMessage(error);
             if (msg === "Problem not found") return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
             return ApiResponse.error(res, msg, HttpStatus.NOT_IMPLEMENTED)
         }
@@ -64,8 +64,8 @@ export class AiController {
             const { userId } = body;
             const analysis = await this._service.performance(userId);
             return ApiResponse.success(res, { analysis })
-        } catch (e: unknown) {
-            const msg = getErrorMessage(e);
+        } catch (error: unknown) {
+            const msg = getErrorMessage(error);
             if (msg === "User not found") return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
             return ApiResponse.error(res, msg, HttpStatus.NOT_IMPLEMENTED)
         }
@@ -98,8 +98,8 @@ export class AiController {
             const { messages } = req.body;
             const summary = await this._service.summarizeDiscussion(messages);
             return ApiResponse.success(res, { summary })
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.NOT_IMPLEMENTED)
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.NOT_IMPLEMENTED)
         }
     }
 
@@ -114,8 +114,8 @@ export class AiController {
             const { difficulty, topic } = req.body;
             const problem = await this._service.generateProblem(difficulty, topic);
             return ApiResponse.success(res, problem)
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.NOT_IMPLEMENTED)
+        } catch (error: unknown) {
+            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.NOT_IMPLEMENTED)
         }
     }
 }

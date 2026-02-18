@@ -56,9 +56,9 @@ export class SocialAuthService implements ISocialAuthService {
 
             logger.info('Google Auth success');
             return { user, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } }
-        } catch (e: unknown) {
-            logger.error({ message: 'Error in handleGoogleCallback', error: e });
-            throw e;
+        } catch (error: unknown) {
+            logger.error({ message: 'Error in handleGoogleCallback', error: error });
+            throw error;
         }
     }
 

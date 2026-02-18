@@ -18,7 +18,7 @@ export class DuelService implements IDuelService {
   async create(difficulty: Difficulty, wager: number, player1Id: string, player2Id: string) {
     const allProblems = await this._problems.all();
     // Filter out Custom problems (only allow Approved)
-    const approvedProblems = allProblems.filter(p => p.status === 'Approved');
+    const approvedProblems = allProblems.filter(problem => problem.status === 'Approved');
     const candidates = approvedProblems.filter(problem => problem.difficulty === difficulty);
     const problem = candidates.length > 0
       ? candidates[Math.floor(Math.random() * candidates.length)]
@@ -104,7 +104,7 @@ export class DuelService implements IDuelService {
   async createOpen(difficulty: Difficulty, wager: number, playerId: string) {
     const allProblems = await this._problems.all()
     // Filter out Custom problems
-    const approvedProblems = allProblems.filter(p => p.status === 'Approved');
+    const approvedProblems = allProblems.filter(problem => problem.status === 'Approved');
     const candidates = approvedProblems.filter(problem => problem.difficulty === difficulty)
     const problem = candidates.length > 0
       ? candidates[Math.floor(Math.random() * candidates.length)]
@@ -282,10 +282,10 @@ export class DuelService implements IDuelService {
 
   // Helper to extract player IDs from a duel
   private _getPlayerIds(duel: Duel): { p1Id: string | null, p2Id: string | null } {
-    const getUserId = (u: User | string | undefined | null) => {
-      if (!u) return null;
-      if (typeof u === 'string') return u;
-      return u.id || u._id?.toString() || null;
+    const getUserId = (user: User | string | undefined | null) => {
+      if (!user) return null;
+      if (typeof user === 'string') return user;
+      return user.id || user._id?.toString() || null;
     }
     return {
       p1Id: getUserId(duel.player1?.user),

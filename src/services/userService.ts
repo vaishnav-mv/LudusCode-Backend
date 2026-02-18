@@ -57,7 +57,7 @@ export class UserService implements IUserService {
     return {
       user: mapUser(userDoc, rank),
       recentDuels: duels,
-      joinedGroups: groupsDocs.map(g => mapGroup(g)).filter((g): g is GroupResponseDTO => g !== null),
+      joinedGroups: groupsDocs.map(group => mapGroup(group)).filter((group): group is GroupResponseDTO => group !== null),
       submissionStats
     };
   }
