@@ -44,7 +44,7 @@ export class WalletRepository implements IWalletRepository {
     }
   }
 
-  // Used for DIRECT deposits (e.g. bonus), not Razorpay flow
+  
   async deposit(userId: string, amount: number, description: string) {
     const wallet = await WalletModel.findOneAndUpdate(
       { userId },

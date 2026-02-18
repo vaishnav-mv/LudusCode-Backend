@@ -252,6 +252,32 @@ export class AdminService implements IAdminService {
           }
         }
       }
+
+      // Check DB warnings (Real-time enforcement)
+      const checkPlayer = (p: any) => {
+        if (p.user && p.warnings > 0) {
+          const uid = typeof p.user === 'string' ? p.user : p.user.id || p.user._id?.toString();
+          if (uid) {
+            const prev = flags.get(uid) || { count: 0, paste: 0, visibility: 0, last: 0 }
+            const duelTime = new Date(duel.updatedAt || duel.startTime || Date.now()).getTime();
+            const last = Math.max(prev.last, duelTime)
+
+            // Avoid double counting if we run this loop over same user multiple times? 
+            // The flags map is keyed by User ID. We are aggregating across ALL duels.
+            // So we add this duel's warnings to the user's total.
+            const breakdown = p.warningsBreakdown || { paste: 0, visibility: 0 }
+
+            flags.set(uid, {
+              count: prev.count + p.warnings,
+              paste: prev.paste + (breakdown.paste || 0),
+              visibility: prev.visibility + (breakdown.visibility || 0),
+              last
+            })
+          }
+        }
+      }
+      checkPlayer(duel.player1);
+      checkPlayer(duel.player2);
     }
     const out: { _id?: string, user: User, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[] = []
     for (const [uid, flagData] of flags.entries()) {
@@ -270,10 +296,6 @@ export class AdminService implements IAdminService {
       page,
       totalPages: Math.ceil(total / limit)
     }
-  }
-
-  async clearFlags(_userId: string) {
-    return true
   }
 
   async monitoredDuels(page: number = 1, limit: number = 50) {

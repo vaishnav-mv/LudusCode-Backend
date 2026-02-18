@@ -442,4 +442,78 @@ export class DuelService implements IDuelService {
     console.log(`[DuelService.forfeit] Player ${playerId} forfeited. Winner: ${winnerId}`);
     return this.finish(id, winnerId, SubmissionStatus.Forfeit)
   }
+
+  async reportWarning(duelId: string, userId: string, reason?: 'visibility' | 'paste'): Promise<{ duel: Duel | null, disqualified: boolean }> {
+    const duel = await this._duels.getById(duelId)
+    if (!duel) return { duel: null, disqualified: false }
+    if (duel.status !== DuelStatus.InProgress) return { duel, disqualified: false }
+
+    const { p1Id, p2Id } = this._getPlayerIds(duel)
+    const isPlayer1 = userId === p1Id
+    const isPlayer2 = userId === p2Id
+    if (!isPlayer1 && !isPlayer2) return { duel, disqualified: false }
+
+    // Increment warnings on the correct player
+    const currentWarnings = isPlayer1
+      ? (duel.player1?.warnings || 0)
+      : (duel.player2?.warnings || 0)
+    const newWarnings = currentWarnings + 1
+
+    // Prepare update payload
+    const updatePayload: any = {}
+    const fieldPrefix = isPlayer1 ? 'player1' : 'player2'
+
+    updatePayload[`${fieldPrefix}.warnings`] = newWarnings
+
+    if (reason) {
+      // breakdown might be undefined if not initialized, but Mongoose default should handle it if we load doc
+      // Safest to use $inc for breakdown if possible, but _duels.update takes Partial<Duel> usually
+      // However, since we have the object, let's construct the new state.
+      const currentBreakdown = isPlayer1
+        ? (duel.player1?.warningsBreakdown || { paste: 0, visibility: 0 })
+        : (duel.player2?.warningsBreakdown || { paste: 0, visibility: 0 })
+
+      const newBreakdown = { ...currentBreakdown }
+      if (reason === 'visibility') newBreakdown.visibility = (newBreakdown.visibility || 0) + 1
+      if (reason === 'paste') newBreakdown.paste = (newBreakdown.paste || 0) + 1
+
+      updatePayload[`${fieldPrefix}.warningsBreakdown`] = newBreakdown
+    }
+
+    // Since _duels.update takes Partial<Duel>, and we constructed dot notation keys above which strictly simple Partial<Duel> might not support without casting to any or using a specific update method
+    // Let's refactor to use object structure if the repository supports it, OR just accept that we need to cast to any to pass dot notation if simple update doesn't support deep merge automatically.
+    // Actually, looking at typical repo implementation: Model.findByIdAndUpdate(id, data). 
+    // If data is { "player1.warnings": 1 }, Mongoose handles it.
+    // But Partial<Duel> expects { player1: { ... } }.
+    // Let's construct the nested object safely.
+
+    const pData = isPlayer1 ? { ...duel.player1 } : { ...duel.player2 }
+    pData.warnings = newWarnings
+    if (reason) {
+      if (!pData.warningsBreakdown) pData.warningsBreakdown = { paste: 0, visibility: 0 }
+      if (reason === 'visibility') pData.warningsBreakdown.visibility = (pData.warningsBreakdown.visibility || 0) + 1
+      else if (reason === 'paste') pData.warningsBreakdown.paste = (pData.warningsBreakdown.paste || 0) + 1
+    }
+
+    const safePayload: Partial<Duel> = {}
+    if (isPlayer1) safePayload.player1 = pData
+    else safePayload.player2 = pData
+
+    await this._duels.update(duelId, safePayload)
+
+    console.log(`[DuelService.reportWarning] User ${userId} now has ${newWarnings} warnings in duel ${duelId} (Reason: ${reason})`)
+
+    // Auto-disqualify at MAX_WARNINGS (3)
+    if (newWarnings >= 3) {
+      const opponentId = isPlayer1 ? p2Id : p1Id
+      if (opponentId) {
+        console.log(`[DuelService.reportWarning] User ${userId} disqualified! Opponent ${opponentId} wins.`)
+        const finishedDuel = await this.finish(duelId, opponentId, SubmissionStatus.Disqualified)
+        return { duel: finishedDuel || null, disqualified: true }
+      }
+    }
+
+    const updatedDuel = await this._duels.getById(duelId)
+    return { duel: updatedDuel || null, disqualified: false }
+  }
 }

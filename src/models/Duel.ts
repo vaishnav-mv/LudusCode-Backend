@@ -2,7 +2,11 @@ import mongoose, { Schema } from 'mongoose'
 
 const DuelPlayerSchema = new Schema({
   user: { type: Schema.Types.ObjectId, ref: 'User' },
-  warnings: { type: Number, default: 0 }
+  warnings: { type: Number, default: 0 },
+  warningsBreakdown: {
+    paste: { type: Number, default: 0 },
+    visibility: { type: Number, default: 0 }
+  }
 })
 
 const DuelSubmissionSchema = new Schema({

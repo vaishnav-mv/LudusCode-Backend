@@ -96,13 +96,14 @@ export interface IDuelService {
   processSubmission(id: string, userId: string, userCode: string, result: SubmissionResult): Promise<Duel | null | undefined>
   cancel(id: string, playerId: string): Promise<Duel | undefined>
   forfeit(id: string, playerId: string): Promise<Duel | undefined>
+  reportWarning(duelId: string, userId: string, reason?: 'visibility' | 'paste'): Promise<{ duel: Duel | null, disqualified: boolean }>
 }
 
 export interface IWalletService {
   get(userId: string): Promise<Wallet>
   createDepositOrder(userId: string, amount: number): Promise<RazorpayOrder>
   verifyDeposit(userId: string, orderId: string, paymentId: string, signature: string): Promise<boolean>
-  deposit(userId: string, amount: number): Promise<void>
+
   withdraw(userId: string, amount: number, vpa: string, name?: string, email?: string, phone?: string): Promise<boolean>
   wager(userId: string, amount: number, description: string): Promise<void>
   win(userId: string, amount: number, description: string): Promise<void>
@@ -130,7 +131,6 @@ export interface IAdminService {
   banUser(id: string): Promise<boolean>
   unbanUser(id: string): Promise<boolean>
   flaggedActivities(page?: number, limit?: number): Promise<{ data: { _id?: string, user: User, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[], total: number, page: number, totalPages: number }>
-  clearFlags(userId: string): Promise<boolean>
   monitoredDuels(page?: number, limit?: number): Promise<{ duels: Duel[], total: number, page: number, totalPages: number }>
   cancelDuel(id: string): Promise<boolean>
   cancelDuel(id: string): Promise<boolean>

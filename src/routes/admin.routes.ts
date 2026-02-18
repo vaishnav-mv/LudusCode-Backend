@@ -36,7 +36,6 @@ export class AdminRoutes {
         this.router.post('/users/:id/unban', auth, requireAdmin, validate(AdminNoBodySchema), (req, res, next) => this._controller.unbanUser(req, res).catch(next))
         this.router.get('/users/search', auth, requireAdmin, (req, res, next) => this._controller.searchUsers(req, res).catch(next))
         this.router.get('/anti-cheat/flagged', auth, requireAdmin, (req, res, next) => this._controller.flaggedActivities(req, res).catch(next))
-        this.router.post('/anti-cheat/users/:id/clear-flags', auth, requireAdmin, validate(AdminNoBodySchema), (req, res, next) => this._controller.clearFlags(req, res).catch(next))
         this.router.get('/duels', auth, requireAdmin, (req, res, next) => this._controller.monitoredDuels(req, res).catch(next))
         this.router.post('/duels/:id/cancel', auth, requireAdmin, (req, res, next) => this._controller.cancelDuel(req, res).catch(next))
         this.router.post('/duels/:id/force-result', auth, requireAdmin, validate(ForceDuelResultSchema), (req, res, next) => this._controller.forceDuelResult(req, res).catch(next))

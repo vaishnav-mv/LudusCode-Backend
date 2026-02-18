@@ -4,13 +4,14 @@ import { Server } from 'socket.io'
 let io: Server
 
 import { container } from 'tsyringe'
-import { IJudgeService } from '../interfaces/services'
+import { IJudgeService, IDuelService } from '../interfaces/services'
 import { IProblemRepository } from '../interfaces/repositories'
 import { ChatMessageResponseDTO } from '../dto/response/chat.response.dto'
 import { DuelResponseDTO } from '../dto/response/duel.response.dto'
 import { CompetitionResponseDTO } from '../dto/response/competition.response.dto'
 import { DuelInviteDTO } from '../dto/response/duel.invite.dto'
 import { StudySession, TestCase } from '../types'
+import { mapDuel } from '../utils/mapper'
 
 interface SignalData {
   type: 'offer' | 'answer' | 'candidate';
@@ -95,6 +96,23 @@ export const initRealtime = (server: HttpServer) => {
     socket.on('duel:progress', ({ duelId, progress }: { duelId: string, progress: DuelProgressData }) => {
       // Broadcast to opponent in the same duel room (excluding sender)
       socket.to(`duel:${duelId}`).emit('duel:progress', { playerId: socket.id, progress });
+    });
+
+    socket.on('duel:warning', async ({ duelId, userId, reason }: { duelId: string, userId: string, reason: 'paste' | 'visibility' }) => {
+      try {
+        const duelService = container.resolve<IDuelService>("IDuelService");
+        const { duel, disqualified } = await duelService.reportWarning(duelId, userId, reason);
+        if (disqualified && duel) {
+          // Broadcast finished duel to both players so they redirect to summary
+          const mapped = mapDuel(duel);
+          if (mapped) {
+            broadcastDuel(duelId, mapped);
+            broadcastDuelLobby(mapped);
+          }
+        }
+      } catch (e) {
+        console.error('[ws] duel:warning error:', e);
+      }
     });
 
     socket.on('disconnect', () => {

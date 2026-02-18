@@ -22,8 +22,7 @@ export class WalletService implements IWalletService {
 
     async verifyDeposit(userId: string, orderId: string, paymentId: string, signature: string) {
         if (this._paymentProvider.verifySignature(orderId, paymentId, signature)) {
-            // Signature valid, proceed to deposit
-            // For simplicity/MVP as per plan: just fetch the payment details to get AMOUNT
+        
             const payment = await this._paymentProvider.fetchPayment(paymentId) as { amount: number };
             const amountInRupees = payment.amount / 100;
 
@@ -33,18 +32,11 @@ export class WalletService implements IWalletService {
         return false;
     }
 
-    async deposit(userId: string, amount: number) {
-        await this._wallets.deposit(userId, amount, `Deposit of ₹${amount.toFixed(2)}`);
-    }
 
-    // Updated: Simulated Withdrawal (since Razorpay Test Mode doesn't support real Payouts)
+
+    // Simulated Withdrawal (since Razorpay Test Mode doesn't support real Payouts)
     async withdraw(userId: string, amount: number, vpa: string, _name?: string, _email?: string, _phone?: string) {
-        // 1. Check Balance locally first
-        const wallet = await this._wallets.get(userId);
-        if (!wallet || wallet.balance < amount) return false;
-
         try {
-            // 2. Direct DB Deduction (Simulation)
             console.log(`[WalletService] Simulating withdrawal for ${userId}, amount: ${amount}, VPA: ${vpa}`);
             const deducted = await this._wallets.withdraw(userId, amount, `Withdrawal to ${vpa}`);
 

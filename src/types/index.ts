@@ -215,6 +215,10 @@ export interface ProblemSubmission {
 export interface DuelPlayer {
     user: User | string | null;
     warnings: number;
+    warningsBreakdown?: {
+        paste: number;
+        visibility: number;
+    };
     _id?: string;
 }
 

@@ -219,17 +219,6 @@ export class AdminController {
   }
 
   /**
-   * @desc    Clear flags for a user
-   * @route   POST /api/admin/anti-cheat/users/:id/clear-flags
-   * @req     params: { id }
-   * @res     { ok: boolean }
-   */
-  clearFlags = async (req: Request, res: Response) => {
-    const ok = await this._service.clearFlags(req.params.id)
-    return ApiResponse.success(res, { ok })
-  }
-
-  /**
    * @desc    Get monitored duels
    * @route   GET /api/admin/duels
    * @req     -
