@@ -89,7 +89,7 @@ export class DuelService implements IDuelService {
       return duel.status === DuelStatus.InProgress && isParticipant;
     });
 
-    console.log(`[DuelService.listActive] Found ${active.length} active duels for user ${resolvedId}`);
+
     return active;
   }
   async listInvites(userId: string) {
@@ -170,9 +170,7 @@ export class DuelService implements IDuelService {
     }
 
     // Log the join
-    console.log(`[DuelService.join] Player ${player2UserId} joined duel ${id}. Status: InProgress`);
-    const { p1Id } = this._getPlayerIds(updatedDuel);
-    console.log(`[DuelService.join] Player 1: ${p1Id}`);
+
 
     return updatedDuel
   }
@@ -196,7 +194,7 @@ export class DuelService implements IDuelService {
     const finishedDuel = await this._duels.attemptFinish(id, winner, DuelStatus.Finished);
 
     if (!finishedDuel) {
-      console.log(`[DuelService.finish] Atomic finish failed for duel ${id}. It may have already been finished.`);
+
       // If it failed, we can still perform the "side effect" of updating the submission details 
       // if we want, but we should NOT process money or ELO.
       if (finalOverallStatus || finalUserCode) {
@@ -266,7 +264,7 @@ export class DuelService implements IDuelService {
     const finishedDuel = await this._duels.attemptFinish(id, null, DuelStatus.Finished);
 
     if (!finishedDuel) {
-      console.log(`[DuelService.finishDraw] Atomic finish failed for duel ${id}. It may have already been finished.`);
+
       return this._duels.getById(id);
     }
 
@@ -278,7 +276,7 @@ export class DuelService implements IDuelService {
       if (p2Id) await this._wallets.add(p2Id, wager, 'Duel draw refund');
     }
 
-    console.log(`[DuelService.finishDraw] Duel ${id} ended as a draw. Wagers refunded.`);
+
     return finishedDuel;
   }
 
@@ -301,7 +299,7 @@ export class DuelService implements IDuelService {
 
     // --- GUARD: Duel must be in progress ---
     if (duel.status === DuelStatus.Finished) {
-      console.log(`[DuelService.processSubmission] Duel ${id} already finished. Returning as-is.`);
+
       return duel; // Idempotent
     }
     if (duel.status !== DuelStatus.InProgress) {
@@ -325,7 +323,7 @@ export class DuelService implements IDuelService {
       : (duel.player2?.warnings || 0)
 
     // Disqualified if warnings exceeded
-    console.log('[DuelService] Saving submission. Warnings:', pWarnings);
+
     const finalStatus = pWarnings >= 3 ? SubmissionStatus.Disqualified : result.overallStatus
 
     const codeHash = createHash('sha256').update(userCode || '').digest('hex')
@@ -351,16 +349,16 @@ export class DuelService implements IDuelService {
       // --- RACE CONDITION FIX: Re-fetch duel to check if it was already finished ---
       const freshDuel = await this._duels.getById(id);
       if (freshDuel && freshDuel.status === DuelStatus.Finished) {
-        console.log(`[DuelService] Duel ${id} was already finished by opponent. Skipping finish.`);
+
         return freshDuel;
       }
 
-      console.log(`[DuelService] User ${userId} solved the problem! Finishing duel.`);
+
       return this.finish(id, userId, finalStatus, userCode);
     }
 
     // Wrong answer / runtime error / TLE — do NOT finish. Return duel with submission result embedded.
-    console.log(`[DuelService] User ${userId} submitted with status: ${finalStatus}. Duel continues.`);
+
     const updatedDuel = await this._duels.getById(id);
     // Attach the submission result to the response so frontend knows what happened
     if (updatedDuel) {
@@ -381,16 +379,7 @@ export class DuelService implements IDuelService {
     const { p1Id, p2Id } = this._getPlayerIds(duel);
     const requestUserId = playerId;
 
-    console.log('[DuelService.cancel] Debug:', {
-      duelId: id,
-      playerId,
-      requestUserId: requestUserId?.toString(),
-      p1Id: p1Id?.toString(),
-      p2Id: p2Id?.toString(),
-      matchP1: p1Id?.toString() === requestUserId?.toString(),
-      matchP2: p2Id?.toString() === requestUserId?.toString(),
-      duelStatus: duel.status
-    });
+
 
     if (p1Id?.toString() !== requestUserId.toString() && p2Id?.toString() !== requestUserId.toString()) {
       throw new Error(ResponseMessages.ONLY_CREATOR_CAN_CANCEL); // or "Only participants can cancel"
@@ -439,7 +428,7 @@ export class DuelService implements IDuelService {
       throw new Error(ResponseMessages.USER_NOT_FOUND)
     }
 
-    console.log(`[DuelService.forfeit] Player ${playerId} forfeited. Winner: ${winnerId}`);
+
     return this.finish(id, winnerId, SubmissionStatus.Forfeit)
   }
 
@@ -482,13 +471,13 @@ export class DuelService implements IDuelService {
 
     await this._duels.update(duelId, safePayload)
 
-    console.log(`[DuelService.reportWarning] User ${userId} now has ${newWarnings} warnings in duel ${duelId} (Reason: ${reason})`)
+
 
     // Auto-disqualify at MAX_WARNINGS (3)
     if (newWarnings >= 3) {
       const opponentId = isPlayer1 ? p2Id : p1Id
       if (opponentId) {
-        console.log(`[DuelService.reportWarning] User ${userId} disqualified! Opponent ${opponentId} wins.`)
+
         const finishedDuel = await this.finish(duelId, opponentId, SubmissionStatus.Disqualified)
         return { duel: finishedDuel || null, disqualified: true }
       }

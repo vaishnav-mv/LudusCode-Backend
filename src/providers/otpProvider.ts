@@ -23,7 +23,7 @@ export class OtpProvider implements IOtpProvider {
     async create(email: string, purpose: string) {
         this.ensure()
         const code = Math.floor(100000 + Math.random() * 900000).toString()
-        console.log(`[OTP] Generated for ${email} (${purpose}): ${code}`)
+        // Log removed
         const key = `otp:${purpose}:${email.toLowerCase()}`
 
         if (redis) {
@@ -42,22 +42,19 @@ export class OtpProvider implements IOtpProvider {
     async verify(email: string, code: string, purpose: string) {
         this.ensure()
         const key = `otp:${purpose}:${email.toLowerCase()}`
-        console.log(`[OTP] Verifying for ${key}. Input: ${code}`)
+        // Log removed
 
         if (redis) {
             try {
                 const stored = await redis.get(key)
-                console.log(`[OTP] Redis stored value: ${stored}`)
+                // Log removed
                 if (!stored) {
-                    console.log('[OTP] Verification failed: No OTP found in Redis')
                     return false
                 }
                 if (stored !== code) {
-                    console.log(`[OTP] Verification failed: Mismatch (Stored: ${stored} !== Input: ${code})`)
                     return false
                 }
                 await redis.del(key)
-                console.log('[OTP] Verification success (Redis)')
                 return true
             } catch (e) {
                 console.error('Redis get/del error, falling back to memory check', e)
@@ -66,19 +63,14 @@ export class OtpProvider implements IOtpProvider {
 
         const rec = mem[key]
         if (!rec) {
-            console.log('[OTP] Verification failed: No OTP found in Memory')
             return false
         }
         if (Date.now() > rec.expiresAt) {
-            console.log('[OTP] Verification failed: Memory OTP expired')
             return false
         }
         const ok = rec.code === code
         if (ok) {
             delete mem[key]
-            console.log('[OTP] Verification success (Memory)')
-        } else {
-            console.log(`[OTP] Verification failed: Mismatch (Stored: ${rec.code} !== Input: ${code})`)
         }
         return ok
     }

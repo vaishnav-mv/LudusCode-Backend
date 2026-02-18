@@ -44,7 +44,7 @@ export class WalletRepository implements IWalletRepository {
     }
   }
 
-  
+
   async deposit(userId: string, amount: number, description: string) {
     const wallet = await WalletModel.findOneAndUpdate(
       { userId },
@@ -69,7 +69,7 @@ export class WalletRepository implements IWalletRepository {
       { $inc: { balance: -amount } },
       { new: true }
     );
-    console.log(`[WalletRepository] Withdraw for ${userId} amount ${amount}. Result:`, wallet ? 'Success' : 'Failed/Insufficient Found');
+
 
     if (!wallet) {
       return false; // Insufficient funds

@@ -22,7 +22,7 @@ export class WalletService implements IWalletService {
 
     async verifyDeposit(userId: string, orderId: string, paymentId: string, signature: string) {
         if (this._paymentProvider.verifySignature(orderId, paymentId, signature)) {
-        
+
             const payment = await this._paymentProvider.fetchPayment(paymentId) as { amount: number };
             const amountInRupees = payment.amount / 100;
 
@@ -37,14 +37,14 @@ export class WalletService implements IWalletService {
     // Simulated Withdrawal (since Razorpay Test Mode doesn't support real Payouts)
     async withdraw(userId: string, amount: number, vpa: string, _name?: string, _email?: string, _phone?: string) {
         try {
-            console.log(`[WalletService] Simulating withdrawal for ${userId}, amount: ${amount}, VPA: ${vpa}`);
+
             const deducted = await this._wallets.withdraw(userId, amount, `Withdrawal to ${vpa}`);
 
             if (!deducted) {
                 throw new Error("Insufficient funds or database error during withdrawal.");
             }
 
-            console.log(`[WalletService] Withdrawal successful.`);
+
             return true;
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : 'Withdrawal failed';

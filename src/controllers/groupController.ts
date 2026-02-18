@@ -66,7 +66,7 @@ export class GroupController {
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined
       })
-      console.log(`[GroupController] Listing groups. Found: ${result.data.length} of ${result.total}`);
+
       return ApiResponse.success(res, result)
     } catch (err: unknown) {
       console.error('GroupController: Error listing groups:', err);
@@ -116,7 +116,7 @@ export class GroupController {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
     if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
-    // const body = req.body as GroupMemberActionDTO
+
     const ok = await this._service.leave(req.params.id, userId)
     return ApiResponse.success(res, { ok })
   }

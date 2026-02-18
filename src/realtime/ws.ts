@@ -34,7 +34,7 @@ export const initRealtime = (server: HttpServer) => {
   })
 
   io.on('connection', (socket) => {
-    // console.log('Client connected', socket.id)
+
 
     socket.on('join', (room: string) => {
       socket.join(room)
@@ -56,9 +56,7 @@ export const initRealtime = (server: HttpServer) => {
         // Scratchpad Mode
         if (!problemId) {
           const lang = language || 'javascript';
-          console.log('[ws] Executing scratchpad...', { codeLength: code?.length, language: lang });
           const result = await judgeService.executeScratchpad(code, lang);
-          console.log('[ws] Result:', result);
           io.to(`session:${sessionId}`).emit('execution_result', { result, runBy: socket.id });
           return;
         }
@@ -116,7 +114,7 @@ export const initRealtime = (server: HttpServer) => {
     });
 
     socket.on('disconnect', () => {
-      // console.log('Client disconnected', socket.id)
+      /* Client disconnected */
     })
   })
 }
