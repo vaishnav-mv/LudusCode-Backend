@@ -4,7 +4,7 @@ import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository,
 import { broadcastDuel } from '../realtime/ws'
 import { mapDuel } from '../utils/mapper'
 import { IAdminService } from '../interfaces/services'
-import { DuelStatus, ProblemStatus, User, SubscriptionPlan, Problem } from '../types'
+import { DuelStatus, ProblemStatus, User, SubscriptionPlan, Problem, DuelPlayer } from '../types'
 import { SubscriptionPlanModel } from '../models/SubscriptionPlan'
 import { SubscriptionLogModel } from '../models/SubscriptionLog'
 
@@ -254,7 +254,7 @@ export class AdminService implements IAdminService {
       }
 
       // Check DB warnings (Real-time enforcement)
-      const checkPlayer = (p: any) => {
+      const checkPlayer = (p: DuelPlayer) => {
         if (p.user && p.warnings > 0) {
           const uid = typeof p.user === 'string' ? p.user : p.user.id || p.user._id?.toString();
           if (uid) {

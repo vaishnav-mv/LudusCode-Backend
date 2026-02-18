@@ -459,26 +459,7 @@ export class DuelService implements IDuelService {
       : (duel.player2?.warnings || 0)
     const newWarnings = currentWarnings + 1
 
-    // Prepare update payload
-    const updatePayload: any = {}
-    const fieldPrefix = isPlayer1 ? 'player1' : 'player2'
 
-    updatePayload[`${fieldPrefix}.warnings`] = newWarnings
-
-    if (reason) {
-      // breakdown might be undefined if not initialized, but Mongoose default should handle it if we load doc
-      // Safest to use $inc for breakdown if possible, but _duels.update takes Partial<Duel> usually
-      // However, since we have the object, let's construct the new state.
-      const currentBreakdown = isPlayer1
-        ? (duel.player1?.warningsBreakdown || { paste: 0, visibility: 0 })
-        : (duel.player2?.warningsBreakdown || { paste: 0, visibility: 0 })
-
-      const newBreakdown = { ...currentBreakdown }
-      if (reason === 'visibility') newBreakdown.visibility = (newBreakdown.visibility || 0) + 1
-      if (reason === 'paste') newBreakdown.paste = (newBreakdown.paste || 0) + 1
-
-      updatePayload[`${fieldPrefix}.warningsBreakdown`] = newBreakdown
-    }
 
     // Since _duels.update takes Partial<Duel>, and we constructed dot notation keys above which strictly simple Partial<Duel> might not support without casting to any or using a specific update method
     // Let's refactor to use object structure if the repository supports it, OR just accept that we need to cast to any to pass dot notation if simple update doesn't support deep merge automatically.
