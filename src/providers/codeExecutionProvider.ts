@@ -5,7 +5,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { singleton } from 'tsyringe';
 import { ICodeExecutionProvider } from '../interfaces/providers';
-import { ExecutionResult } from '../interfaces/repositories'; // Keep ExecutionResult here for now or move to definitions
+import { ExecutionResult } from '../interfaces/repositories';
 
 @singleton()
 export class CodeExecutionProvider implements ICodeExecutionProvider {
@@ -27,9 +27,6 @@ export class CodeExecutionProvider implements ICodeExecutionProvider {
         if (lang === 'javascript' || lang === 'js') {
             extension = 'js';
             cmd = 'node';
-        } else if (lang === 'python' || lang === 'py') {
-            extension = 'py';
-            cmd = 'python';
         } else {
             return { stdout: '', stderr: 'Language not supported locally', code: 1 };
         }
@@ -52,15 +49,37 @@ export class CodeExecutionProvider implements ICodeExecutionProvider {
 
     private spawnProcess(cmd: string, args: string[], timeoutMs: number): Promise<ExecutionResult> {
         return new Promise((resolve) => {
+            const startTime = process.hrtime.bigint();
             const child = spawn(cmd, args);
             let stdout = '';
             let stderr = '';
             let timedOut = false;
+            let maxMemoryKB = 0;
+
+            // Poll memory usage of child process
+            const memoryInterval = setInterval(() => {
+                try {
+                    if (child.pid) {
+                        const usage = process.memoryUsage();
+                        const rssKB = Math.round(usage.rss / 1024);
+                        if (rssKB > maxMemoryKB) maxMemoryKB = rssKB;
+                    }
+                } catch { /* process may have exited */ }
+            }, 100);
 
             const timeout = setTimeout(() => {
                 timedOut = true;
                 child.kill();
-                resolve({ stdout, stderr: stderr + '\nExecution timed out', code: 1 });
+                clearInterval(memoryInterval);
+                const elapsed = Number(process.hrtime.bigint() - startTime) / 1e6;
+                resolve({
+                    stdout,
+                    stderr: stderr + '\nExecution timed out',
+                    code: 1,
+                    timedOut: true,
+                    executionTimeMs: Math.round(elapsed),
+                    memoryKB: maxMemoryKB
+                });
             }, timeoutMs);
 
             child.stdout.on('data', (data) => {
@@ -72,8 +91,6 @@ export class CodeExecutionProvider implements ICodeExecutionProvider {
             });
 
             const sanitize = (output: string) => {
-                // Remove temp directory paths for cleaner output
-                // Escaping backslashes for regex if windows
                 const tempDirRegex = new RegExp(this.tempDir.replace(/\\/g, '\\\\'), 'g');
                 return output.replace(tempDirRegex, 'sandbox');
             };
@@ -81,14 +98,32 @@ export class CodeExecutionProvider implements ICodeExecutionProvider {
             child.on('close', (code) => {
                 if (!timedOut) {
                     clearTimeout(timeout);
-                    resolve({ stdout, stderr: sanitize(stderr), code });
+                    clearInterval(memoryInterval);
+                    const elapsed = Number(process.hrtime.bigint() - startTime) / 1e6;
+                    resolve({
+                        stdout,
+                        stderr: sanitize(stderr),
+                        code,
+                        timedOut: false,
+                        executionTimeMs: Math.round(elapsed),
+                        memoryKB: maxMemoryKB
+                    });
                 }
             });
 
             child.on('error', (err) => {
                 if (!timedOut) {
                     clearTimeout(timeout);
-                    resolve({ stdout, stderr: sanitize(stderr + '\n' + err.message), code: 1 });
+                    clearInterval(memoryInterval);
+                    const elapsed = Number(process.hrtime.bigint() - startTime) / 1e6;
+                    resolve({
+                        stdout,
+                        stderr: sanitize(stderr + '\n' + err.message),
+                        code: 1,
+                        timedOut: false,
+                        executionTimeMs: Math.round(elapsed),
+                        memoryKB: maxMemoryKB
+                    });
                 }
             });
         });

@@ -84,6 +84,9 @@ export interface ExecutionResult {
     stderr: string;
     code: number | null;
     error?: string;
+    timedOut?: boolean;
+    executionTimeMs?: number;
+    memoryKB?: number;
 }
 
 export interface ICodeExecutionRepository {

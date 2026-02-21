@@ -38,13 +38,18 @@ export const mapProblem = (problem: Partial<Problem> | null | undefined) => {
         description: problem.description || '',
         difficulty: problem.difficulty || Difficulty.Easy,
         constraints: problem.constraints || [],
+        tags: problem.tags || [],
         inputFormat: problem.inputFormat || '',
         outputFormat: problem.outputFormat || '',
+        inputSchema: problem.inputSchema || [],
+        outputSchema: problem.outputSchema || [],
         testCases: problem.testCases || [],
         solution: problem.solution,
         solutions: problem.solutions,
         starterCode: problem.starterCode,
         functionName: problem.functionName,
+        editorial: problem.editorial,
+        timeLimitMs: problem.timeLimitMs || 5000,
         status: problem.status || ProblemStatus.Pending
     };
 };
@@ -57,8 +62,11 @@ export const mapDuelProblem = (problem: Partial<Problem> | null | undefined) => 
         description: problem.description || '',
         difficulty: problem.difficulty || Difficulty.Easy,
         constraints: problem.constraints || [],
+        tags: problem.tags || [],
         inputFormat: problem.inputFormat || '',
         outputFormat: problem.outputFormat || '',
+        inputSchema: problem.inputSchema || [],
+        outputSchema: problem.outputSchema || [],
         testCases: problem.testCases || [],
         // SECURITY FIX: Do not expose full solution code to frontend
         solution: problem.solution ? { language: problem.solution.language, code: '' } : undefined,

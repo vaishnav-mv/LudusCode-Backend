@@ -11,6 +11,22 @@ const SolutionSchema = new Schema({
   code: { type: String }
 })
 
+const ParamSchemaDefinition = new Schema({
+  name: { type: String, required: true },
+  type: {
+    type: String,
+    enum: ['integer', 'float', 'string', 'boolean', 'char', 'array', 'matrix', 'object'],
+    required: true
+  },
+  elementType: {
+    type: String,
+    enum: ['integer', 'float', 'string', 'boolean', 'char'],
+    required: false
+  },
+  properties: { type: [Schema.Types.Mixed], default: undefined },
+  description: { type: String, required: false }
+}, { _id: false })
+
 const ProblemSchema = new Schema({
   title: { type: String, required: true },
   description: { type: String },
@@ -22,11 +38,16 @@ const ProblemSchema = new Schema({
   constraints: { type: [String], default: [] },
   inputFormat: { type: String },
   outputFormat: { type: String },
+  inputSchema: { type: [ParamSchemaDefinition], default: [] },
+  outputSchema: { type: [ParamSchemaDefinition], default: [] },
   testCases: { type: [TestCaseSchema], default: [] },
   solutions: { type: [SolutionSchema], default: [] },
   solution: { type: SolutionSchema, required: false }, // Deprecated, kept for backward compatibility/migration
   starterCode: { type: String, required: false },
   functionName: { type: String, required: false },
+  editorial: { type: String, required: false },
+  timeLimitMs: { type: Number, default: 5000 },
+  tags: { type: [String], default: [] },
   status: {
     type: String,
     enum: ['Pending', 'Approved', 'Custom'],

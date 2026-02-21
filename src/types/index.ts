@@ -121,6 +121,18 @@ export interface ChatMessage {
     id?: string;
 }
 
+// Supported primitive types for problem parameters
+export type ParamPrimitiveType = 'integer' | 'float' | 'string' | 'boolean' | 'char';
+
+// Schema for a single parameter (input or output)
+export interface ParamSchema {
+    name: string;           // e.g. "nums", "target", "result"
+    type: ParamPrimitiveType | 'array' | 'matrix' | 'object';
+    elementType?: ParamPrimitiveType;  // For array/matrix: type of elements
+    properties?: ParamSchema[];       // For object: nested fields
+    description?: string;             // Optional human-readable hint
+}
+
 export interface TestCase {
     input: string;
     output: string;
@@ -140,13 +152,18 @@ export interface Problem {
     description?: string;
     difficulty: Difficulty;
     constraints?: string[];
+    tags?: string[];
     inputFormat?: string;
     outputFormat?: string;
+    inputSchema?: ParamSchema[];
+    outputSchema?: ParamSchema[];
     testCases?: TestCase[];
     solutions?: Solution[];
     solution?: Solution;
     starterCode?: string;
     functionName?: string;
+    editorial?: string;
+    timeLimitMs?: number;
     status: 'Pending' | 'Approved' | 'Custom';
     createdAt?: Date | string;
     updatedAt?: Date | string;

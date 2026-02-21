@@ -51,12 +51,10 @@ export class JudgeService implements IJudgeService {
   }
 
   private async _executeInternal(userCode: string, solutionCode: string, testCases: TestCase[], problem?: Problem, language: string = 'javascript'): Promise<SubmissionResult> {
+    const timeLimitMs = problem?.timeLimitMs || 5000;
     const languageMap: Record<string, { language: string }> = {
       'javascript': { language: 'javascript' },
       'js': { language: 'javascript' },
-      'python': { language: 'python' },
-      'py': { language: 'python' },
-      // c/cpp/java not supported locally yet without robust setup
     }
 
     const config = languageMap[language.toLowerCase()];
@@ -71,6 +69,8 @@ export class JudgeService implements IJudgeService {
 
     const results: TestCaseResult[] = []
     let passed = 0
+    let totalTimeMs = 0
+    let peakMemoryKB = 0
 
     for (const testCase of testCases) {
       try {
@@ -78,88 +78,80 @@ export class JudgeService implements IJudgeService {
 
         // Language specific wrappers
         if (config.language === 'javascript') {
-          // Basic wrapper to call solution(input) and log result
           const fnName = (problem && problem.functionName) ? problem.functionName : 'solution';
+          const hasMultipleParams = problem?.inputSchema && problem.inputSchema.length > 1;
+          const hasSingleParam = problem?.inputSchema && problem.inputSchema.length === 1;
+
+          // Build the call logic based on inputSchema
+          let callLogic: string;
+          if (hasMultipleParams) {
+            // inputSchema has multiple params — test input is an array of args, always spread
+            callLogic = `console.log(JSON.stringify(userFn(...input)));`;
+          } else if (hasSingleParam) {
+            // inputSchema has exactly 1 param — pass input as single argument
+            callLogic = `console.log(JSON.stringify(userFn(input)));`;
+          } else {
+            // No inputSchema — use old heuristic for backward compatibility
+            callLogic = `if (Array.isArray(input) && userFn.length > 1) {
+    console.log(JSON.stringify(userFn(...input)));
+  } else {
+    console.log(JSON.stringify(userFn(input)));
+  }`;
+          }
+
           runCode = `
 ${userCode}
 
 const userFn = (typeof ${fnName} !== 'undefined') ? ${fnName} : ((typeof solution !== 'undefined') ? solution : undefined);
 
 if (userFn) {
-  const input = ${testCase.input}; // Inject input directly
-  // Heuristic: If input is array AND function expects multiple arguments (length > 1), spread it.
-  // Otherwise, pass it as a single argument (e.g. solution(nums) where nums is array).
-  if (Array.isArray(input) && userFn.length > 1) { 
-     console.log(JSON.stringify(userFn(...input)));
-  } else {
-     console.log(JSON.stringify(userFn(input)));
-  }
+  const input = ${testCase.input};
+  ${callLogic}
 } else {
   console.log("No function found");
 }
 `
-        } else if (config.language === 'python') {
-          const fnName = (problem && problem.functionName) ? problem.functionName : 'solution';
-          runCode = `
-import json
-import sys
-
-${userCode}
-
-try:
-    input_str = '${testCase.input.replace(/'/g, "\\'")}'
-    input_val = json.loads(input_str)
-    
-    # Check if function exists
-    if '${fnName}' in locals():
-        func = locals()['${fnName}']
-        if isinstance(input_val, list) and not isinstance(input_val, str):
-             # Simple heuristic: if input is list, try unpacking? 
-             # Assumption: Input is either a single argument or a list of arguments (piston/leetcode style).
-             try:
-                print(json.dumps(func(*input_val)))
-             except TypeError:
-                print(json.dumps(func(input_val)))
-        else:
-            print(json.dumps(func(input_val)))
-    elif 'solution' in locals():
-        print(json.dumps(solution(input_val)))
-    else:
-        print("No function found")
-except Exception as error:
-    print(str(error), file=sys.stderr)
-`
         }
 
-        const run = await this._codeExecutor.execute(config.language, runCode);
+        const run = await this._codeExecutor.execute(config.language, runCode, timeLimitMs);
 
         const output = run.stdout ? run.stdout.trim() : '';
         const stderr = run.stderr ? run.stderr.trim() : '';
+        totalTimeMs += run.executionTimeMs || 0;
+        if (run.memoryKB && run.memoryKB > peakMemoryKB) peakMemoryKB = run.memoryKB;
 
-
-        if (run.code !== 0 || stderr) {
+        if (run.timedOut) {
+          results.push({ testCase, status: SubmissionStatus.TimeLimitExceeded, userOutput: `Execution timed out (limit: ${timeLimitMs}ms)` });
+        } else if (run.code !== 0 || stderr) {
           results.push({ testCase, status: SubmissionStatus.RuntimeError, userOutput: stderr || "Runtime Error" });
         } else {
-          // Compare output
-          const normalize = (str: string) => {
+          // Compare output using deep normalization
+          const normalize = (str: string): string => {
+            const trimmed = str.trim();
+            if (!trimmed) return '';
             try {
-              // Parse JSON and sort keys recursively to ensure {"a":1, "b":2} === {"b":2, "a":1}
-              const obj = JSON.parse(str);
-              const sortKeys = (obj: unknown): unknown => {
-                if (Array.isArray(obj)) {
-                  return obj.map(sortKeys);
-                } else if (obj !== null && typeof obj === 'object') {
+              const obj = JSON.parse(trimmed);
+              // Recursively sort object keys and normalize numeric values
+              const deepNormalize = (val: unknown): unknown => {
+                if (Array.isArray(val)) {
+                  return val.map(deepNormalize);
+                } else if (val !== null && typeof val === 'object') {
                   const sorted: Record<string, unknown> = {};
-                  Object.keys(obj as Record<string, unknown>).sort().forEach(key => {
-                    sorted[key] = sortKeys((obj as Record<string, unknown>)[key]);
+                  Object.keys(val as Record<string, unknown>).sort().forEach(key => {
+                    sorted[key] = deepNormalize((val as Record<string, unknown>)[key]);
                   });
                   return sorted;
+                } else if (typeof val === 'number') {
+                  // Normalize floats: 2.0 === 2, handle precision
+                  return Number.isInteger(val) ? val : parseFloat(val.toPrecision(12));
                 }
-                return obj;
+                return val;
               };
-              return JSON.stringify(sortKeys(obj));
+              return JSON.stringify(deepNormalize(obj));
             } catch {
-              return str.trim(); // Fallback to trimmed string if not valid JSON
+              // Not valid JSON — normalize as plain text
+              // Strip trailing newlines and collapse whitespace per line
+              return trimmed.split('\n').map(l => l.trimEnd()).join('\n');
             }
           };
 
@@ -180,19 +172,28 @@ except Exception as error:
       }
     }
 
-    const overall = passed === testCases.length ? SubmissionStatus.Accepted : SubmissionStatus.WrongAnswer;
+    // Determine overall status: TLE takes priority over WrongAnswer
+    let overall: SubmissionStatus;
+    if (passed === testCases.length) {
+      overall = SubmissionStatus.Accepted;
+    } else if (results.some(r => r.status === SubmissionStatus.TimeLimitExceeded)) {
+      overall = SubmissionStatus.TimeLimitExceeded;
+    } else if (results.some(r => r.status === SubmissionStatus.RuntimeError)) {
+      overall = SubmissionStatus.RuntimeError;
+    } else {
+      overall = SubmissionStatus.WrongAnswer;
+    }
 
     return {
       overallStatus: overall,
       results,
-      executionTime: Math.floor(Math.random() * 100), // Mock time
-      memoryUsage: 0
+      executionTime: totalTimeMs,
+      memoryUsage: peakMemoryKB
     }
   }
   async executeScratchpad(userCode: string, language: string): Promise<SubmissionResult> {
     const languageMap: Record<string, { language: string }> = {
       'javascript': { language: 'javascript' },
-      'python': { language: 'python' }
     };
 
     const config = languageMap[language.toLowerCase()] || languageMap['javascript'];
