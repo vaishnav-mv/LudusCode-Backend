@@ -87,8 +87,11 @@ export class SubscriptionController {
 
         const page = parseInt(req.query.page as string) || 1
         const limit = parseInt(req.query.limit as string) || 20
+        const action = req.query.action as string | undefined
+        const sortStr = req.query.sortStr as string | undefined
+        const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined
 
-        const result = await this._service.history(userId, page, limit)
+        const result = await this._service.history(userId, page, limit, { action, sortStr, sortOrder })
         return ApiResponse.success(res, result)
     }
 }

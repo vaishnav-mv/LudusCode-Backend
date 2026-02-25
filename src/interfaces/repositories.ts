@@ -60,8 +60,8 @@ export interface ISubscriptionRepository {
     updatePlan(id: string, data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | null>;
     deletePlan(id: string): Promise<boolean>;
     createLog(data: Partial<SubscriptionLog>): Promise<SubscriptionLog>;
-    getLogsByUser(userId: string, skip: number, limit: number): Promise<{ logs: SubscriptionLog[], total: number }>;
-    getLogsAll(skip: number, limit: number): Promise<{ logs: SubscriptionLog[], total: number }>;
+    getLogsByUser(userId: string, skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc' }): Promise<{ logs: SubscriptionLog[], total: number }>;
+    getLogsAll(skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }): Promise<{ logs: SubscriptionLog[], total: number }>;
     getTotalSubscriptionRevenue(): Promise<number>;
 }
 

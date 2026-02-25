@@ -128,7 +128,7 @@ export interface IAdminService {
   monitoredDuels(page?: number, limit?: number): Promise<{ duels: Duel[], total: number, page: number, totalPages: number }>
   cancelDuel(id: string): Promise<boolean>
   cancelDuel(id: string): Promise<boolean>
-  subscriptionData(page?: number, limit?: number): Promise<{
+  subscriptionData(page?: number, limit?: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }): Promise<{
     plans: { id: string, name: string, price: number, period: string, features: string[] }[],
     logs: { id: string, user: { name: string, avatarUrl: string }, plan: { name: string }, action: string, timestamp: Date | string, amount: number, expiryDate?: Date | string }[],
     total: number;
@@ -207,5 +207,5 @@ export interface ISubscriptionService {
   subscribe(userId: string, planId: string): Promise<{ success: boolean, action?: string, expiry?: Date, message?: string }>
   cancel(userId: string): Promise<{ success: boolean, message?: string }>
   resume(userId: string): Promise<{ success: boolean, message?: string }>
-  history(userId: string, page: number, limit: number): Promise<{ logs: SubscriptionLog[], total: number, page: number, totalPages: number }>
+  history(userId: string, page: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc' }): Promise<{ logs: SubscriptionLog[], total: number, page: number, totalPages: number }>
 }

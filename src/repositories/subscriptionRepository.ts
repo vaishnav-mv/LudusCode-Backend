@@ -2,6 +2,7 @@ import { singleton } from 'tsyringe'
 import { ISubscriptionRepository } from '../interfaces/repositories'
 import { SubscriptionPlanModel } from '../models/SubscriptionPlan'
 import { SubscriptionLogModel } from '../models/SubscriptionLog'
+import { UserModel } from '../models/User'
 import { SubscriptionPlan, SubscriptionLog } from '../types'
 
 @singleton()
@@ -44,11 +45,24 @@ export class SubscriptionRepository implements ISubscriptionRepository {
         return log.toObject() as unknown as SubscriptionLog
     }
 
-    async getLogsByUser(userId: string, skip: number, limit: number): Promise<{ logs: SubscriptionLog[], total: number }> {
-        const total = await SubscriptionLogModel.countDocuments({ userId })
-        const logs = await SubscriptionLogModel.find({ userId })
+    async getLogsByUser(userId: string, skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc' }): Promise<{ logs: SubscriptionLog[], total: number }> {
+        const match: Record<string, unknown> = { userId }
+        if (options?.action && options.action !== 'All') {
+            match.action = options.action
+        }
+
+        const sortDir = options?.sortOrder === 'asc' ? 1 : -1
+        let sortObj: Record<string, 1 | -1> = { timestamp: -1 } // default
+
+        if (options?.sortStr) {
+            if (options.sortStr === 'date') sortObj = { timestamp: sortDir }
+            else if (options.sortStr === 'amount') sortObj = { amount: sortDir }
+        }
+
+        const total = await SubscriptionLogModel.countDocuments(match)
+        const logs = await SubscriptionLogModel.find(match)
             .populate('planId', 'name period price')
-            .sort({ timestamp: -1 })
+            .sort(sortObj)
             .skip(skip)
             .limit(limit)
             .lean()
@@ -69,12 +83,38 @@ export class SubscriptionRepository implements ISubscriptionRepository {
         return { logs: formattedLogs, total }
     }
 
-    async getLogsAll(skip: number, limit: number): Promise<{ logs: SubscriptionLog[], total: number }> {
-        const total = await SubscriptionLogModel.countDocuments()
-        const logs = await SubscriptionLogModel.find()
+    async getLogsAll(skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }): Promise<{ logs: SubscriptionLog[], total: number }> {
+        const match: Record<string, unknown> = {}
+
+        if (options?.action && options.action !== 'All') {
+            match.action = options.action
+        }
+
+        if (options?.query && options.query.trim() !== '') {
+            const userFilter = {
+                $or: [
+                    { username: { $regex: options.query, $options: 'i' } },
+                    { email: { $regex: options.query, $options: 'i' } }
+                ]
+            }
+            const users = await UserModel.find(userFilter).select('_id').lean()
+            const userIds = users.map(u => u._id)
+            match.userId = { $in: userIds }
+        }
+
+        const sortDir = options?.sortOrder === 'asc' ? 1 : -1
+        let sortObj: Record<string, 1 | -1> = { timestamp: -1 } // default
+
+        if (options?.sortStr) {
+            if (options.sortStr === 'date') sortObj = { timestamp: sortDir }
+            else if (options.sortStr === 'amount') sortObj = { amount: sortDir }
+        }
+
+        const total = await SubscriptionLogModel.countDocuments(match)
+        const logs = await SubscriptionLogModel.find(match)
             .populate('userId', 'username avatarUrl')
             .populate('planId', 'name period')
-            .sort({ timestamp: -1 })
+            .sort(sortObj)
             .skip(skip)
             .limit(limit)
             .lean()

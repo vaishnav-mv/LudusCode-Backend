@@ -184,9 +184,9 @@ export class SubscriptionService implements ISubscriptionService {
         return { success: true, message: 'Auto-renew enabled successfully.' }
     }
 
-    async history(userId: string, page: number, limit: number): Promise<{ logs: SubscriptionLog[], total: number, page: number, totalPages: number }> {
+    async history(userId: string, page: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc' }): Promise<{ logs: SubscriptionLog[], total: number, page: number, totalPages: number }> {
         const skip = (page - 1) * limit
-        const { logs, total } = await this._subscriptions.getLogsByUser(userId, skip, limit)
+        const { logs, total } = await this._subscriptions.getLogsByUser(userId, skip, limit, options)
         return {
             logs,
             total,

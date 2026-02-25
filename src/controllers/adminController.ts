@@ -46,8 +46,13 @@ export class AdminController {
   subscriptionData = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 50
-    const subscriptionData = await this._service.subscriptionData(page, limit)
-    return ApiResponse.success(res, subscriptionData)
+    const action = req.query.action as string | undefined
+    const sortStr = req.query.sortStr as string | undefined
+    const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined
+    const q = req.query.q as string | undefined
+
+    const data = await this._service.subscriptionData(page, limit, { action, sortStr, sortOrder, query: q })
+    return ApiResponse.success(res, data)
   }
 
 

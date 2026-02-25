@@ -336,11 +336,13 @@ export class AdminService implements IAdminService {
     return true
   }
 
-  async subscriptionData(page: number = 1, limit: number = 50) {
-    const plans = await this._subscriptions.getPlans()
-    const { logs, total } = await this._subscriptions.getLogsAll((page - 1) * limit, limit)
+  async subscriptionData(page: number = 1, limit: number = 50, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }) {
+    const plansInfo = await this._subscriptions.getPlans()
 
-    const formattedPlans = plans.map((plan) => ({
+    const skip = (page - 1) * limit
+    const { logs, total } = await this._subscriptions.getLogsAll(skip, limit, options)
+
+    const formattedPlans = plansInfo.map((plan) => ({
       id: (plan._id || plan.id || '').toString(),
       name: plan.name,
       price: plan.price,
