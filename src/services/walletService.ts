@@ -34,7 +34,8 @@ export class WalletService implements IWalletService {
 
 
 
-    // Simulated Withdrawal (since Razorpay Test Mode doesn't support real Payouts)
+    // PRODUCTION TODO: Implement real payouts via Razorpay X Payouts API.
+    // Currently simulated — deducts from wallet but no actual bank transfer occurs. (Gap 8)
     async withdraw(userId: string, amount: number, vpa: string, _name?: string, _email?: string, _phone?: string) {
         try {
 
@@ -61,9 +62,9 @@ export class WalletService implements IWalletService {
         await this._wallets.add(userId, amount, description);
     }
 
-    async getTransactions(userId: string, page: number, limit: number) {
+    async getTransactions(userId: string, page: number, limit: number, type?: string, startDate?: string, endDate?: string) {
         const skip = (page - 1) * limit;
-        const { transactions, total } = await this._wallets.getTransactions(userId, skip, limit);
+        const { transactions, total } = await this._wallets.getTransactions(userId, skip, limit, type, startDate, endDate);
         return {
             transactions,
             total,

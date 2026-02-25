@@ -7,13 +7,12 @@ export const toId = (document: { _id?: Types.ObjectId | string, id?: string } | 
 import { UserResponseDTO } from '../dto/response/user.response.dto';
 import { GroupResponseDTO } from '../dto/response/group.response.dto';
 import { DuelResponseDTO } from '../dto/response/duel.response.dto';
-import { CompetitionResponseDTO } from '../dto/response/competition.response.dto';
 import { WalletResponseDTO } from '../dto/response/wallet.response.dto';
 import { ChatMessageResponseDTO } from '../dto/response/chat.response.dto';
 import { SubmissionResponseDTO } from '../dto/response/submission.response.dto';
-import { User, Problem, Group, Competition, Wallet, ChatMessage, Duel, ProblemSubmission, Difficulty, CompetitionStatus, SubmissionStatus, ProblemStatus } from '../types';
+import { User, Problem, Group, Wallet, ChatMessage, Duel, ProblemSubmission, Difficulty, SubmissionStatus, ProblemStatus } from '../types';
 
-export const mapUser = (user: Partial<User> | null | undefined, leaderboardRank?: number): UserResponseDTO | null => {
+export const mapUser = (user: Partial<User> | null | undefined, leaderboardRank?: number, premiumFeatures?: string[]): UserResponseDTO | null => {
     if (!user) return null;
     return {
         id: user._id?.toString() || user.id || '',
@@ -26,7 +25,11 @@ export const mapUser = (user: Partial<User> | null | undefined, leaderboardRank?
         isAdmin: !!user.isAdmin,
         isBanned: !!user.isBanned,
         isPremium: !!user.isPremium,
-        hasPassword: !!user.passwordHash
+        hasPassword: !!user.passwordHash,
+        premiumFeatures: premiumFeatures || user.premiumFeatures || [],
+        currentPlanId: user.currentPlanId ? user.currentPlanId.toString() : undefined,
+        subscriptionExpiry: user.subscriptionExpiry,
+        cancelAtPeriodEnd: !!user.cancelAtPeriodEnd
     };
 };
 
@@ -44,7 +47,6 @@ export const mapProblem = (problem: Partial<Problem> | null | undefined) => {
         inputSchema: problem.inputSchema || [],
         outputSchema: problem.outputSchema || [],
         testCases: problem.testCases || [],
-        solution: problem.solution,
         solutions: problem.solutions,
         starterCode: problem.starterCode,
         functionName: problem.functionName,
@@ -54,7 +56,7 @@ export const mapProblem = (problem: Partial<Problem> | null | undefined) => {
     };
 };
 
-export const mapDuelProblem = (problem: Partial<Problem> | null | undefined) => {
+export const mapDuelProblem = (problem: Partial<Problem> | null | undefined, showSecrets = false) => {
     if (!problem) return null;
     return {
         id: problem._id?.toString() || problem.id || '',
@@ -68,9 +70,8 @@ export const mapDuelProblem = (problem: Partial<Problem> | null | undefined) => 
         inputSchema: problem.inputSchema || [],
         outputSchema: problem.outputSchema || [],
         testCases: problem.testCases || [],
-        // SECURITY FIX: Do not expose full solution code to frontend
-        solution: problem.solution ? { language: problem.solution.language, code: '' } : undefined,
-        solutions: [], // Hide all other solutions
+        solutions: showSecrets ? problem.solutions : [], // Hide all solutions in active duel context
+        editorial: showSecrets ? problem.editorial : undefined,
         starterCode: problem.starterCode,
         functionName: problem.functionName,
         status: problem.status || ProblemStatus.Pending
@@ -89,28 +90,6 @@ export const mapGroup = (group: Partial<Group> | null | undefined): GroupRespons
         pendingMembers: (group.pendingMembers || []).map((member) => mapUser(member as Partial<User>)).filter((u): u is UserResponseDTO => u !== null),
         blockedMembers: (group.blockedMembers || []).map((member) => mapUser(member as Partial<User>)).filter((u): u is UserResponseDTO => u !== null),
         ownerId: (typeof group.owner === 'object' && group.owner && '_id' in group.owner) ? (group.owner as { _id: { toString: () => string } })._id?.toString() : (group.owner as string) || ''
-    };
-};
-
-export const mapCompetition = (competition: Partial<Competition> | null | undefined): CompetitionResponseDTO | null => {
-    if (!competition) return null;
-    return {
-        id: competition._id?.toString() || competition.id || '',
-        groupId: (typeof competition.groupId === 'object' && competition.groupId && '_id' in competition.groupId) ? (competition.groupId as { _id: { toString: () => string } })._id?.toString() : (competition.groupId as string) || '',
-        title: competition.title || '',
-        startTime: competition.startTime instanceof Date ? competition.startTime.toISOString() : (competition.startTime as string) || '',
-        durationMinutes: competition.durationMinutes || 0,
-        problems: (competition.problems || []).map((problemEntry) => ({
-            problem: mapProblem(problemEntry.problem as Partial<Problem>)!,
-            points: problemEntry.points
-        })),
-        participants: (competition.participants || []).map((participant) => ({
-            user: mapUser(participant.user as Partial<User>)!,
-            score: participant.score || 0,
-            rank: participant.rank || 0,
-            problemStatus: participant.problemStatus || {}
-        })),
-        status: competition.status || CompetitionStatus.Upcoming
     };
 };
 
@@ -138,7 +117,7 @@ export const mapDuel = (duel: Partial<Duel> | null | undefined): DuelResponseDTO
     if (!duel) return null;
     return {
         id: duel._id?.toString() || duel.id || '',
-        problem: mapDuelProblem(duel.problem as Partial<Problem>)!,
+        problem: mapDuelProblem(duel.problem as Partial<Problem>, duel.status === 'Finished')!,
         player1: { user: mapUser(duel.player1?.user as Partial<User>), warnings: duel.player1?.warnings || 0 },
         player2: { user: mapUser(duel.player2?.user as Partial<User>), warnings: duel.player2?.warnings || 0 },
         status: duel.status || 'Waiting',

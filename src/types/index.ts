@@ -37,6 +37,7 @@ export enum TransactionType {
     Withdrawal = 'Withdrawal',
     DuelWager = 'Duel Wager',
     DuelWin = 'Duel Win',
+    Subscription = 'Subscription',
 }
 
 export enum TransactionStatus {
@@ -45,17 +46,9 @@ export enum TransactionStatus {
     Failed = 'Failed',
 }
 
-export enum CompetitionStatus {
-    Upcoming = 'Upcoming',
-    Active = 'Active',
-    Completed = 'Completed'
-}
 
-export enum ParticipantProblemStatus {
-    Solved = 'Solved',
-    Attempted = 'Attempted',
-    Unsolved = 'Unsolved'
-}
+
+
 
 
 
@@ -85,6 +78,8 @@ export interface User {
     updatedAt?: Date | string;
     id?: string;
     sub?: string; // for auth context
+    premiumFeatures?: string[];
+    cancelAtPeriodEnd?: boolean;
 }
 
 export interface SubscriptionPlan {
@@ -92,6 +87,7 @@ export interface SubscriptionPlan {
     name: string;
     price: number;
     period: string; // 'monthly'
+    maxDailyDuels?: number;
     features: string[];
     createdAt?: Date | string;
     updatedAt?: Date | string;
@@ -104,6 +100,7 @@ export interface SubscriptionLog {
     planId: string | SubscriptionPlan;
     action: string;
     amount: number;
+    expiryDate?: Date | string;
     timestamp: Date | string;
     createdAt?: Date | string;
     updatedAt?: Date | string;
@@ -159,7 +156,6 @@ export interface Problem {
     outputSchema?: ParamSchema[];
     testCases?: TestCase[];
     solutions?: Solution[];
-    solution?: Solution;
     starterCode?: string;
     functionName?: string;
     editorial?: string;
@@ -308,27 +304,7 @@ export interface StudySession {
     id?: string;
 }
 
-export interface CompetitionProblem {
-    problem: Problem | string;
-    points: number;
-}
 
-export interface Competition {
-    _id?: string;
-    groupId: string | Group;
-    title: string;
-    startTime: Date | string;
-    durationMinutes: number;
-    problems: CompetitionProblem[];
-    participants: {
-        user: User | string;
-        score: number;
-        rank: number;
-        problemStatus: Record<string, ParticipantProblemStatus>;
-    }[];
-    status: CompetitionStatus;
-    id?: string;
-}
 
 export interface PaginatedResponse<T> {
     data: T[];

@@ -4,7 +4,7 @@ import { HttpStatus, ResponseMessages } from '../constants'
 import { IAiService } from '../interfaces/services'
 
 
-import { HintDTO, CodeReviewDTO, PerformanceDTO } from '../dto/request/ai.request.dto'
+import { HintDTO, CodeReviewDTO, PerformanceDTO, ComplexityDTO } from '../dto/request/ai.request.dto'
 import { getErrorMessage } from '../utils/errorUtils'
 import { ApiResponse } from '../utils/ApiResponse'
 
@@ -72,39 +72,7 @@ export class AiController {
     }
 
     /**
-     * @desc    Get AI explanation for a concept
-     * @route   POST /api/ai/explain-concept
-     * @req     body: { concept }
-     * @res     { explanation }
-     */
-    explainConcept = async (req: Request, res: Response) => {
-        try {
-            const { concept } = req.body;
-            const explanation = await this._service.explainConcept(concept);
-            return ApiResponse.success(res, { explanation })
-        } catch (e: unknown) {
-            return ApiResponse.error(res, getErrorMessage(e), HttpStatus.NOT_IMPLEMENTED)
-        }
-    }
-
-    /**
-     * @desc    Summarize a chat discussion
-     * @route   POST /api/ai/summarize-discussion
-     * @req     body: { messages }
-     * @res     { summary }
-     */
-    summarizeDiscussion = async (req: Request, res: Response) => {
-        try {
-            const { messages } = req.body;
-            const summary = await this._service.summarizeDiscussion(messages);
-            return ApiResponse.success(res, { summary })
-        } catch (error: unknown) {
-            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.NOT_IMPLEMENTED)
-        }
-    }
-
-    /**
-     * @desc    Generate a problem using AI
+     * @desc    Generate problem
      * @route   POST /api/ai/generate-problem
      * @req     body: { difficulty, topic }
      * @res     { problem }
@@ -113,9 +81,67 @@ export class AiController {
         try {
             const { difficulty, topic } = req.body;
             const problem = await this._service.generateProblem(difficulty, topic);
-            return ApiResponse.success(res, problem)
+            return ApiResponse.success(res, { problem })
         } catch (error: unknown) {
-            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.NOT_IMPLEMENTED)
+            const msg = getErrorMessage(error);
+            return ApiResponse.error(res, msg, HttpStatus.INTERNAL_SERVER_ERROR)
+        }
+    }
+
+    /**
+     * @desc    Get live code complexity (Premium feature)
+     * @route   POST /api/ai/live-complexity
+     * @req     body: { userCode }
+     * @res     { complexity }
+     */
+    liveComplexity = async (req: Request, res: Response) => {
+        try {
+            const body = req.body as ComplexityDTO;
+            const complexityJSON = await this._service.complexity(body.userCode);
+            // Returns a JSON string from Gemini, parse it before sending
+            const complexity = JSON.parse(complexityJSON);
+            return ApiResponse.success(res, { complexity });
+        } catch (error: unknown) {
+            const msg = getErrorMessage(error);
+            return ApiResponse.error(res, msg, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * @desc    Get AI code optimization (Premium feature)
+     * @route   POST /api/ai/optimize
+     * @req     body: { problemId, userCode }
+     * @res     { optimization }
+     */
+    optimize = async (req: Request, res: Response) => {
+        try {
+            const body = req.body as CodeReviewDTO;
+            const { problemId, userCode } = body;
+            const optimizationJSON = await this._service.optimize(problemId, userCode);
+            return ApiResponse.success(res, { optimization: JSON.parse(optimizationJSON) });
+        } catch (error: unknown) {
+            const msg = getErrorMessage(error);
+            if (msg === "Problem not found") return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
+            return ApiResponse.error(res, msg, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * @desc    Get AI edge cases analysis (Premium feature)
+     * @route   POST /api/ai/edge-cases
+     * @req     body: { problemId, userCode }
+     * @res     { edgeCases }
+     */
+    edgeCases = async (req: Request, res: Response) => {
+        try {
+            const body = req.body as CodeReviewDTO;
+            const { problemId, userCode } = body;
+            const edgeCasesJSON = await this._service.edgeCases(problemId, userCode);
+            return ApiResponse.success(res, { edgeCases: JSON.parse(edgeCasesJSON) });
+        } catch (error: unknown) {
+            const msg = getErrorMessage(error);
+            if (msg === "Problem not found") return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
+            return ApiResponse.error(res, msg, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

@@ -116,14 +116,43 @@ export class WalletRepository implements IWalletRepository {
   }
 
 
-  async getTransactions(userId: string, skip: number, limit: number) {
-    const transactions = await TransactionModel.find({ userId })
+  async getTransactions(userId: string, skip: number, limit: number, type?: string, startDate?: string, endDate?: string) {
+    const filter: Record<string, unknown> = { userId };
+    if (type) filter.type = type;
+    if (startDate || endDate) {
+      const dateFilter: Record<string, Date> = {};
+      if (startDate) dateFilter.$gte = new Date(startDate);
+      if (endDate) dateFilter.$lte = new Date(endDate);
+      filter.createdAt = dateFilter;
+    }
+
+    const transactions = await TransactionModel.find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
-    const total = await TransactionModel.countDocuments({ userId });
+    const total = await TransactionModel.countDocuments(filter);
+
+    return {
+      transactions: transactions.map(transaction => ({
+        ...transaction,
+        _id: transaction._id.toString(),
+        id: transaction._id.toString(),
+        timestamp: transaction.createdAt
+      } as unknown as import('../types').Transaction)),
+      total
+    };
+  }
+
+  async getAllTransactions(skip: number, limit: number) {
+    const transactions = await TransactionModel.find()
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    const total = await TransactionModel.countDocuments();
 
     return {
       transactions: transactions.map(transaction => ({
@@ -136,3 +165,4 @@ export class WalletRepository implements IWalletRepository {
     };
   }
 }
+

@@ -17,5 +17,8 @@ export class SubscriptionRoutes {
     private setupRoutes() {
         this.router.get('/', (req, res, next) => this._controller.getPlans(req, res).catch(next))
         this.router.post('/subscribe', auth, (req, res, next) => this._controller.subscribe(req, res).catch(next))
+        this.router.post('/cancel', auth, (req, res, next) => this._controller.cancel(req, res).catch(next))
+        this.router.post('/resume', auth, (req, res, next) => this._controller.resume(req, res).catch(next))
+        this.router.get('/history', auth, (req, res, next) => this._controller.history(req, res).catch(next))
     }
 }

@@ -44,15 +44,23 @@ export class AiService implements IAiService {
         return this._provider.performance({ user: profile, submissionStats, joinedGroups });
     }
 
-    async explainConcept(concept: string): Promise<string> {
-        return this._provider.explainConcept(concept);
-    }
-
-    async summarizeDiscussion(messages: string[]): Promise<string> {
-        return this._provider.summarizeDiscussion(messages);
-    }
-
     async generateProblem(difficulty: string, topic: string): Promise<Problem> {
         return this._provider.generateProblem(difficulty, topic);
+    }
+
+    async complexity(userCode: string): Promise<string> {
+        return this._provider.complexity(userCode);
+    }
+
+    async optimize(problemId: string, userCode: string): Promise<string> {
+        const problem = await this._problemRepo.getById(problemId);
+        if (!problem) throw new Error("Problem not found");
+        return this._provider.optimize(problem, userCode);
+    }
+
+    async edgeCases(problemId: string, userCode: string): Promise<string> {
+        const problem = await this._problemRepo.getById(problemId);
+        if (!problem) throw new Error("Problem not found");
+        return this._provider.edgeCases(problem, userCode);
     }
 }

@@ -35,7 +35,10 @@ export class WalletController {
     const userId = req.params.userId
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 20
-    const result = await this._service.getTransactions(userId, page, limit)
+    const type = req.query.type as string | undefined
+    const startDate = req.query.startDate as string | undefined
+    const endDate = req.query.endDate as string | undefined
+    const result = await this._service.getTransactions(userId, page, limit, type, startDate, endDate)
     return ApiResponse.success(res, result)
   }
 

@@ -111,5 +111,17 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
 
     return (updatedDuel ? this.mapDoc(updatedDuel) : null) || null;
   }
+
+  async countRecentDuels(userId: string, since: Date): Promise<number> {
+    return this.model.countDocuments({
+      $or: [
+        /* eslint-disable-next-line @typescript-eslint/naming-convention */
+        { 'player1.user': userId },
+        /* eslint-disable-next-line @typescript-eslint/naming-convention */
+        { 'player2.user': userId }
+      ],
+      createdAt: { $gte: since }
+    });
+  }
 }
 

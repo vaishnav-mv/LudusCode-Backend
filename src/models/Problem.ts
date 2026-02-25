@@ -42,7 +42,6 @@ const ProblemSchema = new Schema({
   outputSchema: { type: [ParamSchemaDefinition], default: [] },
   testCases: { type: [TestCaseSchema], default: [] },
   solutions: { type: [SolutionSchema], default: [] },
-  solution: { type: SolutionSchema, required: false }, // Deprecated, kept for backward compatibility/migration
   starterCode: { type: String, required: false },
   functionName: { type: String, required: false },
   editorial: { type: String, required: false },

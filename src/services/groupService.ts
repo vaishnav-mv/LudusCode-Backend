@@ -81,9 +81,12 @@ export class GroupService implements IGroupService {
     }
 
     async create(name: string, description: string, topics: string[], creatorId: string, isPrivate: boolean = false) {
-        const userId = creatorId;
-        const creator = await this._users.getById(userId);
+        const creator = await this._users.getById(creatorId);
         if (!creator) throw new Error(ResponseMessages.USER_NOT_FOUND);
+
+        if (isPrivate && !creator.isPremium && !creator.isAdmin) {
+            throw new Error("Only premium users can create private groups.");
+        }
 
         const existingGroup = await this._groups.findByName(name);
         if (existingGroup) {

@@ -12,6 +12,7 @@ const UserSchema = new Schema({
   isPremium: { type: Boolean, default: false },
   isVerified: { type: Boolean, default: false },
   currentPlanId: { type: Schema.Types.ObjectId, ref: 'SubscriptionPlan' },
-  subscriptionExpiry: { type: Date }
+  subscriptionExpiry: { type: Date },
+  cancelAtPeriodEnd: { type: Boolean, default: false }
 }, { timestamps: true })
 export const UserModel = mongoose.model('User', UserSchema)

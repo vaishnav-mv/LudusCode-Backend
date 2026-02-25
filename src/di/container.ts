@@ -21,7 +21,8 @@ import {
 import {
     IUserRepository, IGroupRepository, IProblemRepository,
     IDuelRepository, IWalletRepository, IChatRepository,
-    ISubmissionRepository, IStudySessionRepository
+    ISubmissionRepository, IStudySessionRepository,
+    ISubscriptionRepository
 } from '../interfaces/repositories'
 
 // Repositories
@@ -33,6 +34,7 @@ import { StudySessionRepository } from '../repositories/studySessionRepository'
 import { WalletRepository } from '../repositories/walletRepository'
 import { ChatRepository } from '../repositories/chatRepository'
 import { SubmissionRepository } from '../repositories/submissionRepository'
+import { SubscriptionRepository } from '../repositories/subscriptionRepository'
 
 // Providers
 import { EmailProvider } from '../providers/emailProvider'
@@ -70,6 +72,7 @@ container.registerSingleton<IStudySessionRepository>("IStudySessionRepository", 
 container.registerSingleton<IWalletRepository>("IWalletRepository", WalletRepository)
 container.registerSingleton<IChatRepository>("IChatRepository", ChatRepository)
 container.registerSingleton<ISubmissionRepository>("ISubmissionRepository", SubmissionRepository)
+container.registerSingleton<ISubscriptionRepository>("ISubscriptionRepository", SubscriptionRepository)
 
 // Register Providers
 container.registerSingleton<IEmailProvider>("IEmailProvider", EmailProvider)

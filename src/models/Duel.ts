@@ -21,7 +21,6 @@ const DuelSubmissionSchema = new Schema({
 })
 
 const DuelSchema = new Schema({
-  legacyId: { type: String },
   problem: { type: Schema.Types.ObjectId, ref: 'Problem' },
   player1: { type: DuelPlayerSchema, required: true },
   player2: { type: DuelPlayerSchema, required: true },

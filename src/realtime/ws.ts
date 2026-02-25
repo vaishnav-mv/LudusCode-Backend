@@ -8,7 +8,6 @@ import { IJudgeService, IDuelService } from '../interfaces/services'
 import { IProblemRepository } from '../interfaces/repositories'
 import { ChatMessageResponseDTO } from '../dto/response/chat.response.dto'
 import { DuelResponseDTO } from '../dto/response/duel.response.dto'
-import { CompetitionResponseDTO } from '../dto/response/competition.response.dto'
 import { DuelInviteDTO } from '../dto/response/duel.invite.dto'
 import { StudySession, TestCase } from '../types'
 import { mapDuel } from '../utils/mapper'
@@ -140,12 +139,6 @@ export const broadcastDuelLobby = (payload: DuelResponseDTO) => {
 export const broadcastDuelInvite = (userId: string, payload: DuelInviteDTO) => {
   if (io) {
     io.to(`user:${userId}`).emit('duel:invite', payload)
-  }
-}
-
-export const broadcastCompetition = (competitionId: string, payload: CompetitionResponseDTO) => {
-  if (io) {
-    io.to(`competition:${competitionId}`).emit('competition', { competitionId, competition: payload })
   }
 }
 

@@ -1,4 +1,4 @@
-import { User, Group, Problem, Duel, DuelPlayer, Competition, ProblemSubmission, Wallet, StudySession, ChatMessage, Transaction } from '../types';
+import { User, Group, Problem, Duel, DuelPlayer, ProblemSubmission, Wallet, StudySession, ChatMessage, Transaction, SubscriptionPlan, SubscriptionLog } from '../types';
 
 export interface IBaseRepository<T> {
     all(skip?: number, limit?: number, filter?: Record<string, unknown>, sort?: Record<string, unknown> | string): Promise<T[]>;
@@ -15,6 +15,7 @@ export interface IUserRepository extends IBaseRepository<User> {
     leaderboard(skip?: number, limit?: number): Promise<{ users: User[], total: number }>;
     search(query: string): Promise<User[]>;
     getRank(elo: number): Promise<number>;
+    findExpiredPremiumUsers(date: Date): Promise<User[]>;
 }
 
 export interface IGroupRepository extends IBaseRepository<Group> {
@@ -29,10 +30,7 @@ export interface IDuelRepository extends IBaseRepository<Duel> {
     attemptJoin(id: string, player2Data: Partial<DuelPlayer>): Promise<Duel | null>;
     attemptFinish(id: string, winner: User | string | null, finalStatus: string): Promise<Duel | null>;
     attemptCancel(id: string): Promise<Duel | null>;
-}
-
-export interface ICompetitionRepository extends IBaseRepository<Competition> {
-    forGroup(groupId: string): Promise<Competition[]>;
+    countRecentDuels(userId: string, since: Date): Promise<number>;
 }
 
 export interface ISubmissionRepository {
@@ -51,7 +49,20 @@ export interface IWalletRepository {
     deposit(userId: string, amount: number, description: string): Promise<void>;
     withdraw(userId: string, amount: number, description: string): Promise<boolean>;
     add(userId: string, amount: number, description: string): Promise<void>;
-    getTransactions(userId: string, skip: number, limit: number): Promise<{ transactions: Transaction[], total: number }>;
+    getTransactions(userId: string, skip: number, limit: number, type?: string, startDate?: string, endDate?: string): Promise<{ transactions: Transaction[], total: number }>;
+    getAllTransactions(skip: number, limit: number): Promise<{ transactions: Transaction[], total: number }>;
+}
+
+export interface ISubscriptionRepository {
+    getPlans(): Promise<SubscriptionPlan[]>;
+    getPlanById(id: string): Promise<SubscriptionPlan | null>;
+    createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan>;
+    updatePlan(id: string, data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | null>;
+    deletePlan(id: string): Promise<boolean>;
+    createLog(data: Partial<SubscriptionLog>): Promise<SubscriptionLog>;
+    getLogsByUser(userId: string, skip: number, limit: number): Promise<{ logs: SubscriptionLog[], total: number }>;
+    getLogsAll(skip: number, limit: number): Promise<{ logs: SubscriptionLog[], total: number }>;
+    getTotalSubscriptionRevenue(): Promise<number>;
 }
 
 

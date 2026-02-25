@@ -50,8 +50,6 @@ export const ResponseMessages = {
     DUEL_ALREADY_FINISHED: 'This duel has already ended',
     NOT_A_PARTICIPANT: 'You are not a participant in this duel',
     DUEL_NOT_IN_PROGRESS: 'This duel is not currently in progress',
-    COMPETITION_NOT_FOUND: 'Competition not found',
-    PARTICIPANT_NOT_FOUND: 'Participant not found',
     NO_REFERENCE_SOLUTION: 'No reference solution found for this problem.',
     FAILED_SEND: 'Failed to send',
     INCORRECT_PASSWORD: 'Incorrect current password',

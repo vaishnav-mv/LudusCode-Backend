@@ -257,4 +257,44 @@ export class AdminController {
       return ApiResponse.error(res, "Failed to force result", HttpStatus.INTERNAL_SERVER_ERROR, { ok: false })
     }
   }
+
+  /**
+   * @desc    Get a user's wallet details
+   * @route   GET /api/admin/wallet/:userId
+   * @req     params: { userId }
+   * @res     { balance, currency }
+   */
+  getUserWallet = async (req: Request, res: Response) => {
+    const wallet = await this._service.getUserWallet(req.params.userId)
+    return ApiResponse.success(res, wallet)
+  }
+
+  /**
+   * @desc    Get all platform transactions
+   * @route   GET /api/admin/transactions
+   * @req     query: { page, limit }
+   * @res     { transactions, total, page, totalPages }
+   */
+  getAllTransactions = async (req: Request, res: Response) => {
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 50
+    const result = await this._service.getAllTransactions(page, limit)
+    return ApiResponse.success(res, result)
+  }
+
+  /**
+   * @desc    Adjust a user's wallet balance (credit or debit)
+   * @route   POST /api/admin/wallet/:userId/adjust
+   * @req     params: { userId }, body: { amount, description }
+   * @res     { ok: boolean }
+   */
+  adjustBalance = async (req: Request, res: Response) => {
+    const { amount, description } = req.body
+    if (!amount || !description) {
+      return ApiResponse.error(res, 'Amount and description are required', HttpStatus.BAD_REQUEST)
+    }
+    const ok = await this._service.adjustUserBalance(req.params.userId, amount, description)
+    return ApiResponse.success(res, { ok })
+  }
 }
+

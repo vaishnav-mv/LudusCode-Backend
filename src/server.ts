@@ -3,6 +3,7 @@ import './di/container' // Must be imported before app
 import app from './app'
 import { container } from 'tsyringe'
 import { StudySessionService } from './services/studySessionService'
+import { CronService } from './services/cronService'
 import { env } from './config/env'
 import mongoose from 'mongoose'
 import http from 'http'
@@ -22,6 +23,11 @@ async function bootstrap() {
     server.listen(env.PORT, () => {
       console.log(`Server listening on port ${env.PORT}`);
     })
+
+    // Start Daily Subscription Expiry/Renew Cron
+    const cronService = container.resolve(CronService);
+    cronService.startDailyCron();
+
     // Start Round Robin Timer Loop
     setInterval(async () => {
       try {

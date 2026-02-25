@@ -10,6 +10,10 @@ export interface UserResponseDTO {
     isBanned: boolean;
     isPremium: boolean;
     hasPassword?: boolean;
+    premiumFeatures?: string[];
+    currentPlanId?: string;
+    subscriptionExpiry?: Date | string;
+    cancelAtPeriodEnd?: boolean;
 }
 
 export interface AuthResponseDTO {

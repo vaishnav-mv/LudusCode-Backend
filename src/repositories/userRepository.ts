@@ -20,29 +20,37 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
 
     if (foundUser) {
       const user = foundUser;
-      const rank = await this.model.countDocuments({ elo: { $gt: user.elo } }) + 1;
+      const rank = await this.model.countDocuments({ elo: { $gt: user.elo }, isAdmin: false, isBanned: false }) + 1;
       return { ...this.mapDoc(user), leaderboardRank: rank } as User;
     }
     return undefined;
   }
 
   async getRank(elo: number) {
-    return await this.model.countDocuments({ elo: { $gt: elo } }) + 1;
+    return await this.model.countDocuments({ elo: { $gt: elo }, isAdmin: false, isBanned: false }) + 1;
+  }
+
+  async findExpiredPremiumUsers(date: Date): Promise<User[]> {
+    const list = await this.model.find({
+      isPremium: true,
+      subscriptionExpiry: { $lte: date }
+    }).lean();
+    return list.map((doc) => this.mapDoc(doc) as User);
   }
 
   async getByEmail(email: string) {
     const foundUser = await this.model.findOne({ email: email.toLowerCase() }).lean();
     if (foundUser) {
       const user = foundUser;
-      const rank = await this.model.countDocuments({ elo: { $gt: user.elo } }) + 1;
+      const rank = await this.model.countDocuments({ elo: { $gt: user.elo }, isAdmin: false, isBanned: false }) + 1;
       return { ...this.mapDoc(user), leaderboardRank: rank } as User;
     }
     return undefined;
   }
 
   async leaderboard(skip: number = 0, limit: number = 100) {
-    const list = await this.model.find({ isAdmin: false }).sort({ elo: -1 }).skip(skip).limit(limit).lean();
-    const total = await this.model.countDocuments({ isAdmin: false });
+    const list = await this.model.find({ isAdmin: false, isBanned: false }).sort({ elo: -1 }).skip(skip).limit(limit).lean();
+    const total = await this.model.countDocuments({ isAdmin: false, isBanned: false });
     return {
       users: list.map((userDoc) => this.mapDoc(userDoc)!),
       total
@@ -53,7 +61,7 @@ export class UserRepository extends BaseRepository<User> implements IUserReposit
     const foundUser = await this.model.findOne({ username }).lean();
     if (foundUser) {
       const user = foundUser;
-      const rank = await this.model.countDocuments({ elo: { $gt: user.elo } }) + 1;
+      const rank = await this.model.countDocuments({ elo: { $gt: user.elo }, isAdmin: false, isBanned: false }) + 1;
       return { ...this.mapDoc(user), leaderboardRank: rank } as User;
     }
     return undefined;

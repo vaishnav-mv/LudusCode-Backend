@@ -1,6 +1,6 @@
 import { singleton, inject } from 'tsyringe'
 import { IUserService } from '../interfaces/services'
-import { IUserRepository, IGroupRepository, IDuelRepository } from '../interfaces/repositories'
+import { IUserRepository, IGroupRepository, IDuelRepository, ISubscriptionRepository } from '../interfaces/repositories'
 import { mapUser, mapGroup } from '../utils/mapper'
 import { ResponseMessages } from '../constants'
 import { User, Duel, Group } from '../types'
@@ -12,7 +12,8 @@ export class UserService implements IUserService {
   constructor(
     @inject("IUserRepository") private _userRepo: IUserRepository,
     @inject("IGroupRepository") private _groupRepo: IGroupRepository,
-    @inject("IDuelRepository") private _duelRepo: IDuelRepository
+    @inject("IDuelRepository") private _duelRepo: IDuelRepository,
+    @inject("ISubscriptionRepository") private _subscriptions: ISubscriptionRepository
   ) { }
 
   async profile(id: string): Promise<{
@@ -25,6 +26,14 @@ export class UserService implements IUserService {
     if (!userDoc) {
       console.error(`User profile not found for id: ${id}`);
       return null;
+    }
+
+    // Auto-revoke expired premium status on profile load
+    if (userDoc.isPremium && userDoc.subscriptionExpiry && new Date(userDoc.subscriptionExpiry) <= new Date()) {
+      await this._userRepo.update(id, { isPremium: false, currentPlanId: undefined, subscriptionExpiry: undefined });
+      userDoc.isPremium = false;
+      userDoc.currentPlanId = undefined;
+      userDoc.subscriptionExpiry = undefined;
     }
 
     // Fetch duels involving the user
@@ -54,8 +63,17 @@ export class UserService implements IUserService {
     // Calculate Leaderboard Rank
     const rank = await this._userRepo.count({ elo: { $gt: userDoc.elo } }) + 1;
 
+    let features: string[] = [];
+    if (userDoc.isPremium && userDoc.currentPlanId) {
+      const planIdStr = typeof userDoc.currentPlanId === 'object' ? (userDoc.currentPlanId as object).toString() : userDoc.currentPlanId;
+      const plan = await this._subscriptions.getPlanById(planIdStr as string);
+      if (plan && plan.features) {
+        features = plan.features;
+      }
+    }
+
     return {
-      user: mapUser(userDoc, rank),
+      user: mapUser(userDoc, rank, features),
       recentDuels: duels,
       joinedGroups: groupsDocs.map(group => mapGroup(group)).filter((group): group is GroupResponseDTO => group !== null),
       submissionStats

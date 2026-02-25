@@ -16,3 +16,8 @@ export const PerformanceSchema = z.object({
     userId: z.string()
 })
 export type PerformanceDTO = z.infer<typeof PerformanceSchema>
+
+export const ComplexitySchema = z.object({
+    userCode: z.string()
+})
+export type ComplexityDTO = z.infer<typeof ComplexitySchema>

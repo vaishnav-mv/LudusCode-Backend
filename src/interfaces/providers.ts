@@ -28,10 +28,10 @@ export interface IAiProvider {
     hint(problem: Problem, userCode: string): Promise<string>
     codeReview(problem: Problem, userCode: string): Promise<string>
     performance(data: { user: User, submissionStats: { total: number, accepted: number, acceptanceRate: number }, joinedGroups: Group[] }): Promise<string>
-
-    explainConcept(concept: string): Promise<string>
-    summarizeDiscussion(messages: string[]): Promise<string>
     generateProblem(difficulty: string, topic: string): Promise<Problem>
+    complexity(userCode: string): Promise<string>
+    optimize(problem: Problem, userCode: string): Promise<string>
+    edgeCases(problem: Problem, userCode: string): Promise<string>
 }
 
 export interface IOtpProvider {

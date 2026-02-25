@@ -28,7 +28,9 @@ import { AuthMiddleware } from './middleware/auth'
 const auth = container.resolve(AuthMiddleware).auth
 import { PermissionsMiddleware } from './middleware/permissions'
 const requireAdmin = container.resolve(AuthMiddleware).roleGuard('admin')
+import { subscriptionExpiryMiddleware } from './middleware/subscriptionExpiry'
 const requirePremium = container.resolve(PermissionsMiddleware).requirePremium
+const checkExpiry = subscriptionExpiryMiddleware
 const app = express()
 app.use(express.json())
 app.use(cookieParser())
@@ -66,7 +68,7 @@ app.use('/api/users', apiLimiter, csrfProtection, new UserRoutes().router)
 app.use('/api/chat', apiLimiter, csrfProtection, auth, new ChatRoutes().router)
 app.use('/api/judge', apiLimiter, csrfProtection, auth, new JudgeRoutes().router)
 app.use('/api/problems', new ProblemRoutes().router)
-app.use('/api/ai', apiLimiter, csrfProtection, auth, requirePremium, new AiRoutes().router)
+app.use('/api/ai', apiLimiter, csrfProtection, auth, checkExpiry, requirePremium, new AiRoutes().router)
 app.use('/api/submissions', apiLimiter, csrfProtection, auth, new SubmissionRoutes().router)
 app.use('/api/subscriptions', apiLimiter, csrfProtection, new SubscriptionRoutes().router)
 app.use('/api/health', new HealthRoutes().router)

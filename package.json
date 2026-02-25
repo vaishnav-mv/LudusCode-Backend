@@ -30,6 +30,7 @@
     "mongoose": "^8.8.0",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
+    "node-cron": "^4.2.1",
     "node-fetch": "2.7.0",
     "razorpay": "^2.9.6",
     "reflect-metadata": "^0.2.2",

@@ -5,6 +5,7 @@ const SubscriptionPlanSchema = new Schema({
     name: { type: String, required: true },
     price: { type: Number, required: true },
     period: { type: String, enum: ['monthly', 'yearly'], required: true },
+    maxDailyDuels: { type: Number, default: 5 },
     features: { type: [String], default: [] }
 }, { timestamps: true });
 

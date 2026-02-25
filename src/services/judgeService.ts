@@ -16,10 +16,10 @@ export class JudgeService implements IJudgeService {
     const problem = await this._problemRepo.getById(problemId);
     if (!problem) throw new Error("Problem not found");
 
-    let solutionCode = problem.solution?.code;
+    let solutionCode: string | undefined;
     if (problem.solutions && problem.solutions.length > 0) {
       const match = problem.solutions.find((solution: { language: string, code: string }) => solution.language.toLowerCase() === language.toLowerCase());
-      if (match) solutionCode = match.code;
+      solutionCode = match ? match.code : problem.solutions[0].code;
     }
 
     let testCasesToRun: TestCase[] = problem.testCases || [];

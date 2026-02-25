@@ -1,4 +1,4 @@
-import { IUserRepository } from '../interfaces/repositories'
+import { IUserRepository, ISubscriptionRepository } from '../interfaces/repositories'
 import { IEmailProvider, IJwtProvider, IPasswordProvider, IOtpProvider } from '../interfaces/providers'
 import { singleton, inject } from 'tsyringe'
 import { User } from '../types'
@@ -15,8 +15,24 @@ export class AuthService implements IAuthService {
     @inject("IOtpProvider") private _otpProvider: IOtpProvider,
     @inject("IEmailProvider") private _emailProvider: IEmailProvider,
     @inject("IJwtProvider") private _jwtProvider: IJwtProvider,
-    @inject("IPasswordProvider") private _passwordProvider: IPasswordProvider
+    @inject("IPasswordProvider") private _passwordProvider: IPasswordProvider,
+    @inject("ISubscriptionRepository") private _subscriptions: ISubscriptionRepository
   ) { }
+
+  private async _attachFeatures(user: User): Promise<User> {
+    if (user.isPremium && user.currentPlanId) {
+      const planId = user.currentPlanId.toString();
+      const plan = await this._subscriptions.getPlanById(planId);
+      if (plan && plan.features) {
+        user.premiumFeatures = plan.features;
+      } else {
+        user.premiumFeatures = [];
+      }
+    } else {
+      user.premiumFeatures = [];
+    }
+    return user;
+  }
 
   async login(email: string, password: string) {
     const user = await this._userRepo.getByEmail(email);
@@ -30,7 +46,8 @@ export class AuthService implements IAuthService {
     if (!user.isVerified) throw new Error(ResponseMessages.EMAIL_NOT_VERIFIED);
     const access = this._jwtProvider.signAccess({ sub: user._id!.toString(), isAdmin: !!user.isAdmin });
     const refresh = this._jwtProvider.signRefresh({ sub: user._id!.toString() });
-    return { user, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
+    const userWithFeatures = await this._attachFeatures(user);
+    return { user: userWithFeatures, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
   }
 
   async adminLogin(email: string, password: string) {
@@ -45,7 +62,8 @@ export class AuthService implements IAuthService {
 
     const access = this._jwtProvider.signAccess({ sub: user._id!.toString(), isAdmin: !!user.isAdmin });
     const refresh = this._jwtProvider.signRefresh({ sub: user._id!.toString() });
-    return { user, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
+    const userWithFeatures = await this._attachFeatures(user);
+    return { user: userWithFeatures, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
   }
 
   async register(username: string, email: string, password: string) {
@@ -91,7 +109,8 @@ export class AuthService implements IAuthService {
       await this._userRepo.update(user._id!.toString(), { isVerified: true });
       const access = this._jwtProvider.signAccess({ sub: user._id!.toString(), isAdmin: !!user.isAdmin });
       const refresh = this._jwtProvider.signRefresh({ sub: user._id!.toString() });
-      return { ok: true, user, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
+      const userWithFeatures = await this._attachFeatures(user);
+      return { ok: true, user: userWithFeatures, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
     }
     return { ok: true };
   }
@@ -133,6 +152,6 @@ export class AuthService implements IAuthService {
     const user = await this._userRepo.getById(userId);
     if (!user) throw new Error(ResponseMessages.UNAUTHORIZED);
     if (user.isBanned) throw new Error(ResponseMessages.USER_BANNED);
-    return user;
+    return await this._attachFeatures(user);
   }
 }

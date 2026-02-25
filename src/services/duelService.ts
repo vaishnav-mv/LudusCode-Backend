@@ -1,5 +1,5 @@
 import { singleton, inject } from 'tsyringe'
-import { IDuelRepository, IProblemRepository, IUserRepository, IWalletRepository } from '../interfaces/repositories'
+import { IDuelRepository, IProblemRepository, IUserRepository, IWalletRepository, ISubscriptionRepository } from '../interfaces/repositories'
 import { IDuelService } from '../interfaces/services'
 import { Duel, DuelStatus, Difficulty, SubmissionStatus, User, SubmissionResult } from '../types'
 import { createHash } from 'crypto'
@@ -13,7 +13,37 @@ export class DuelService implements IDuelService {
     @inject("IProblemRepository") private _problems: IProblemRepository,
     @inject("IUserRepository") private _users: IUserRepository,
     @inject("IWalletRepository") private _wallets: IWalletRepository,
+    @inject("ISubscriptionRepository") private _subscriptions: ISubscriptionRepository,
   ) { }
+
+  private async _checkDuelLimit(userId: string): Promise<void> {
+    const user = await this._users.getById(userId);
+    if (!user) return;
+    if (user.isAdmin) return; // Admins bypass limits
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const duelsToday = await this._duels.countRecentDuels(userId, today);
+
+    let maxDuels = 2; // Default free tier limit
+    if (user.currentPlanId) {
+      const planIdStr = typeof user.currentPlanId === 'object' ? (user.currentPlanId as object).toString() : user.currentPlanId;
+      const plan = await this._subscriptions.getPlanById(planIdStr as string);
+      if (plan && plan.maxDailyDuels !== undefined) {
+        maxDuels = plan.maxDailyDuels;
+      }
+    }
+
+    if (maxDuels === -1) return; // Unlimited matches
+
+    if (duelsToday >= maxDuels) {
+      if (!user.isPremium) {
+        throw new Error(`Daily duel limit (${maxDuels}) reached. Please upgrade to Pro or Max to play unlimited duels!`);
+      } else {
+        throw new Error(`Daily duel limit (${maxDuels}) reached. Please upgrade to the Max plan for unlimited duels!`);
+      }
+    }
+  }
 
   async create(difficulty: Difficulty, wager: number, player1Id: string, player2Id: string) {
     const allProblems = await this._problems.all();
@@ -31,6 +61,9 @@ export class DuelService implements IDuelService {
     const player2User = await this._users.getById(player2UserId);
 
     if (!player1User || !player2User) throw new Error(ResponseMessages.USERS_NOT_FOUND);
+
+    // DAILY LIMIT CHECK
+    await this._checkDuelLimit(player1UserId);
 
     if (wager > 0) {
       await this._wallets.add(player1UserId, -wager, 'Duel wager');
@@ -117,6 +150,10 @@ export class DuelService implements IDuelService {
     const player1UserId = playerId
     const player1User = await this._users.getById(player1UserId)
     if (!player1User) throw new Error(ResponseMessages.USER_NOT_FOUND)
+
+    // DAILY LIMIT CHECK
+    await this._checkDuelLimit(player1UserId);
+
     if (wager > 0) await this._wallets.add(player1UserId, -wager, 'Duel wager')
 
     const duelPayload = {
@@ -149,6 +186,10 @@ export class DuelService implements IDuelService {
 
     const player2User = await this._users.getById(player2UserId)
     if (!player2User) throw new Error(ResponseMessages.USER_NOT_FOUND)
+
+    // DAILY LIMIT CHECK
+    await this._checkDuelLimit(player2UserId);
+
     const wager = duel.wager || 0
     if (wager > 0) await this._wallets.add(player2UserId, -wager, 'Duel wager')
     // Atomic join
@@ -213,7 +254,14 @@ export class DuelService implements IDuelService {
     // B. Transfer Winnings
     if (winner && finishedDuel.wager && finishedDuel.wager > 0) {
       const winnerId = winner.id || winner._id?.toString();
-      if (winnerId) await this._wallets.add(winnerId, finishedDuel.wager * 2, 'Duel winnings');
+      if (winnerId) {
+        const pool = finishedDuel.wager * 2;
+        const rate = winner.isPremium ? 0.05 : 0.1;
+        const commissionAmount = pool * rate;
+        const payoutAmount = pool - commissionAmount;
+
+        await this._wallets.add(winnerId, payoutAmount, 'Duel winnings');
+      }
     }
 
     // C. ELO Calculation
@@ -314,8 +362,9 @@ export class DuelService implements IDuelService {
 
     const submissions = duel.submissions || []
     const cleanedSubmissions = submissions.filter((submission) => {
-      const sUserId = typeof submission.user === 'string' ? submission.user : (submission.user.id || submission.user._id?.toString());
-      return sUserId !== userId
+      const sUser = submission.user as { _id?: object, id?: string } | null;
+      const sUserId = sUser?._id?.toString() || (typeof sUser?.id === 'string' ? sUser.id : null) || String(submission.user);
+      return sUserId !== userId;
     })
 
     const pWarnings = p1Id === userId

@@ -194,16 +194,9 @@ export class DuelController {
 
     // Find the specific user's last unique submission
     const userSubmission = duel.submissions?.slice().reverse().find(s => {
-      let sUserId: string | undefined;
-      // Handle various forms of user ID (string, populated object, raw ObjectId)
-      if (typeof s.user === 'string') {
-        sUserId = s.user;
-      } else if (s.user && typeof s.user === 'object') {
-        if ('id' in s.user) sUserId = (s.user as unknown as { id: string }).id;
-        else if ('_id' in s.user) sUserId = String((s.user as unknown as { _id: unknown })._id);
-        else sUserId = s.user.toString(); // Raw ObjectId
-      }
-      return sUserId?.toString() === userId?.toString();
+      const sUser = s.user as { _id?: object, id?: string } | null;
+      const sUserId = sUser?._id?.toString() || (typeof sUser?.id === 'string' ? sUser.id : null) || String(s.user);
+      return sUserId === userId?.toString();
     });
 
 
@@ -228,7 +221,8 @@ export class DuelController {
 
 
 
-    const userCode = userSubmission?.userCode || duel.finalUserCode; // Fallback to finalUserCode
+    // Provide the user's last code, or empty if they didn't submit anything
+    const userCode = userSubmission?.userCode || '';
     const result = userSubmission ? {
       overallStatus: userSubmission.status,
       results: [],
@@ -285,7 +279,7 @@ export class DuelController {
       // I can change JudgeService to default language if not provided, OR fetch from problem.
 
       // Actually, JudgeService ALREADY fetches problem.
-      // I can update JudgeService to fallback to problem.solution.language if `language` is not passed?
+      // JudgeService uses problem.solutions[] to find the right language
 
       // For now, I will pass 'javascript' as default or 'javascript'.
       // Ideally, the request body should have `language`.

@@ -1,4 +1,4 @@
-import { User, Competition, CompetitionProblem, SubmissionResult, Duel, Wallet, Problem, PaginatedResponse, ChatMessage, StudySession, RazorpayOrder, JwtPayload, SubscriptionPlan, Transaction } from '../types'
+import { User, SubmissionResult, Duel, Wallet, Problem, PaginatedResponse, ChatMessage, StudySession, RazorpayOrder, JwtPayload, SubscriptionPlan, SubscriptionLog, Transaction } from '../types'
 import { SubmissionResponseDTO } from '../dto/response/submission.response.dto'
 import { UserResponseDTO } from '../dto/response/user.response.dto'
 import { GroupResponseDTO } from '../dto/response/group.response.dto'
@@ -73,14 +73,6 @@ export interface IGroupService {
   addMember(groupId: string, targetUserId: string, requesterId: string): Promise<boolean>
 }
 
-export interface ICompetitionService {
-  forGroup(groupId: string, params?: Record<string, unknown>): Promise<Competition[]>
-  create(data: { groupId: string, title: string, startTime: string, durationMinutes: number, problems: CompetitionProblem[] }): Promise<Competition>
-  detail(id: string, currentUserId?: string): Promise<Competition | undefined>
-  submit(competitionId: string, userId: string, cp: CompetitionProblem, code: string): Promise<SubmissionResult>
-  hint(competitionId: string, userId: string, problemId: string, code: string): Promise<string>
-}
-
 export interface IDuelService {
   create(difficulty: string, wager: number, player1Id: string, player2Id: string): Promise<Duel>
   detail(id: string): Promise<Duel | undefined>
@@ -107,7 +99,7 @@ export interface IWalletService {
   withdraw(userId: string, amount: number, vpa: string, name?: string, email?: string, phone?: string): Promise<boolean>
   wager(userId: string, amount: number, description: string): Promise<void>
   win(userId: string, amount: number, description: string): Promise<void>
-  getTransactions(userId: string, page: number, limit: number): Promise<{ transactions: Transaction[], total: number, page: number, totalPages: number }>
+  getTransactions(userId: string, page: number, limit: number, type?: string, startDate?: string, endDate?: string): Promise<{ transactions: Transaction[], total: number, page: number, totalPages: number }>
 }
 
 export interface IAdminService {
@@ -117,6 +109,8 @@ export interface IAdminService {
     totalWagered: number;
     totalCommissions: number;
     totalDuelsWithWagers: number;
+    subscriptionRevenue: number;
+    totalPlatformRevenue: number;
     commissionsByDay: { date: string, amount: number }[];
     recentCommissions: { duelId: string; problemTitle: string; winnerName: string; wager: number; commission: number; timestamp: number }[];
     total: number;
@@ -147,6 +141,9 @@ export interface IAdminService {
   grantSubscription(username: string, planId: string): Promise<boolean>
   cancelSubscription(userId: string): Promise<boolean>
   searchUsers(query: string): Promise<User[]>
+  getUserWallet(userId: string): Promise<{ balance: number, currency: string }>
+  getAllTransactions(page: number, limit: number): Promise<{ transactions: Transaction[], total: number, page: number, totalPages: number }>
+  adjustUserBalance(userId: string, amount: number, description: string): Promise<boolean>
 }
 
 
@@ -182,10 +179,10 @@ export interface IAiService {
   hint(problemId: string, userCode: string): Promise<string>
   codeReview(problemId: string, userCode: string): Promise<string>
   performance(userId: string): Promise<string>
-
-  explainConcept(concept: string): Promise<string>
-  summarizeDiscussion(messages: string[]): Promise<string>
   generateProblem(difficulty: string, topic: string): Promise<Problem>
+  complexity(userCode: string): Promise<string>
+  optimize(problemId: string, userCode: string): Promise<string>
+  edgeCases(problemId: string, userCode: string): Promise<string>
 }
 
 export interface IStudySessionService {
@@ -208,4 +205,7 @@ export interface ISubmissionService {
 export interface ISubscriptionService {
   getPlans(): Promise<SubscriptionPlan[]>
   subscribe(userId: string, planId: string): Promise<{ success: boolean, action?: string, expiry?: Date, message?: string }>
+  cancel(userId: string): Promise<{ success: boolean, message?: string }>
+  resume(userId: string): Promise<{ success: boolean, message?: string }>
+  history(userId: string, page: number, limit: number): Promise<{ logs: SubscriptionLog[], total: number, page: number, totalPages: number }>
 }

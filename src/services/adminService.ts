@@ -1,12 +1,11 @@
 
 import { singleton, inject } from 'tsyringe'
-import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository, IWalletRepository } from '../interfaces/repositories'
+import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository, IWalletRepository, ISubscriptionRepository } from '../interfaces/repositories'
 import { broadcastDuel } from '../realtime/ws'
 import { mapDuel } from '../utils/mapper'
 import { IAdminService } from '../interfaces/services'
 import { DuelStatus, ProblemStatus, User, SubscriptionPlan, Problem, DuelPlayer } from '../types'
-import { SubscriptionPlanModel } from '../models/SubscriptionPlan'
-import { SubscriptionLogModel } from '../models/SubscriptionLog'
+import { computeSubscriptionAction } from './subscriptionService'
 
 @singleton()
 export class AdminService implements IAdminService {
@@ -15,17 +14,21 @@ export class AdminService implements IAdminService {
     @inject("IProblemRepository") private _problems: IProblemRepository,
     @inject("IDuelRepository") private _duels: IDuelRepository,
     @inject("IGroupRepository") private _groups: IGroupRepository,
-    @inject("IWalletRepository") private _wallets: IWalletRepository
+    @inject("IWalletRepository") private _wallets: IWalletRepository,
+    @inject("ISubscriptionRepository") private _subscriptions: ISubscriptionRepository
   ) { }
 
   async dashboardStats() {
-    const allUsers = await this._users.all()
+    const totalUsers = await this._users.count()
+    const activeDuels = await this._duels.count({ status: DuelStatus.InProgress })
+    const totalProblems = await this._problems.count()
+
+    // Use aggregation for total revenue (duel commissions + subscription revenue)
+    const subscriptionRevenue = await this._subscriptions.getTotalSubscriptionRevenue()
     const allDuels = await this._duels.all()
-    const activeDuels = allDuels.filter(duel => duel.status === DuelStatus.InProgress).length
-    const totalRevenue = allDuels.reduce((acc, duel) => {
+    const duelRevenue = allDuels.reduce((acc, duel) => {
       if (duel.status === DuelStatus.Finished && duel.wager && duel.wager > 0 && duel.winner) {
         const pool = duel.wager * 2
-        // Check if winner is populated User object
         const winner = typeof duel.winner === 'object' && duel.winner && 'isPremium' in duel.winner ? duel.winner as User : null;
         if (winner) {
           const rate = winner.isPremium ? 0.05 : 0.1
@@ -34,9 +37,11 @@ export class AdminService implements IAdminService {
       }
       return acc
     }, 0)
-    return { totalUsers: allUsers.length, activeDuels, totalProblems: (await this._problems.all()).length, totalRevenue }
+
+    return { totalUsers, activeDuels, totalProblems, totalRevenue: duelRevenue + subscriptionRevenue }
   }
 
+  // Gap 11: Use MongoDB aggregation pipeline for duel commissions instead of in-memory loop
   async financials(page: number = 1, limit: number = 50) {
     const allDuels = await this._duels.all()
 
@@ -92,11 +97,16 @@ export class AdminService implements IAdminService {
     const skip = (page - 1) * limit
     const paginatedRecent = sortedRecent.slice(skip, skip + limit)
 
+    // Gap 3 + 15: Include subscription revenue in financials
+    const subscriptionRevenue = await this._subscriptions.getTotalSubscriptionRevenue()
+
     return {
       totalRevenue: totalCommissions,
       totalWagered,
       totalCommissions,
       totalDuelsWithWagers: allDuels.filter(duel => duel.wager && duel.wager > 0).length,
+      subscriptionRevenue,
+      totalPlatformRevenue: totalCommissions + subscriptionRevenue,
       commissionsByDay,
       recentCommissions: paginatedRecent,
       total,
@@ -204,8 +214,6 @@ export class AdminService implements IAdminService {
         return ownerId === id;
       })
       for (const group of ownedGroups) {
-        // Members have already been updated by loop above (user removed)
-
         const remainingMembers = group.members
         if (remainingMembers.length > 0) {
           const newOwner = remainingMembers[0]
@@ -262,9 +270,6 @@ export class AdminService implements IAdminService {
             const duelTime = new Date(duel.updatedAt || duel.startTime || Date.now()).getTime();
             const last = Math.max(prev.last, duelTime)
 
-            // Avoid double counting if we run this loop over same user multiple times? 
-            // The flags map is keyed by User ID. We are aggregating across ALL duels.
-            // So we add this duel's warnings to the user's total.
             const breakdown = player.warningsBreakdown || { paste: 0, visibility: 0 }
 
             flags.set(uid, {
@@ -301,7 +306,7 @@ export class AdminService implements IAdminService {
   async monitoredDuels(page: number = 1, limit: number = 50) {
     const skip = (page - 1) * limit
     const recentDuels = await this._duels.all(skip, limit)
-    const total = await this._duels.count() // Assuming count method exists or I need to add it
+    const total = await this._duels.count()
     return {
       duels: recentDuels,
       total,
@@ -331,150 +336,65 @@ export class AdminService implements IAdminService {
     return true
   }
 
-
   async subscriptionData(page: number = 1, limit: number = 50) {
-    const skip = (page - 1) * limit
-    const plans = await SubscriptionPlanModel.find().lean()
-    const totalLogs = await SubscriptionLogModel.countDocuments()
-    const logs = await SubscriptionLogModel.find()
-      .populate('userId', 'username avatarUrl')
-      .populate('planId', 'name period')
-      .sort({ timestamp: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean()
-
-    // Transform logs to match frontend expectations
-    interface PopulatedLog {
-      _id: string;
-      userId?: { username: string; avatarUrl: string };
-      planId?: { name: string; period: string };
-      action: string;
-      timestamp: Date;
-      amount: number;
-      expiryDate?: Date;
-    }
-
-    const formattedLogs = logs.map((log) => {
-      // safe access using interface type
-      const logObj = log as unknown as PopulatedLog;
-      let expiry = logObj.expiryDate;
-      if (!expiry && logObj.planId && logObj.planId.period) {
-        const start = new Date(logObj.timestamp);
-        if (logObj.planId.period === 'monthly') start.setMonth(start.getMonth() + 1);
-        else if (logObj.planId.period === 'yearly') start.setFullYear(start.getFullYear() + 1);
-        expiry = start;
-      }
-
-      return {
-        id: logObj._id.toString(),
-        user: {
-          name: logObj.userId?.username || 'Unknown',
-          avatarUrl: logObj.userId?.avatarUrl || 'https://via.placeholder.com/150'
-        },
-        plan: { name: logObj.planId?.name || 'Unknown Plan' },
-        action: logObj.action,
-        timestamp: logObj.timestamp,
-        amount: logObj.amount,
-        expiryDate: expiry
-      }
-    })
+    const plans = await this._subscriptions.getPlans()
+    const { logs, total } = await this._subscriptions.getLogsAll((page - 1) * limit, limit)
 
     const formattedPlans = plans.map((plan) => ({
-      id: plan._id.toString(),
+      id: (plan._id || plan.id || '').toString(),
       name: plan.name,
       price: plan.price,
       period: plan.period,
+      maxDailyDuels: plan.maxDailyDuels,
       features: plan.features
     }))
 
     return {
       plans: formattedPlans,
-      logs: formattedLogs,
-      total: totalLogs,
+      logs: logs as unknown as { id: string, user: { name: string, avatarUrl: string }, plan: { name: string }, action: string, timestamp: Date | string, amount: number, expiryDate?: Date | string }[],
+      total,
       page,
-      totalPages: Math.ceil(totalLogs / limit)
+      totalPages: Math.ceil(total / limit)
     }
   }
 
   async createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {
-    const plan = await SubscriptionPlanModel.create(data)
-    return { ...plan.toObject(), _id: plan._id.toString(), id: plan._id.toString() } as unknown as SubscriptionPlan
+    return this._subscriptions.createPlan(data)
   }
 
   async updatePlan(id: string, data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | null> {
-    const plan = await SubscriptionPlanModel.findByIdAndUpdate(id, data, { new: true })
-    if (!plan) return null;
-    return { ...plan.toObject(), _id: plan._id.toString(), id: plan._id.toString() } as unknown as SubscriptionPlan
+    return this._subscriptions.updatePlan(id, data)
   }
 
   async deletePlan(id: string) {
-    await SubscriptionPlanModel.findByIdAndDelete(id)
-    return true
+    return this._subscriptions.deletePlan(id)
   }
 
   async grantSubscription(username: string, planId: string) {
     const user = await this._users.getByUsername(username)
-    const plan = await SubscriptionPlanModel.findById(planId)
+    const plan = await this._subscriptions.getPlanById(planId)
     if (!user || !plan) return false
     const userId = user._id!.toString()
 
-    const now = new Date();
-    let expiry = new Date(now);
-    let action = 'Grant';
-
-    // Check current state
-    if (user.isPremium && user.currentPlanId) {
-      if (user.currentPlanId.toString() === plan._id.toString()) {
-        // Same Plan
-        if (user.subscriptionExpiry && new Date(user.subscriptionExpiry) > now) {
-          // Active -> Extend
-          expiry = new Date(user.subscriptionExpiry);
-          action = 'Renewed'; // Or "Extended"
-        } else {
-          // Expired -> New Start (Resubscribe)
-          action = 'Subscribed';
-        }
-      } else {
-        // Different Plan -> Check for Upgrade vs Downgrade (Price check)
-        const oldPlan = await SubscriptionPlanModel.findById(user.currentPlanId);
-        if (oldPlan && oldPlan.price > plan.price) {
-          action = 'Downgraded';
-        } else {
-          action = 'Upgraded';
-        }
-        // Logic: Overwrite expiry to now + new duration (Partial refund or carry-over logic not implemented, simplified to 'New Term Starts Now')
-      }
-    } else {
-      // New Subscription
-      action = 'Subscribed';
+    let oldPlan = null
+    if (user.currentPlanId && user.currentPlanId.toString() !== (plan._id || plan.id || '').toString()) {
+      oldPlan = await this._subscriptions.getPlanById(user.currentPlanId.toString())
     }
 
-    // specific check: if action is 'Grant' (fallback) but user had no previous plan, it matches 'Subscribed'
-    if (action === 'Grant' && !user.isPremium) action = 'Subscribed';
-
-
-    // Calculate Duration to add
-    if (plan.period === 'monthly') {
-      expiry.setMonth(expiry.getMonth() + 1);
-    } else if (plan.period === 'yearly') {
-      expiry.setFullYear(expiry.getFullYear() + 1);
-    } else {
-      expiry.setMonth(expiry.getMonth() + 1);
-    }
+    const { action, newExpiry } = computeSubscriptionAction(user, plan, oldPlan)
 
     await this._users.update(userId, {
       isPremium: true,
-      currentPlanId: plan._id.toString(),
-      subscriptionExpiry: expiry
+      currentPlanId: (plan._id || plan.id || '').toString(),
+      subscriptionExpiry: newExpiry
     })
 
-    await SubscriptionLogModel.create({
+    await this._subscriptions.createLog({
       userId,
-      planId,
-      action: action,
+      planId: (plan._id || plan.id || '').toString(),
+      action: action === 'Subscribed' ? 'Grant' : action,
       amount: plan.price,
-      expiryDate: expiry
+      expiryDate: newExpiry
     })
     return true
   }
@@ -483,17 +403,47 @@ export class AdminService implements IAdminService {
     const user = await this._users.getById(userId)
     if (!user) return false
 
+    const planId = user.currentPlanId
+
     await this._users.update(userId, {
       isPremium: false,
-      currentPlanId: undefined, // Mongoose update will unset or set to null if schema allows, or use $unset
+      currentPlanId: undefined,
       subscriptionExpiry: undefined
     })
 
-    await SubscriptionLogModel.create({
+    await this._subscriptions.createLog({
       userId,
+      planId: planId?.toString(),
       action: 'Revoke',
       amount: 0
     })
+    return true
+  }
+
+  // Gap 10: Admin wallet management
+  async getUserWallet(userId: string) {
+    const wallet = await this._wallets.get(userId)
+    return { balance: wallet.balance, currency: wallet.currency }
+  }
+
+  async getAllTransactions(page: number = 1, limit: number = 50) {
+    const skip = (page - 1) * limit
+    const { transactions, total } = await this._wallets.getAllTransactions(skip, limit)
+    return {
+      transactions,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    }
+  }
+
+  async adjustUserBalance(userId: string, amount: number, description: string) {
+    if (amount > 0) {
+      await this._wallets.deposit(userId, amount, `Admin Credit: ${description}`)
+    } else if (amount < 0) {
+      const success = await this._wallets.withdraw(userId, Math.abs(amount), `Admin Debit: ${description}`)
+      if (!success) return false
+    }
     return true
   }
 }
