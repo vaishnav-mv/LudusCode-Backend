@@ -105,11 +105,10 @@ export interface IWalletService {
 export interface IAdminService {
   dashboardStats(): Promise<{ totalUsers: number, activeDuels: number, totalProblems: number, totalRevenue: number }>
   financials(page?: number, limit?: number): Promise<{
-    totalRevenue: number;
-    totalWagered: number;
-    totalCommissions: number;
+    totalDuelWagered: number;
+    totalDuelCommissions: number;
     totalDuelsWithWagers: number;
-    subscriptionRevenue: number;
+    totalSubscriptionRevenue: number;
     totalPlatformRevenue: number;
     commissionsByDay: { date: string, amount: number }[];
     recentCommissions: { duelId: string; problemTitle: string; winnerName: string; wager: number; commission: number; timestamp: number }[];
@@ -142,8 +141,10 @@ export interface IAdminService {
   cancelSubscription(userId: string): Promise<boolean>
   searchUsers(query: string): Promise<User[]>
   getUserWallet(userId: string): Promise<{ balance: number, currency: string }>
-  getAllTransactions(page: number, limit: number): Promise<{ transactions: Transaction[], total: number, page: number, totalPages: number }>
+  getAllTransactions(page: number, limit: number, options?: { status?: string, type?: string, sort?: string, query?: string }): Promise<{ transactions: Transaction[], total: number, page: number, totalPages: number }>
   adjustUserBalance(userId: string, amount: number, description: string): Promise<boolean>
+  approvePayout(transactionId: string): Promise<boolean>
+  rejectPayout(transactionId: string, reason?: string): Promise<boolean>
 }
 
 

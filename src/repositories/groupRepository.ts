@@ -67,4 +67,30 @@ export class GroupRepository extends BaseRepository<Group> implements IGroupRepo
 
     return this.mapDoc(group)
   }
+
+  async removeMemberFromAll(userId: string): Promise<void> {
+    await this.model.updateMany(
+      { $or: [{ members: userId }, { pendingMembers: userId }] },
+      { $pull: { members: userId, pendingMembers: userId } }
+    )
+  }
+
+  async transferOrDeleteOwnedGroups(userId: string): Promise<void> {
+    const ownedGroups = await this.model.find({ owner: userId }).lean()
+
+    for (const group of ownedGroups) {
+      if (group.members && group.members.length > 0) {
+        // Filter out the owner if they are somehow still in the members array
+        const remainingMembers = group.members.filter(m => m.toString() !== userId)
+        if (remainingMembers.length > 0) {
+          const newOwnerId = remainingMembers[0]
+          await this.model.updateOne({ _id: group._id }, { $set: { owner: newOwnerId } })
+        } else {
+          await this.model.deleteOne({ _id: group._id })
+        }
+      } else {
+        await this.model.deleteOne({ _id: group._id })
+      }
+    }
+  }
 }

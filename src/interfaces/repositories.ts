@@ -20,6 +20,8 @@ export interface IUserRepository extends IBaseRepository<User> {
 
 export interface IGroupRepository extends IBaseRepository<Group> {
     findByName(name: string): Promise<Group | undefined>;
+    removeMemberFromAll(userId: string): Promise<void>;
+    transferOrDeleteOwnedGroups(userId: string): Promise<void>;
 }
 
 export interface IProblemRepository extends IBaseRepository<Problem> {
@@ -31,6 +33,10 @@ export interface IDuelRepository extends IBaseRepository<Duel> {
     attemptFinish(id: string, winner: User | string | null, finalStatus: string): Promise<Duel | null>;
     attemptCancel(id: string): Promise<Duel | null>;
     countRecentDuels(userId: string, since: Date): Promise<number>;
+    getCommissionStats(): Promise<{ totalWagered: number, totalCommissions: number, totalDuelsWithWagers: number }>;
+    getRecentCommissions(page: number, limit: number): Promise<{ recent: { duelId: string, problemTitle: string, winnerName: string, wager: number, commission: number, timestamp: number }[], total: number }>;
+    getCommissionsByDay(): Promise<{ date: string, amount: number }[]>;
+    getFlaggedActivities(page: number, limit: number): Promise<{ data: any[], total: number }>;
 }
 
 export interface ISubmissionRepository {
@@ -47,10 +53,12 @@ export interface IStudySessionRepository extends IBaseRepository<StudySession> {
 export interface IWalletRepository {
     get(userId: string): Promise<Wallet>;
     deposit(userId: string, amount: number, description: string): Promise<void>;
-    withdraw(userId: string, amount: number, description: string): Promise<boolean>;
+    withdraw(userId: string, amount: number, description: string, type?: string, status?: string): Promise<boolean>;
     add(userId: string, amount: number, description: string): Promise<void>;
     getTransactions(userId: string, skip: number, limit: number, type?: string, startDate?: string, endDate?: string): Promise<{ transactions: Transaction[], total: number }>;
-    getAllTransactions(skip: number, limit: number): Promise<{ transactions: Transaction[], total: number }>;
+    getAllTransactions(skip: number, limit: number, options?: { status?: string, type?: string, sort?: string, query?: string }): Promise<{ transactions: Transaction[], total: number }>;
+    updateTransactionStatus(id: string, status: string): Promise<boolean>;
+    getTransactionById(id: string): Promise<Transaction | null>;
 }
 
 export interface ISubscriptionRepository {

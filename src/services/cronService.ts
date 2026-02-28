@@ -1,7 +1,7 @@
 import { singleton, inject } from 'tsyringe';
 import * as cron from 'node-cron';
 import { IUserRepository, IWalletRepository, ISubscriptionRepository } from '../interfaces/repositories';
-import { SubscriptionLog, User } from '../types';
+import { SubscriptionLog, User, TransactionType } from '../types';
 
 @singleton()
 export class CronService {
@@ -63,7 +63,7 @@ export class CronService {
 
         try {
             // Deduct funds
-            const success = await this._wallet.withdraw(userId, plan.price, `Auto-Renew Subscription: ${plan.name}`);
+            const success = await this._wallet.withdraw(userId, plan.price, `Auto-Renew Subscription: ${plan.name}`, TransactionType.Subscription, 'Completed');
             if (!success) {
                 await this.terminateSubscription(userId, planId, 'Expired (Payment Failed)');
                 return;

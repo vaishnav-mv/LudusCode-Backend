@@ -1,7 +1,7 @@
 import { singleton, inject } from 'tsyringe'
 import { ISubscriptionService } from '../interfaces/services'
 import { ISubscriptionRepository, IWalletRepository, IUserRepository } from '../interfaces/repositories'
-import { SubscriptionPlan, SubscriptionLog, User } from '../types'
+import { SubscriptionPlan, SubscriptionLog, User, TransactionType } from '../types'
 
 /**
  * Determines the subscription action (new, renew, upgrade, downgrade)
@@ -110,7 +110,7 @@ export class SubscriptionService implements ISubscriptionService {
                     message: `Insufficient wallet balance. Need ₹${effectiveCost.toFixed(2)}, have ₹${wallet.balance.toFixed(2)}. Please add funds first.`
                 }
             }
-            const deducted = await this._wallet.withdraw(userId, effectiveCost, `Subscription: ${plan.name} (${action})`)
+            const deducted = await this._wallet.withdraw(userId, effectiveCost, `Subscription: ${plan.name} (${action})`, TransactionType.Subscription, 'Completed')
             if (!deducted) {
                 return { success: false, message: 'Payment failed. Insufficient funds.' }
             }

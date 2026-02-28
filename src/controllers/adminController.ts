@@ -283,7 +283,11 @@ export class AdminController {
   getAllTransactions = async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 50
-    const result = await this._service.getAllTransactions(page, limit)
+    const status = req.query.status as string | undefined
+    const type = req.query.type as string | undefined
+    const sort = req.query.sort as string | undefined
+    const query = req.query.query as string | undefined
+    const result = await this._service.getAllTransactions(page, limit, { status, type, sort, query })
     return ApiResponse.success(res, result)
   }
 
@@ -299,6 +303,31 @@ export class AdminController {
       return ApiResponse.error(res, 'Amount and description are required', HttpStatus.BAD_REQUEST)
     }
     const ok = await this._service.adjustUserBalance(req.params.userId, amount, description)
+    return ApiResponse.success(res, { ok })
+  }
+
+  /**
+   * @desc    Approve a pending payout
+   * @route   POST /api/admin/payouts/:id/approve
+   * @req     params: { id }
+   * @res     { ok: boolean }
+   */
+  approvePayout = async (req: Request, res: Response) => {
+    const ok = await this._service.approvePayout(req.params.id)
+    if (!ok) return ApiResponse.error(res, "Payout not found or not pending", HttpStatus.BAD_REQUEST)
+    return ApiResponse.success(res, { ok })
+  }
+
+  /**
+   * @desc    Reject a pending payout
+   * @route   POST /api/admin/payouts/:id/reject
+   * @req     params: { id }, body: { reason }
+   * @res     { ok: boolean }
+   */
+  rejectPayout = async (req: Request, res: Response) => {
+    const { reason } = req.body
+    const ok = await this._service.rejectPayout(req.params.id, reason)
+    if (!ok) return ApiResponse.error(res, "Payout not found or not pending", HttpStatus.BAD_REQUEST)
     return ApiResponse.success(res, { ok })
   }
 }

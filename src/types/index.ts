@@ -189,6 +189,8 @@ export interface SubmissionResult {
 export interface Transaction {
     id: string; // Sample HAS 'id' (tx-...) and '_id'
     _id?: string;
+    userId?: string | User;
+    walletId?: string;
     type: TransactionType;
     status: TransactionStatus;
     amount: number;

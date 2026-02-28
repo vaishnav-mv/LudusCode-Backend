@@ -4,7 +4,7 @@ import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository,
 import { broadcastDuel } from '../realtime/ws'
 import { mapDuel } from '../utils/mapper'
 import { IAdminService } from '../interfaces/services'
-import { DuelStatus, ProblemStatus, User, SubscriptionPlan, Problem, DuelPlayer } from '../types'
+import { DuelStatus, ProblemStatus, User, SubscriptionPlan, Problem, DuelPlayer, TransactionType } from '../types'
 import { computeSubscriptionAction } from './subscriptionService'
 
 @singleton()
@@ -25,93 +25,46 @@ export class AdminService implements IAdminService {
 
     // Use aggregation for total revenue (duel commissions + subscription revenue)
     const subscriptionRevenue = await this._subscriptions.getTotalSubscriptionRevenue()
-    const allDuels = await this._duels.all()
-    const duelRevenue = allDuels.reduce((acc, duel) => {
-      if (duel.status === DuelStatus.Finished && duel.wager && duel.wager > 0 && duel.winner) {
-        const pool = duel.wager * 2
-        const winner = typeof duel.winner === 'object' && duel.winner && 'isPremium' in duel.winner ? duel.winner as User : null;
-        if (winner) {
-          const rate = winner.isPremium ? 0.05 : 0.1
-          return acc + pool * rate
-        }
-      }
-      return acc
-    }, 0)
+    const commissionStats = await this._duels.getCommissionStats()
+    const duelRevenue = commissionStats.totalCommissions || 0
 
-    return { totalUsers, activeDuels, totalProblems, totalRevenue: duelRevenue + subscriptionRevenue }
+    const pendingProblems = await this._problems.count({ status: ProblemStatus.Pending })
+    const pendingPayoutsResponse = await this._wallets.getAllTransactions(0, 1, { status: 'Pending', type: TransactionType.Withdrawal })
+    const pendingPayouts = pendingPayoutsResponse.total
+    const flaggedActivitiesResponse = await this._duels.getFlaggedActivities(1, 1)
+    const pendingAntiCheat = flaggedActivitiesResponse.total
+
+    return {
+      totalUsers,
+      activeDuels,
+      totalProblems,
+      totalRevenue: duelRevenue + subscriptionRevenue,
+      pendingProblems,
+      pendingPayouts,
+      pendingAntiCheat
+    }
   }
 
-  // Gap 11: Use MongoDB aggregation pipeline for duel commissions instead of in-memory loop
+  // Gap 11: Fixed - Used MongoDB aggregation pipeline for duel commissions
   async financials(page: number = 1, limit: number = 50) {
-    const allDuels = await this._duels.all()
-
-    interface FinancialRecord {
-      duelId: string;
-      problemTitle: string;
-      winnerName: string;
-      wager: number;
-      commission: number;
-      timestamp: number;
-    }
-
-    const recent: FinancialRecord[] = []
-    let totalWagered = 0
-    let totalCommissions = 0
-    const map = new Map<string, number>()
-
-    for (const duel of allDuels) {
-      if (duel.status === DuelStatus.Finished && duel.wager && duel.wager > 0 && duel.winner) {
-        totalWagered += duel.wager * 2
-        const pool = duel.wager * 2
-        const winner = typeof duel.winner === 'object' && duel.winner && 'username' in duel.winner ? duel.winner as User : null;
-
-        if (winner) {
-          const rate = winner.isPremium ? 0.05 : 0.1
-          const commission = pool * rate
-          totalCommissions += commission
-
-          const problem = typeof duel.problem === 'object' && duel.problem ? duel.problem as Problem : null;
-          const problemTitle = problem ? problem.title : 'Unknown';
-
-          recent.push({
-            duelId: duel.id || duel._id?.toString() || '',
-            problemTitle: problemTitle,
-            winnerName: winner.username || 'Unknown',
-            wager: duel.wager,
-            commission,
-            timestamp: typeof duel.startTime === 'number' ? duel.startTime : new Date(duel.startTime).getTime()
-          })
-          const date = new Date(duel.startTime || Date.now()).toISOString().split('T')[0]
-          map.set(date, (map.get(date) || 0) + commission)
-        }
-      }
-    }
-
-    const commissionsByDay = Array.from(map.entries())
-      .map(([date, amount]) => ({ date, amount }))
-      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-
-    // Memory Pagination
-    const sortedRecent = recent.sort((a, b) => b.timestamp - a.timestamp)
-    const total = sortedRecent.length
-    const skip = (page - 1) * limit
-    const paginatedRecent = sortedRecent.slice(skip, skip + limit)
+    const commissionStats = await this._duels.getCommissionStats()
+    const commissionsByDay = await this._duels.getCommissionsByDay()
+    const recentPagination = await this._duels.getRecentCommissions(page, limit)
 
     // Gap 3 + 15: Include subscription revenue in financials
     const subscriptionRevenue = await this._subscriptions.getTotalSubscriptionRevenue()
 
     return {
-      totalRevenue: totalCommissions,
-      totalWagered,
-      totalCommissions,
-      totalDuelsWithWagers: allDuels.filter(duel => duel.wager && duel.wager > 0).length,
-      subscriptionRevenue,
-      totalPlatformRevenue: totalCommissions + subscriptionRevenue,
+      totalDuelWagered: commissionStats.totalWagered,
+      totalDuelCommissions: commissionStats.totalCommissions,
+      totalDuelsWithWagers: commissionStats.totalDuelsWithWagers,
+      totalSubscriptionRevenue: subscriptionRevenue,
+      totalPlatformRevenue: commissionStats.totalCommissions + subscriptionRevenue,
       commissionsByDay,
-      recentCommissions: paginatedRecent,
-      total,
+      recentCommissions: recentPagination.recent,
+      total: recentPagination.total,
       page,
-      totalPages: Math.ceil(total / limit)
+      totalPages: Math.ceil(recentPagination.total / limit)
     }
   }
 
@@ -179,51 +132,8 @@ export class AdminService implements IAdminService {
   async banUser(id: string) {
     const user = await this._users.update(id, { isBanned: true })
     if (user) {
-      // Remove from all groups
-      const allGroups = await this._groups.all()
-      for (const group of allGroups) {
-        const memberIndex = (group.members || []).findIndex(member => {
-          if (typeof member === 'string') return member === id;
-          return member._id?.toString() === id || member.id === id;
-        });
-        const pendingIndex = (group.pendingMembers || []).findIndex(member => {
-          if (typeof member === 'string') return member === id;
-          return member._id?.toString() === id || member.id === id;
-        });
-
-        let changed = false
-        if (memberIndex !== -1) {
-          group.members.splice(memberIndex, 1)
-          changed = true
-        }
-        if (pendingIndex !== -1) {
-          (group.pendingMembers || []).splice(pendingIndex, 1)
-          changed = true
-        }
-
-        if (changed) {
-          const members = group.members.map(member => typeof member === 'string' ? member : member._id?.toString() || member.id!).filter(Boolean)
-          const pendingMembers = (group.pendingMembers || []).map(member => typeof member === 'string' ? member : member._id?.toString() || member.id!).filter(Boolean)
-          await this._groups.update(group._id as string, { members, pendingMembers })
-        }
-      }
-
-      // Handle ownership transfer or group deletion for groups owned by banned user
-      const ownedGroups = allGroups.filter(group => {
-        const ownerId = typeof group.owner === 'string' ? group.owner : group.owner._id?.toString() || group.owner.id;
-        return ownerId === id;
-      })
-      for (const group of ownedGroups) {
-        const remainingMembers = group.members
-        if (remainingMembers.length > 0) {
-          const newOwner = remainingMembers[0]
-          const newOwnerId = typeof newOwner === 'string' ? newOwner : newOwner._id?.toString() || newOwner.id
-
-          await this._groups.update(group._id as string, { owner: newOwnerId })
-        } else {
-          await this._groups.delete(group._id as string)
-        }
-      }
+      await this._groups.removeMemberFromAll(id)
+      await this._groups.transferOrDeleteOwnedGroups(id)
     }
     return !!user
   }
@@ -238,65 +148,10 @@ export class AdminService implements IAdminService {
   }
 
   async flaggedActivities(page: number = 1, limit: number = 50) {
-    const duels = await this._duels.all()
-    const flags = new Map<string, { count: number; paste: number; visibility: number; last: number }>()
-    for (const duel of duels) {
-      const submissions = duel.submissions || []
-      if (submissions.length >= 2) {
-        const submission1 = submissions[0]
-        const submission2 = submissions[1]
-        const close = Math.abs((submission1.submittedAt || 0) - (submission2.submittedAt || 0)) <= 120000
-        const copied = submission1.codeHash && submission2.codeHash && submission1.codeHash === submission2.codeHash
-        if (copied && close) {
-          const u1 = submission1.user;
-          const u2 = submission2.user;
-          const uid1 = typeof u1 === 'string' ? u1 : u1?._id?.toString() || u1?.id;
-          const uid2 = typeof u2 === 'string' ? u2 : u2?._id?.toString() || u2?.id;
-          const uids = [uid1, uid2].filter(Boolean) as string[]
-          for (const uid of uids) {
-            const prev = flags.get(uid) || { count: 0, paste: 0, visibility: 0, last: 0 }
-            const last = Math.max(prev.last, (submission1.submittedAt || 0), (submission2.submittedAt || 0))
-            flags.set(uid, { count: prev.count + 1, paste: prev.paste + 1, visibility: prev.visibility, last })
-          }
-        }
-      }
-
-      // Check DB warnings (Real-time enforcement)
-      const checkPlayer = (player: DuelPlayer) => {
-        if (player.user && player.warnings > 0) {
-          const uid = typeof player.user === 'string' ? player.user : player.user.id || player.user._id?.toString();
-          if (uid) {
-            const prev = flags.get(uid) || { count: 0, paste: 0, visibility: 0, last: 0 }
-            const duelTime = new Date(duel.updatedAt || duel.startTime || Date.now()).getTime();
-            const last = Math.max(prev.last, duelTime)
-
-            const breakdown = player.warningsBreakdown || { paste: 0, visibility: 0 }
-
-            flags.set(uid, {
-              count: prev.count + player.warnings,
-              paste: prev.paste + (breakdown.paste || 0),
-              visibility: prev.visibility + (breakdown.visibility || 0),
-              last
-            })
-          }
-        }
-      }
-      checkPlayer(duel.player1);
-      checkPlayer(duel.player2);
-    }
-    const out: { _id?: string, user: User, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[] = []
-    for (const [uid, flagData] of flags.entries()) {
-      const user = await this._users.getById(uid)
-      if (user) out.push({ user: user, totalWarnings: flagData.count, lastOffense: new Date(flagData.last || Date.now()).toISOString(), breakdown: { paste: flagData.paste, visibility: flagData.visibility } })
-    }
-
-    // Memory Pagination
-    const total = out.length
-    const skip = (page - 1) * limit
-    const paginatedOut = out.slice(skip, skip + limit)
+    const { data, total } = await this._duels.getFlaggedActivities(page, limit)
 
     return {
-      data: paginatedOut,
+      data,
       total,
       page,
       totalPages: Math.ceil(total / limit)
@@ -428,9 +283,9 @@ export class AdminService implements IAdminService {
     return { balance: wallet.balance, currency: wallet.currency }
   }
 
-  async getAllTransactions(page: number = 1, limit: number = 50) {
+  async getAllTransactions(page: number = 1, limit: number = 50, options?: { status?: string, type?: string, sort?: string, query?: string }) {
     const skip = (page - 1) * limit
-    const { transactions, total } = await this._wallets.getAllTransactions(skip, limit)
+    const { transactions, total } = await this._wallets.getAllTransactions(skip, limit, options)
     return {
       transactions,
       total,
@@ -447,5 +302,34 @@ export class AdminService implements IAdminService {
       if (!success) return false
     }
     return true
+  }
+
+  async approvePayout(transactionId: string) {
+    const tx = await this._wallets.getTransactionById(transactionId)
+    if (!tx || tx.type !== TransactionType.Withdrawal || tx.status !== 'Pending') {
+      return false
+    }
+    return this._wallets.updateTransactionStatus(transactionId, 'Completed')
+  }
+
+  async rejectPayout(transactionId: string, reason?: string) {
+    const tx = await this._wallets.getTransactionById(transactionId)
+    if (!tx || tx.type !== TransactionType.Withdrawal || tx.status !== 'Pending') {
+      return false
+    }
+
+    const updated = await this._wallets.updateTransactionStatus(transactionId, 'Failed')
+    if (updated) {
+      const refundAmount = Math.abs(tx.amount)
+      let description = `Refund: Payout Rejected`
+      if (reason) description += ` (${reason})`
+
+      const uId = tx.userId as any;
+      const userIdStr = typeof uId === 'string' ? uId : uId?._id?.toString() || uId?.id
+      if (userIdStr) {
+        await this._wallets.deposit(userIdStr as string, refundAmount, description)
+      }
+    }
+    return updated
   }
 }

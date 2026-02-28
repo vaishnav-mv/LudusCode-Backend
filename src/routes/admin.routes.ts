@@ -44,5 +44,9 @@ export class AdminRoutes {
         this.router.get('/wallet/:userId', auth, requireAdmin, (req, res, next) => this._controller.getUserWallet(req, res).catch(next))
         this.router.get('/transactions', auth, requireAdmin, (req, res, next) => this._controller.getAllTransactions(req, res).catch(next))
         this.router.post('/wallet/:userId/adjust', auth, requireAdmin, (req, res, next) => this._controller.adjustBalance(req, res).catch(next))
+
+        // Payout Approvals
+        this.router.post('/payouts/:id/approve', auth, requireAdmin, validate(AdminNoBodySchema), (req, res, next) => this._controller.approvePayout(req, res).catch(next))
+        this.router.post('/payouts/:id/reject', auth, requireAdmin, (req, res, next) => this._controller.rejectPayout(req, res).catch(next))
     }
 }

@@ -1,6 +1,7 @@
 import { singleton } from 'tsyringe'
 import { IWalletRepository } from '../interfaces/repositories'
 import { WalletModel } from '../models/Wallet'
+import { UserModel } from '../models/User'
 import { TransactionModel } from '../models/Transaction'
 import { TransactionType } from '../types'
 
@@ -62,7 +63,7 @@ export class WalletRepository implements IWalletRepository {
     });
   }
 
-  async withdraw(userId: string, amount: number, description: string) {
+  async withdraw(userId: string, amount: number, description: string, type: string = TransactionType.Withdrawal, status: string = 'Pending') {
     // Atomic check and deduct
     const wallet = await WalletModel.findOneAndUpdate(
       { userId, balance: { $gte: amount } },
@@ -79,8 +80,8 @@ export class WalletRepository implements IWalletRepository {
       walletId: wallet._id,
       userId,
       amount: -amount,
-      type: TransactionType.Withdrawal,
-      status: 'Pending', // pending admin approval or payout
+      type,
+      status, // pending admin approval or payout if it's a real withdrawal
       description
     });
 
@@ -145,14 +146,41 @@ export class WalletRepository implements IWalletRepository {
     };
   }
 
-  async getAllTransactions(skip: number, limit: number) {
-    const transactions = await TransactionModel.find()
-      .sort({ createdAt: -1 })
+  async getAllTransactions(skip: number, limit: number, options?: { status?: string, type?: string, sort?: string, query?: string }) {
+    const filter: Record<string, unknown> = {};
+    if (options?.status) filter.status = options.status;
+    if (options?.type) filter.type = options.type;
+
+    if (options?.query) {
+      const users = await UserModel.find({
+        $or: [
+          { username: { $regex: options.query, $options: 'i' } },
+          { email: { $regex: options.query, $options: 'i' } }
+        ]
+      }).select('_id').lean();
+
+      const userIds = users.map(u => u._id);
+
+      filter['$or'] = [
+        { description: { $regex: options.query, $options: 'i' } },
+        { userId: { $in: userIds } }
+      ];
+    }
+
+    let sortObj: any = { createdAt: -1 };
+    if (options?.sort === 'amount_desc') sortObj = { amount: -1 };
+    if (options?.sort === 'amount_asc') sortObj = { amount: 1 };
+    if (options?.sort === 'date_asc') sortObj = { createdAt: 1 };
+    if (options?.sort === 'date_desc') sortObj = { createdAt: -1 };
+
+    const transactions = await TransactionModel.find(filter)
+      .populate('userId', 'username email')
+      .sort(sortObj)
       .skip(skip)
       .limit(limit)
       .lean();
 
-    const total = await TransactionModel.countDocuments();
+    const total = await TransactionModel.countDocuments(filter);
 
     return {
       transactions: transactions.map(transaction => ({
@@ -163,6 +191,22 @@ export class WalletRepository implements IWalletRepository {
       } as unknown as import('../types').Transaction)),
       total
     };
+  }
+
+  async updateTransactionStatus(id: string, status: string): Promise<boolean> {
+    const res = await TransactionModel.updateOne({ _id: id }, { $set: { status } });
+    return res.modifiedCount > 0;
+  }
+
+  async getTransactionById(id: string) {
+    const transaction = await TransactionModel.findById(id).lean();
+    if (!transaction) return null;
+    return {
+      ...transaction,
+      _id: transaction._id.toString(),
+      id: transaction._id.toString(),
+      timestamp: transaction.createdAt
+    } as unknown as import('../types').Transaction;
   }
 }
 
