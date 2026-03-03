@@ -39,7 +39,7 @@ import { SubscriptionRepository } from '../repositories/subscriptionRepository'
 // Providers
 import { EmailProvider } from '../providers/emailProvider'
 import { CloudinaryProvider } from '../providers/cloudinaryProvider'
-import { CodeExecutionProvider } from '../providers/codeExecutionProvider'
+import { PistonProvider } from '../providers/pistonProvider'
 import { AiProvider } from '../providers/aiProvider'
 import { JwtProvider } from '../providers/jwtProvider'
 import { PasswordProvider } from '../providers/passwordProvider'
@@ -77,7 +77,7 @@ container.registerSingleton<ISubscriptionRepository>("ISubscriptionRepository", 
 // Register Providers
 container.registerSingleton<IEmailProvider>("IEmailProvider", EmailProvider)
 container.registerSingleton<ICloudinaryProvider>("ICloudinaryProvider", CloudinaryProvider)
-container.registerSingleton<ICodeExecutionProvider>("ICodeExecutionProvider", CodeExecutionProvider)
+container.registerSingleton<ICodeExecutionProvider>("ICodeExecutionProvider", PistonProvider)
 container.registerSingleton<IAiProvider>("IAiProvider", AiProvider)
 container.registerSingleton<IJwtProvider>("IJwtProvider", JwtProvider)
 container.registerSingleton<IPasswordProvider>("IPasswordProvider", PasswordProvider)
