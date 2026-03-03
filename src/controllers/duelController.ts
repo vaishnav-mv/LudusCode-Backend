@@ -256,39 +256,11 @@ export class DuelController {
       const problem = duel.problem;
       const problemId = typeof problem === 'string' ? problem : (problem.id || problem._id?.toString());
       if (!problemId) throw new Error("Problem ID not found");
-
-      // 2. Fetch language from problem? or rely on JudgeService to detect/default?
-      // JudgeService needs language. We can try to infer or pass 'javascript' default.
-      // Better: DuelService previously fetched problem to get language.
-      // Now Controller can't easily fetch problem doc unless we inject ProblemRepository (violation).
-      // But JudgeService fetches problemDoc internally now! 
-      // JudgeService.execute(problemId, userCode, language)
-      // We need 'language'.
-      // Assumption: JudgeService can handle fetching problem details. 
-      // But we need to pass 'language' to JudgeService.
-      // If we don't know it, we might need to fetch problem summary or require frontend to send it?
-      // Frontend typically sends userCode. It might send language too?
-      // Check SubmitDuelResultDTO.
-
-      // Temporary fix: Default 'javascript' or assume 'javascript'.
-      // Or: JudgeService should look up language from problem if not provided?
-      // My JudgeService implementation uses `language` param to select config.
-
-      // Let's modify JudgeService to allow optional language, or fetch it from problem if not provided?
-      // Current JudgeService: `language: string` (required).
-      // I can change JudgeService to default language if not provided, OR fetch from problem.
-
-      // Actually, JudgeService ALREADY fetches problem.
-      // JudgeService uses problem.solutions[] to find the right language
-
-      // For now, I will pass 'javascript' as default or 'javascript'.
-      // Ideally, the request body should have `language`.
-
-      // Let's assume 'javascript' for now as existing code did default to it.
+      //2. Select a language
       const language = 'javascript';
-
+      //3. Execute the code
       const result = await this._judgeService.execute(problemId, userCode, language);
-
+      //4. Process the submission
       const updatedDuel = await this._service.processSubmission(duelId, userId, userCode, result);
       if (!updatedDuel) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
 

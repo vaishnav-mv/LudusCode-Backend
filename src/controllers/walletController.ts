@@ -97,8 +97,6 @@ export class WalletController {
   withdraw = async (req: Request, res: Response) => {
     const body = req.body as WithdrawDTO
     const userId = body.userId
-    // In a real app, fetch name/email/phone from User Auth context/Database
-    // using defaults for demo/test mode as requested
     try {
       const ok = await this._service.withdraw(userId, body.amount, body.vpa, "Test User", "test@ludus.com", "9000090000")
       if (!ok) {

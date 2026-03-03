@@ -301,9 +301,7 @@ export class DuelService implements IDuelService {
   /**
    * Finish the duel as a draw (no winner). Refunds both players' wagers.
    */
-  /**
-   * Finish the duel as a draw (no winner). Refunds both players' wagers.
-   */
+
   async finishDraw(id: string) {
     const duel = await this._duels.getById(id);
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND);
@@ -379,7 +377,7 @@ export class DuelService implements IDuelService {
 
     // Save submission
     cleanedSubmissions.push({
-      userId: userId, // Legacy ?
+      userId: userId, 
       user: userId,
       status: finalStatus,
       userCode,
@@ -395,7 +393,6 @@ export class DuelService implements IDuelService {
 
     // Win Condition: First to solve wins immediately
     if (finalStatus === SubmissionStatus.Accepted) {
-      // --- RACE CONDITION FIX: Re-fetch duel to check if it was already finished ---
       const freshDuel = await this._duels.getById(id);
       if (freshDuel && freshDuel.status === DuelStatus.Finished) {
 
@@ -497,14 +494,6 @@ export class DuelService implements IDuelService {
       : (duel.player2?.warnings || 0)
     const newWarnings = currentWarnings + 1
 
-
-
-    // Since _duels.update takes Partial<Duel>, and we constructed dot notation keys above which strictly simple Partial<Duel> might not support without casting to any or using a specific update method
-    // Let's refactor to use object structure if the repository supports it, OR just accept that we need to cast to any to pass dot notation if simple update doesn't support deep merge automatically.
-    // Actually, looking at typical repo implementation: Model.findByIdAndUpdate(id, data). 
-    // If data is { "player1.warnings": 1 }, Mongoose handles it.
-    // But Partial<Duel> expects { player1: { ... } }.
-    // Let's construct the nested object safely.
 
     const pData = isPlayer1 ? { ...duel.player1 } : { ...duel.player2 }
     pData.warnings = newWarnings
