@@ -7,6 +7,7 @@ import { mapDuel } from '../utils/mapper'
 import { DuelResponseDTO } from '../dto/response/duel.response.dto'
 import logger from '../utils/logger'
 import { ResponseMessages } from '../constants'
+import { env } from '../config/env'
 
 @singleton()
 export class DuelService implements IDuelService {
@@ -263,7 +264,7 @@ export class DuelService implements IDuelService {
       const winnerId = winner.id || winner._id?.toString();
       if (winnerId) {
         const pool = finishedDuel.wager * 2;
-        const rate = winner.isPremium ? 0.05 : 0.1;
+        const rate = winner.isPremium ? env.DUEL_PREMIUM_COMMISSION_RATE : env.DUEL_COMMISSION_RATE;
         const commissionAmount = pool * rate;
         const payoutAmount = pool - commissionAmount;
 

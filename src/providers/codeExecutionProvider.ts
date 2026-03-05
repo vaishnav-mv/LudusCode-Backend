@@ -6,6 +6,7 @@ import * as os from 'os';
 import { singleton } from 'tsyringe';
 import { ICodeExecutionProvider } from '../interfaces/providers';
 import { ExecutionResult } from '../interfaces/repositories';
+import { env } from '../config/env';
 
 @singleton()
 export class CodeExecutionProvider implements ICodeExecutionProvider {
@@ -18,7 +19,7 @@ export class CodeExecutionProvider implements ICodeExecutionProvider {
         }
     }
 
-    async execute(language: string, code: string, timeoutMs: number = 5000): Promise<ExecutionResult> {
+    async execute(language: string, code: string, timeoutMs: number = env.CODE_EXECUTION_TIMEOUT_MS): Promise<ExecutionResult> {
         const lang = language.toLowerCase();
         let extension = '';
         let cmd = '';

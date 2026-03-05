@@ -28,4 +28,9 @@ export const env = {
   , SMTP_PORT: parseInt(process.env.SMTP_PORT || '587', 10)
   , SMTP_USER: process.env.SMTP_USER || ''
   , SMTP_PASS: process.env.SMTP_PASS || ''
+  , CRON_SCHEDULE: process.env.CRON_SCHEDULE || '0 0 * * *'
+  , ROUND_ROBIN_INTERVAL_MS: parseInt(process.env.ROUND_ROBIN_INTERVAL_MS || '5000', 10)
+  , CODE_EXECUTION_TIMEOUT_MS: parseInt(process.env.CODE_EXECUTION_TIMEOUT_MS || '5000', 10)
+  , DUEL_COMMISSION_RATE: parseFloat(process.env.DUEL_COMMISSION_RATE || '0.1')
+  , DUEL_PREMIUM_COMMISSION_RATE: parseFloat(process.env.DUEL_PREMIUM_COMMISSION_RATE || '0.05')
 }

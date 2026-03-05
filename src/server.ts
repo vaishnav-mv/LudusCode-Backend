@@ -37,7 +37,7 @@ async function bootstrap() {
       } catch (e) {
         logger.error('Timer Helper Error:', e);
       }
-    }, 5000);
+    }, env.ROUND_ROBIN_INTERVAL_MS);
   } catch (e) {
     logger.error('Failed to start server:', e);
     process.exit(1)

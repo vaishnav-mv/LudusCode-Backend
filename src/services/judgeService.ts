@@ -4,6 +4,7 @@ import { ICodeExecutionProvider } from '../interfaces/providers'
 
 import { SubmissionResult, SubmissionStatus, TestCase, Problem, TestCaseResult } from '../types'
 import { IJudgeService } from '../interfaces/services'
+import { env } from '../config/env'
 
 @singleton()
 export class JudgeService implements IJudgeService {
@@ -51,7 +52,7 @@ export class JudgeService implements IJudgeService {
   }
 
   private async _executeInternal(userCode: string, solutionCode: string, testCases: TestCase[], problem?: Problem, language: string = 'javascript'): Promise<SubmissionResult> {
-    const timeLimitMs = problem?.timeLimitMs || 5000;
+    const timeLimitMs = problem?.timeLimitMs || env.CODE_EXECUTION_TIMEOUT_MS;
     const languageMap: Record<string, { language: string }> = {
       'javascript': { language: 'javascript' },
       'js': { language: 'javascript' },

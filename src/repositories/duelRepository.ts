@@ -5,6 +5,7 @@ import { Duel, DuelStatus } from '../types'
 import { Model } from 'mongoose'
 import { BaseRepository } from './BaseRepository'
 import logger from '../utils/logger'
+import { env } from '../config/env'
 
 @singleton()
 export class DuelRepository extends BaseRepository<Duel> implements IDuelRepository {
@@ -136,7 +137,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
           commission: {
             $multiply: [
               { $multiply: ['$wager', 2] },
-              { $cond: [{ $eq: ['$winnerDoc.isPremium', true] }, 0.05, 0.1] }
+              { $cond: [{ $eq: ['$winnerDoc.isPremium', true] }, env.DUEL_PREMIUM_COMMISSION_RATE, env.DUEL_COMMISSION_RATE] }
             ]
           }
         }
@@ -176,7 +177,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
           commission: {
             $multiply: [
               { $multiply: ['$wager', 2] },
-              { $cond: [{ $eq: ['$winnerDoc.isPremium', true] }, 0.05, 0.1] }
+              { $cond: [{ $eq: ['$winnerDoc.isPremium', true] }, env.DUEL_PREMIUM_COMMISSION_RATE, env.DUEL_COMMISSION_RATE] }
             ]
           },
           timestamp: '$startTime'
@@ -199,7 +200,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
           commission: {
             $multiply: [
               { $multiply: ['$wager', 2] },
-              { $cond: [{ $eq: ['$winnerDoc.isPremium', true] }, 0.05, 0.1] }
+              { $cond: [{ $eq: ['$winnerDoc.isPremium', true] }, env.DUEL_PREMIUM_COMMISSION_RATE, env.DUEL_COMMISSION_RATE] }
             ]
           }
         }

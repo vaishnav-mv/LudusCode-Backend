@@ -3,6 +3,7 @@ import * as cron from 'node-cron';
 import { IUserRepository, IWalletRepository, ISubscriptionRepository } from '../interfaces/repositories';
 import { SubscriptionLog, User, TransactionType } from '../types';
 import logger from '../utils/logger';
+import { env } from '../config/env';
 
 @singleton()
 export class CronService {
@@ -15,8 +16,8 @@ export class CronService {
     ) { }
 
     startDailyCron() {
-        // Run every day at midnight server time: '0 0 * * *'
-        this._cronJob = cron.schedule('0 0 * * *', async () => {
+        // Run every day at midnight server time by default
+        this._cronJob = cron.schedule(env.CRON_SCHEDULE, async () => {
             logger.info(`[CronService] Running daily subscription check at ${new Date().toISOString()}`);
             await this.processExpiredSubscriptions();
         });
