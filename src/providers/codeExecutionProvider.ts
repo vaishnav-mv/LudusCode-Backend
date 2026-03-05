@@ -9,12 +9,12 @@ import { ExecutionResult } from '../interfaces/repositories';
 
 @singleton()
 export class CodeExecutionProvider implements ICodeExecutionProvider {
-    private tempDir: string;
+    private _tempDir: string;
 
     constructor() {
-        this.tempDir = path.join(os.tmpdir(), 'ludus-code-exec');
-        if (!fs.existsSync(this.tempDir)) {
-            fs.mkdirSync(this.tempDir, { recursive: true });
+        this._tempDir = path.join(os.tmpdir(), 'ludus-code-exec');
+        if (!fs.existsSync(this._tempDir)) {
+            fs.mkdirSync(this._tempDir, { recursive: true });
         }
     }
 
@@ -32,7 +32,7 @@ export class CodeExecutionProvider implements ICodeExecutionProvider {
         }
 
         const filename = `exec_${Date.now()}_${Math.random().toString(36).substring(7)}.${extension}`;
-        const filepath = path.join(this.tempDir, filename);
+        const filepath = path.join(this._tempDir, filename);
 
         try {
             await fs.promises.writeFile(filepath, code);
@@ -91,7 +91,7 @@ export class CodeExecutionProvider implements ICodeExecutionProvider {
             });
 
             const sanitize = (output: string) => {
-                const tempDirRegex = new RegExp(this.tempDir.replace(/\\/g, '\\\\'), 'g');
+                const tempDirRegex = new RegExp(this._tempDir.replace(/\\/g, '\\\\'), 'g');
                 return output.replace(tempDirRegex, 'sandbox');
             };
 

@@ -4,9 +4,10 @@ import { singleton } from 'tsyringe'
 import { IAiProvider } from '../interfaces/providers'
 import { ResponseMessages } from '../constants'
 import { Problem, User, Group } from '../types'
+import logger from '../utils/logger'
 
 const ai: GoogleGenAI | null = env.GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: env.GOOGLE_API_KEY }) : null;
-console.log(`[AiProvider] ${ai ? `Initialized with key ending ...${env.GOOGLE_API_KEY.slice(-4)}` : 'No GOOGLE_API_KEY set — AI features disabled'}`);
+logger.info(`[AiProvider] ${ai ? 'Initialized successfully' : 'No GOOGLE_API_KEY set — AI features disabled'}`);
 
 @singleton()
 export class AiProvider implements IAiProvider {

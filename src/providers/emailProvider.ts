@@ -2,13 +2,14 @@ import { singleton } from 'tsyringe'
 import { IEmailProvider } from '../interfaces/providers'
 import nodemailer from 'nodemailer'
 import { env } from '../config/env'
+import logger from '../utils/logger'
 
 @singleton()
 export class EmailProvider implements IEmailProvider {
-    private transporter: nodemailer.Transporter
+    private _transporter: nodemailer.Transporter
 
     constructor() {
-        this.transporter = nodemailer.createTransport({
+        this._transporter = nodemailer.createTransport({
             host: env.SMTP_HOST,
             port: env.SMTP_PORT,
             secure: env.SMTP_PORT === 465,
@@ -21,8 +22,8 @@ export class EmailProvider implements IEmailProvider {
 
     async sendOtp(email: string, code: string): Promise<boolean> {
         try {
-            console.log(`[EmailProvider] Sending actual OTP ${code} to ${email}`)
-            await this.transporter.sendMail({
+            logger.info(`[EmailProvider] Sending OTP to ${email}`)
+            await this._transporter.sendMail({
                 from: `"LudusCode Support" <${env.SMTP_USER}>`,
                 to: email,
                 subject: 'Your LudusCode Verification OTP',
@@ -37,7 +38,7 @@ export class EmailProvider implements IEmailProvider {
             })
             return true
         } catch (error) {
-            console.error(`[EmailProvider] Error sending OTP to ${email}:`, error)
+            logger.error(`[EmailProvider] Error sending OTP to ${email}:`, error)
             return false
         }
     }

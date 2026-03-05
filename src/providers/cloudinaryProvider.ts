@@ -3,6 +3,7 @@ import { env } from '../config/env'
 import { ResponseMessages } from '../constants'
 import { singleton } from 'tsyringe'
 import { ICloudinaryProvider } from '../interfaces/providers'
+import logger from '../utils/logger'
 
 @singleton()
 export class CloudinaryProvider implements ICloudinaryProvider {
@@ -22,7 +23,7 @@ export class CloudinaryProvider implements ICloudinaryProvider {
             })
             return result.secure_url
         } catch (error) {
-            console.error('Cloudinary upload error:', error)
+            logger.error('Cloudinary upload error:', error)
             throw new Error(ResponseMessages.FAILED_UPLOAD)
         }
     }

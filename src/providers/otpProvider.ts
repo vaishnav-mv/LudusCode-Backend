@@ -2,6 +2,7 @@ import { singleton } from 'tsyringe'
 import Redis from 'ioredis'
 import { env } from '../config/env'
 import { IOtpProvider } from '../interfaces/providers'
+import logger from '../utils/logger'
 
 let redis: Redis | null = null
 const mem: Record<string, { code: string, expiresAt: number }> = {}
@@ -12,9 +13,9 @@ export class OtpProvider implements IOtpProvider {
         if (!redis && env.REDIS_URL) {
             try {
                 redis = new Redis(env.REDIS_URL)
-                redis.on('error', (err) => console.error('Redis Client Error', err));
+                redis.on('error', (err) => logger.error('Redis Client Error', err));
             } catch (e) {
-                console.error('Failed to initialize Redis', e)
+                logger.error('Failed to initialize Redis', e)
                 redis = null
             }
         }
@@ -23,7 +24,7 @@ export class OtpProvider implements IOtpProvider {
     async create(email: string, purpose: string) {
         this.ensure()
         const code = Math.floor(100000 + Math.random() * 900000).toString()
-        console.log(`[OTP] Generated for ${email} (${purpose}): ${code}`)
+        logger.debug(`[OTP] Generated for ${email} (${purpose}): ${code}`)
         const key = `otp:${purpose}:${email.toLowerCase()}`
 
         if (redis) {
@@ -31,7 +32,7 @@ export class OtpProvider implements IOtpProvider {
                 await redis.set(key, code, 'EX', 60)
                 return code
             } catch (e) {
-                console.error('Redis set error, falling back to memory', e)
+                logger.error('Redis set error, falling back to memory', e)
             }
         }
 
@@ -42,43 +43,43 @@ export class OtpProvider implements IOtpProvider {
     async verify(email: string, code: string, purpose: string) {
         this.ensure()
         const key = `otp:${purpose}:${email.toLowerCase()}`
-        console.log(`[OTP] Verifying for ${key}. Input: ${code}`)
+        logger.debug(`[OTP] Verifying for ${key}. Input: ${code}`)
 
         if (redis) {
             try {
                 const stored = await redis.get(key)
-                console.log(`[OTP] Redis stored value: ${stored}`)
+                logger.debug(`[OTP] Redis stored value: ${stored}`)
                 if (!stored) {
-                    console.log('[OTP] Verification failed: No OTP found in Redis')
+                    logger.debug('[OTP] Verification failed: No OTP found in Redis')
                     return false
                 }
                 if (stored !== code) {
-                    console.log(`[OTP] Verification failed: Mismatch (Stored: ${stored} !== Input: ${code})`)
+                    logger.debug(`[OTP] Verification failed: Mismatch (Stored: ${stored} !== Input: ${code})`)
                     return false
                 }
                 await redis.del(key)
-                console.log('[OTP] Verification success (Redis)')
+                logger.debug('[OTP] Verification success (Redis)')
                 return true
             } catch (e) {
-                console.error('Redis get/del error, falling back to memory check', e)
+                logger.error('Redis get/del error, falling back to memory check', e)
             }
         }
 
         const rec = mem[key]
         if (!rec) {
-            console.log('[OTP] Verification failed: No OTP found in Memory')
+            logger.debug('[OTP] Verification failed: No OTP found in Memory')
             return false
         }
         if (Date.now() > rec.expiresAt) {
-            console.log('[OTP] Verification failed: Memory OTP expired')
+            logger.debug('[OTP] Verification failed: Memory OTP expired')
             return false
         }
         const ok = rec.code === code
         if (ok) {
             delete mem[key]
-            console.log('[OTP] Verification success (Memory)')
+            logger.debug('[OTP] Verification success (Memory)')
         } else {
-            console.log(`[OTP] Verification failed: Mismatch (Stored: ${rec.code} !== Input: ${code})`)
+            logger.debug(`[OTP] Verification failed: Mismatch (Stored: ${rec.code} !== Input: ${code})`)
         }
         return ok
     }

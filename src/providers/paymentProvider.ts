@@ -4,6 +4,7 @@ import crypto from 'crypto'
 import { env } from '../config/env'
 import { RazorpayOrder } from '../types'
 import { IPaymentProvider } from '../interfaces/providers'
+import logger from '../utils/logger'
 
 @singleton()
 export class PaymentProvider implements IPaymentProvider {
@@ -26,7 +27,7 @@ export class PaymentProvider implements IPaymentProvider {
             const order = await this._razorpay.orders.create(options);
             return order as unknown as RazorpayOrder;
         } catch (error: unknown) {
-            console.error("Razorpay Error:", error);
+            logger.error('Razorpay Error:', error);
             throw new Error("Failed to create payment order");
         }
     }

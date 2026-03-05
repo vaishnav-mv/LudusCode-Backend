@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { container } from 'tsyringe'
 import { IUserRepository } from '../interfaces/repositories'
+import logger from '../utils/logger'
 
 /**
  * Middleware that checks if the authenticated user's subscription has expired.
@@ -35,7 +36,7 @@ export const subscriptionExpiryMiddleware = async (req: Request, _res: Response,
         next()
     } catch (err) {
         // Don't block the request if expiry check fails
-        console.error('Subscription expiry check error:', err)
+        logger.error('Subscription expiry check error:', err)
         next()
     }
 }
