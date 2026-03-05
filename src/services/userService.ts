@@ -36,8 +36,12 @@ export class UserService implements IUserService {
       userDoc.subscriptionExpiry = undefined;
     }
 
-    // Fetch duels involving the user
-    const allDuels = await this._duelRepo.all();
+    // Fetch duels and groups concurrently
+    const [allDuels, allGroups] = await Promise.all([
+      this._duelRepo.all(),
+      this._groupRepo.all()
+    ]);
+
     const duels = allDuels.filter((duel: Duel) =>
       (typeof duel.player1.user === 'object' && duel.player1.user && '_id' in duel.player1.user && duel.player1.user._id?.toString() === id) ||
       (typeof duel.player1.user === 'string' && duel.player1.user === id) ||
@@ -45,8 +49,6 @@ export class UserService implements IUserService {
       (typeof duel.player2.user === 'string' && duel.player2.user === id)
     ).sort((a: Duel, b: Duel) => b.startTime - a.startTime);
 
-    // Fetch groups the user is a member of
-    const allGroups = await this._groupRepo.all();
     const groupsDocs = allGroups.filter((group: Group) =>
       (group.members || []).some((member: User | string) => {
         if (typeof member === 'string') return member === id;

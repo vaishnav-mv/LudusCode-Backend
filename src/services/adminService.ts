@@ -19,19 +19,28 @@ export class AdminService implements IAdminService {
   ) { }
 
   async dashboardStats() {
-    const totalUsers = await this._users.count()
-    const activeDuels = await this._duels.count({ status: DuelStatus.InProgress })
-    const totalProblems = await this._problems.count()
+    const [
+      totalUsers,
+      activeDuels,
+      totalProblems,
+      subscriptionRevenue,
+      commissionStats,
+      pendingProblems,
+      pendingPayoutsResponse,
+      flaggedActivitiesResponse
+    ] = await Promise.all([
+      this._users.count(),
+      this._duels.count({ status: DuelStatus.InProgress }),
+      this._problems.count(),
+      this._subscriptions.getTotalSubscriptionRevenue(),
+      this._duels.getCommissionStats(),
+      this._problems.count({ status: ProblemStatus.Pending }),
+      this._wallets.getAllTransactions(0, 1, { status: 'Pending', type: TransactionType.Withdrawal }),
+      this._duels.getFlaggedActivities(1, 1)
+    ])
 
-    // Use aggregation for total revenue (duel commissions + subscription revenue)
-    const subscriptionRevenue = await this._subscriptions.getTotalSubscriptionRevenue()
-    const commissionStats = await this._duels.getCommissionStats()
     const duelRevenue = commissionStats.totalCommissions || 0
-
-    const pendingProblems = await this._problems.count({ status: ProblemStatus.Pending })
-    const pendingPayoutsResponse = await this._wallets.getAllTransactions(0, 1, { status: 'Pending', type: TransactionType.Withdrawal })
     const pendingPayouts = pendingPayoutsResponse.total
-    const flaggedActivitiesResponse = await this._duels.getFlaggedActivities(1, 1)
     const pendingAntiCheat = flaggedActivitiesResponse.total
 
     return {
@@ -46,11 +55,17 @@ export class AdminService implements IAdminService {
   }
 
   async financials(page: number = 1, limit: number = 50) {
-    const commissionStats = await this._duels.getCommissionStats()
-    const commissionsByDay = await this._duels.getCommissionsByDay()
-    const recentPagination = await this._duels.getRecentCommissions(page, limit)
-
-    const subscriptionRevenue = await this._subscriptions.getTotalSubscriptionRevenue()
+    const [
+      commissionStats,
+      commissionsByDay,
+      recentPagination,
+      subscriptionRevenue
+    ] = await Promise.all([
+      this._duels.getCommissionStats(),
+      this._duels.getCommissionsByDay(),
+      this._duels.getRecentCommissions(page, limit),
+      this._subscriptions.getTotalSubscriptionRevenue()
+    ])
 
     return {
       totalDuelWagered: commissionStats.totalWagered,
@@ -86,8 +101,10 @@ export class AdminService implements IAdminService {
 
   async allProblems(page: number = 1, limit: number = 50) {
     const skip = (page - 1) * limit
-    const problems = await this._problems.all(skip, limit)
-    const total = await this._problems.count()
+    const [problems, total] = await Promise.all([
+      this._problems.all(skip, limit),
+      this._problems.count()
+    ])
     return {
       problems,
       total,
@@ -108,8 +125,10 @@ export class AdminService implements IAdminService {
       ]
     }
 
-    const users = await this._users.all(skip, limit, filter)
-    const total = await this._users.count(filter)
+    const [users, total] = await Promise.all([
+      this._users.all(skip, limit, filter),
+      this._users.count(filter)
+    ])
 
     // Compute leaderboard rank for each user
     const usersWithRank = await Promise.all(
@@ -158,8 +177,10 @@ export class AdminService implements IAdminService {
 
   async monitoredDuels(page: number = 1, limit: number = 50) {
     const skip = (page - 1) * limit
-    const recentDuels = await this._duels.all(skip, limit)
-    const total = await this._duels.count()
+    const [recentDuels, total] = await Promise.all([
+      this._duels.all(skip, limit),
+      this._duels.count()
+    ])
     return {
       duels: recentDuels,
       total,
@@ -190,10 +211,11 @@ export class AdminService implements IAdminService {
   }
 
   async subscriptionData(page: number = 1, limit: number = 50, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }) {
-    const plansInfo = await this._subscriptions.getPlans()
-
     const skip = (page - 1) * limit
-    const { logs, total } = await this._subscriptions.getLogsAll(skip, limit, options)
+    const [plansInfo, { logs, total }] = await Promise.all([
+      this._subscriptions.getPlans(),
+      this._subscriptions.getLogsAll(skip, limit, options)
+    ])
 
     const formattedPlans = plansInfo.map((plan) => ({
       id: (plan._id || plan.id || '').toString(),

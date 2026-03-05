@@ -57,8 +57,10 @@ export class DuelService implements IDuelService {
     const player1UserId = player1Id;
     const player2UserId = player2Id;
 
-    const player1User = await this._users.getById(player1UserId);
-    const player2User = await this._users.getById(player2UserId);
+    const [player1User, player2User] = await Promise.all([
+      this._users.getById(player1UserId),
+      this._users.getById(player2UserId)
+    ]);
 
     if (!player1User || !player2User) throw new Error(ResponseMessages.USERS_NOT_FOUND);
 
@@ -377,7 +379,7 @@ export class DuelService implements IDuelService {
 
     // Save submission
     cleanedSubmissions.push({
-      userId: userId, 
+      userId: userId,
       user: userId,
       status: finalStatus,
       userCode,

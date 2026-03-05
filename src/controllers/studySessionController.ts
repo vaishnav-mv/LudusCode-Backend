@@ -14,16 +14,18 @@ export class StudySessionController {
     /**
      * @desc    Create a new study session
      * @route   POST /api/study-sessions
-     * @req     body: { groupId, title, description, mode, startTime, durationMinutes, problems }
+     * @req     body: { groupId, title, description, mode, startTime, durationMinutes }
      * @res     { session }
      */
     create = async (req: Request, res: Response) => {
         try {
             const userId = req.user?.sub
             if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
+            console.log('Study Session Create Payload:', req.body);
             const session = await this._service.create({ ...req.body, userId })
             return ApiResponse.success(res, session, "Session created", HttpStatus.CREATED)
         } catch (error: unknown) {
+            console.error('Study Session Create Error:', error);
             return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST)
         }
     }

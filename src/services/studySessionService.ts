@@ -2,19 +2,18 @@ import { singleton, inject } from 'tsyringe'
 import { IStudySessionRepository, IUserRepository, IGroupRepository } from '../interfaces/repositories'
 import { StudySessionMode, StudySessionStatus, StudySession } from '../types'
 import { broadcastSession } from '../realtime/ws'
-
 import { IStudySessionService } from '../interfaces/services'
 
 @singleton()
 export class StudySessionService implements IStudySessionService {
     constructor(
         @inject("IStudySessionRepository") private _sessions: IStudySessionRepository,
-        @inject("IUserRepository") private _users: IUserRepository,
         @inject("IGroupRepository") private _groups: IGroupRepository
     ) { }
 
-    async create(data: { groupId: string, userId: string, title: string, description: string, mode: string, startTime: string, durationMinutes: number, problems: string[] }) {
+    async create(data: { groupId: string, userId: string, title: string, description: string, mode: string, startTime: string, durationMinutes: number }) {
         const userId = data.userId;
+
         const group = await this._groups.getById(data.groupId);
         if (!group) throw new Error("Group not found");
 
@@ -33,7 +32,7 @@ export class StudySessionService implements IStudySessionService {
             mode: data.mode as StudySessionMode,
             startTime: data.startTime,
             durationMinutes: data.durationMinutes,
-            problems: data.problems,
+            problems: [],
             status: new Date(data.startTime).getTime() > Date.now() ? StudySessionStatus.Upcoming : StudySessionStatus.Active
         };
 
