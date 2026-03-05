@@ -221,7 +221,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
     return result;
   }
 
-  async getFlaggedActivities(page: number, limit: number): Promise<{ data: any[], total: number }> {
+  async getFlaggedActivities(page: number, limit: number): Promise<{ data: { user: unknown, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[], total: number }> {
     const suspectDuels = await this.model.find({
       $or: [
         { 'player1.warnings': { $gt: 0 } },
@@ -239,7 +239,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
       ]
     }).populate('player1.user').populate('player2.user').populate('submissions.user').lean();
 
-    const flags = new Map<string, { count: number; paste: number; visibility: number; last: number; userObj: any }>();
+    const flags = new Map<string, { count: number; paste: number; visibility: number; last: number; userObj: unknown }>();
 
     for (const duel of suspectDuels) {
       const submissions = duel.submissions || [];
@@ -249,8 +249,8 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
         const close = Math.abs((submission1.submittedAt || 0) - (submission2.submittedAt || 0)) <= 120000;
         const copied = submission1.codeHash && submission2.codeHash && submission1.codeHash === submission2.codeHash;
         if (copied && close) {
-          const u1 = submission1.user as any;
-          const u2 = submission2.user as any;
+          const u1 = submission1.user as { _id?: { toString(): string }, id?: string } | string;
+          const u2 = submission2.user as { _id?: { toString(): string }, id?: string } | string;
           const uid1 = typeof u1 === 'object' && u1 ? (u1._id?.toString() || u1.id) : u1;
           const uid2 = typeof u2 === 'object' && u2 ? (u2._id?.toString() || u2.id) : u2;
 
@@ -264,9 +264,10 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
         }
       }
 
-      const checkPlayer = (player: any) => {
+      const checkPlayer = (player: { user?: unknown, warnings?: number, warningsBreakdown?: { paste?: number, visibility?: number } }) => {
         if (player.user && player.warnings && player.warnings > 0) {
-          const uid = typeof player.user === 'object' ? (player.user._id?.toString() || player.user.id) : player.user;
+          const u = player.user as { _id?: { toString(): string }, id?: string } | string | null;
+          const uid = typeof u === 'object' && u !== null ? (u._id?.toString() || u.id) : u;
           if (uid) {
             const prev = flags.get(uid) || { count: 0, paste: 0, visibility: 0, last: 0, userObj: null };
             const duelTime = new Date(duel.updatedAt || duel.startTime || Date.now()).getTime();

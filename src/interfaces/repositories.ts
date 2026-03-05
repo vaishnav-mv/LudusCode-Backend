@@ -36,7 +36,7 @@ export interface IDuelRepository extends IBaseRepository<Duel> {
     getCommissionStats(): Promise<{ totalWagered: number, totalCommissions: number, totalDuelsWithWagers: number }>;
     getRecentCommissions(page: number, limit: number): Promise<{ recent: { duelId: string, problemTitle: string, winnerName: string, wager: number, commission: number, timestamp: number }[], total: number }>;
     getCommissionsByDay(): Promise<{ date: string, amount: number }[]>;
-    getFlaggedActivities(page: number, limit: number): Promise<{ data: any[], total: number }>;
+    getFlaggedActivities(page: number, limit: number): Promise<{ data: { user: unknown, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[], total: number }>;
 }
 
 export interface ISubmissionRepository {

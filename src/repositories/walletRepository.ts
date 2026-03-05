@@ -167,7 +167,7 @@ export class WalletRepository implements IWalletRepository {
       ];
     }
 
-    let sortObj: any = { createdAt: -1 };
+    let sortObj: Record<string, 1 | -1> = { createdAt: -1 };
     if (options?.sort === 'amount_desc') sortObj = { amount: -1 };
     if (options?.sort === 'amount_asc') sortObj = { amount: 1 };
     if (options?.sort === 'date_asc') sortObj = { createdAt: 1 };

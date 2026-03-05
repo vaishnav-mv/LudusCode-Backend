@@ -4,7 +4,7 @@ import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository,
 import { broadcastDuel } from '../realtime/ws'
 import { mapDuel } from '../utils/mapper'
 import { IAdminService } from '../interfaces/services'
-import { DuelStatus, ProblemStatus, User, SubscriptionPlan, Problem, DuelPlayer, TransactionType } from '../types'
+import { DuelStatus, ProblemStatus, SubscriptionPlan, TransactionType, User } from '../types'
 import { computeSubscriptionAction } from './subscriptionService'
 
 @singleton()
@@ -45,13 +45,11 @@ export class AdminService implements IAdminService {
     }
   }
 
-  // Gap 11: Fixed - Used MongoDB aggregation pipeline for duel commissions
   async financials(page: number = 1, limit: number = 50) {
     const commissionStats = await this._duels.getCommissionStats()
     const commissionsByDay = await this._duels.getCommissionsByDay()
     const recentPagination = await this._duels.getRecentCommissions(page, limit)
 
-    // Gap 3 + 15: Include subscription revenue in financials
     const subscriptionRevenue = await this._subscriptions.getTotalSubscriptionRevenue()
 
     return {
@@ -151,7 +149,7 @@ export class AdminService implements IAdminService {
     const { data, total } = await this._duels.getFlaggedActivities(page, limit)
 
     return {
-      data,
+      data: data as { _id?: string; user: User; totalWarnings: number; lastOffense: string; breakdown: { paste: number; visibility: number } }[],
       total,
       page,
       totalPages: Math.ceil(total / limit)
@@ -277,7 +275,6 @@ export class AdminService implements IAdminService {
     return true
   }
 
-  // Gap 10: Admin wallet management
   async getUserWallet(userId: string) {
     const wallet = await this._wallets.get(userId)
     return { balance: wallet.balance, currency: wallet.currency }
@@ -324,7 +321,7 @@ export class AdminService implements IAdminService {
       let description = `Refund: Payout Rejected`
       if (reason) description += ` (${reason})`
 
-      const uId = tx.userId as any;
+      const uId = tx.userId as { _id?: { toString(): string }; id?: string } | string;
       const userIdStr = typeof uId === 'string' ? uId : uId?._id?.toString() || uId?.id
       if (userIdStr) {
         await this._wallets.deposit(userIdStr as string, refundAmount, description)

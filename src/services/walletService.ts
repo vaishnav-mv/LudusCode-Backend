@@ -34,8 +34,6 @@ export class WalletService implements IWalletService {
 
 
 
-    // PRODUCTION TODO: Implement real payouts via Razorpay X Payouts API.
-    // Currently simulated — deducts from wallet but no actual bank transfer occurs. (Gap 8)
     async withdraw(userId: string, amount: number, vpa: string, _name?: string, _email?: string, _phone?: string) {
         try {
 
