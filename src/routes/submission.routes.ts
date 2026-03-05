@@ -15,9 +15,9 @@ export class SubmissionRoutes {
     }
 
     private setupRoutes() {
-        this.router.post('/', auth, (req, res, next) => this._controller.create(req, res).catch(next))
-        this.router.get('/user/me', auth, (req, res, next) => this._controller.getUserSubmissions(req, res).catch(next))
-        this.router.get('/user/:userId/solved', auth, (req, res, next) => this._controller.getSolvedProblems(req, res).catch(next))
-        this.router.get('/user/:userId', auth, (req, res, next) => this._controller.getUserSubmissions(req, res).catch(next))
+        this.router.post('/', auth, this._controller.create)
+        this.router.get('/user/me', auth, this._controller.getUserSubmissions)
+        this.router.get('/user/:userId/solved', auth, this._controller.getSolvedProblems)
+        this.router.get('/user/:userId', auth, this._controller.getUserSubmissions)
     }
 }

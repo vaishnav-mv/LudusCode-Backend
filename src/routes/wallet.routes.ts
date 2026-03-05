@@ -18,13 +18,13 @@ export class WalletRoutes {
     }
 
     private setupRoutes() {
-        this.router.get('/:userId/transactions', auth, (req, res, next) => this._controller.getTransactions(req, res).catch(next))
-        this.router.get('/:userId', auth, (req, res, next) => this._controller.getWallet(req, res).catch(next))
-        this.router.post('/deposit', auth, validate(DepositSchema), (req, res, next) => this._controller.deposit(req, res).catch(next))
-        this.router.post('/verify', auth, validate(VerifySchema), (req, res, next) => this._controller.verify(req, res).catch(next))
-        this.router.post('/withdraw', auth, validate(WithdrawSchema), (req, res, next) => this._controller.withdraw(req, res).catch(next))
-        this.router.post('/wager', auth, validate(WagerSchema), (req, res, next) => this._controller.wager(req, res).catch(next))
-        this.router.post('/win', auth, validate(WinSchema), (req, res, next) => this._controller.win(req, res).catch(next))
+        this.router.get('/:userId/transactions', auth, this._controller.getTransactions)
+        this.router.get('/:userId', auth, this._controller.getWallet)
+        this.router.post('/deposit', auth, validate(DepositSchema), this._controller.deposit)
+        this.router.post('/verify', auth, validate(VerifySchema), this._controller.verify)
+        this.router.post('/withdraw', auth, validate(WithdrawSchema), this._controller.withdraw)
+        this.router.post('/wager', auth, validate(WagerSchema), this._controller.wager)
+        this.router.post('/win', auth, validate(WinSchema), this._controller.win)
     }
 }
 

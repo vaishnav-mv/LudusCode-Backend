@@ -21,11 +21,11 @@ export class UserRoutes {
     }
 
     private setupRoutes() {
-        this.router.get('/:id/profile', auth, (req, res, next) => this._controller.profile(req, res).catch(next))
-        this.router.patch('/:id/premium', auth, (req, res, next) => this._controller.setPremium(req, res).catch(next))
-        this.router.patch('/:id/profile', auth, upload.single('avatar'), validate(UpdateProfileSchema), (req, res, next) => this._controller.updateProfile(req, res).catch(next))
-        this.router.post('/change-password', auth, (req, res, next) => this._controller.changePassword(req, res).catch(next))
-        this.router.get('/leaderboard/all', auth, (req, res, next) => this._controller.leaderboard(req, res).catch(next))
-        this.router.get('/search', auth, (req, res, next) => this._controller.searchUsers(req, res).catch(next))
+        this.router.get('/:id/profile', auth, this._controller.profile)
+        this.router.patch('/:id/premium', auth, this._controller.setPremium)
+        this.router.patch('/:id/profile', auth, upload.single('avatar'), validate(UpdateProfileSchema), this._controller.updateProfile)
+        this.router.post('/change-password', auth, this._controller.changePassword)
+        this.router.get('/leaderboard/all', auth, this._controller.leaderboard)
+        this.router.get('/search', auth, this._controller.searchUsers)
     }
 }

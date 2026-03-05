@@ -18,7 +18,7 @@ export class JudgeRoutes {
     }
 
     private setupRoutes() {
-        this.router.post('/execute', auth, validate(ExecuteSchema), (req, res, next) => this._controller.execute(req, res).catch(next))
+        this.router.post('/execute', auth, validate(ExecuteSchema), this._controller.execute)
     }
 }
 

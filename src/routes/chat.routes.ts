@@ -18,7 +18,7 @@ export class ChatRoutes {
     }
 
     private setupRoutes() {
-        this.router.get('/:groupId/messages', auth, (req, res, next) => this._controller.getMessages(req, res).catch(next))
-        this.router.post('/:groupId/messages', auth, validate(SendMessageSchema), (req, res, next) => this._controller.sendMessage(req, res).catch(next))
+        this.router.get('/:groupId/messages', auth, this._controller.getMessages)
+        this.router.post('/:groupId/messages', auth, validate(SendMessageSchema), this._controller.sendMessage)
     }
 }

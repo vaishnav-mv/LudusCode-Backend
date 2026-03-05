@@ -19,11 +19,11 @@ export class ProblemRoutes {
     }
 
     private setupRoutes() {
-        this.router.get('/approved', (req, res, next) => this._controller.approvedProblems(req, res).catch(next))
-        this.router.get('/daily', (req, res, next) => this._controller.dailyProblem(req, res).catch(next))
-        this.router.post('/', auth, (req, res, next) => this._controller.createProblem(req, res).catch(next))
-        this.router.post('/generate', auth, requireAdmin, validate(GenerateProblemSchema), (req, res, next) => this._controller.generateProblem(req, res).catch(next))
-        this.router.put('/:id', auth, requireAdmin, (req, res, next) => this._controller.updateProblem(req, res).catch(next))
+        this.router.get('/approved', this._controller.approvedProblems)
+        this.router.get('/daily', this._controller.dailyProblem)
+        this.router.post('/', auth, this._controller.createProblem)
+        this.router.post('/generate', auth, requireAdmin, validate(GenerateProblemSchema), this._controller.generateProblem)
+        this.router.put('/:id', auth, requireAdmin, this._controller.updateProblem)
     }
 }
 

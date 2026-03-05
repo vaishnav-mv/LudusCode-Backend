@@ -20,12 +20,12 @@ export class AiRoutes {
     }
 
     private setupRoutes() {
-        this.router.post('/hint', auth, validate(HintSchema), (req, res, next) => this._controller.hint(req, res).catch(next))
-        this.router.post('/code-review', auth, validate(CodeReviewSchema), (req, res, next) => this._controller.codeReview(req, res).catch(next))
-        this.router.post('/performance', auth, validate(PerformanceSchema), (req, res, next) => this._controller.performance(req, res).catch(next))
-        this.router.post('/generate-problem', auth, (req, res, next) => this._controller.generateProblem(req, res).catch(next))
-        this.router.post('/live-complexity', auth, requirePremium, validate(ComplexitySchema), (req, res, next) => this._controller.liveComplexity(req, res).catch(next))
-        this.router.post('/optimize', auth, requirePremium, validate(CodeReviewSchema), (req, res, next) => this._controller.optimize(req, res).catch(next))
-        this.router.post('/edge-cases', auth, requirePremium, validate(CodeReviewSchema), (req, res, next) => this._controller.edgeCases(req, res).catch(next))
+        this.router.post('/hint', auth, validate(HintSchema), this._controller.hint)
+        this.router.post('/code-review', auth, validate(CodeReviewSchema), this._controller.codeReview)
+        this.router.post('/performance', auth, validate(PerformanceSchema), this._controller.performance)
+        this.router.post('/generate-problem', auth, this._controller.generateProblem)
+        this.router.post('/live-complexity', auth, requirePremium, validate(ComplexitySchema), this._controller.liveComplexity)
+        this.router.post('/optimize', auth, requirePremium, validate(CodeReviewSchema), this._controller.optimize)
+        this.router.post('/edge-cases', auth, requirePremium, validate(CodeReviewSchema), this._controller.edgeCases)
     }
 }
