@@ -159,7 +159,7 @@ export class WalletRepository implements IWalletRepository {
         ]
       }).select('_id').lean();
 
-      const userIds = users.map(u => u._id);
+      const userIds = users.map(user => user._id);
 
       filter['$or'] = [
         { description: { $regex: options.query, $options: 'i' } },

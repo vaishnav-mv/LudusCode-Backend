@@ -4,7 +4,7 @@ import { HttpStatus, ResponseMessages } from '../constants'
 import { ApiResponse } from '../utils/ApiResponse'
 import { IGroupService } from '../interfaces/services'
 import { CreateGroupDTO, UpdateGroupDTO, GroupMemberActionDTO, AddMemberDTO } from '../dto/request/group.request.dto'
-import { getErrorMessage } from '../utils/errorUtils'
+import { asyncHandler } from "../utils/asyncHandler";
 
 @singleton()
 export class GroupController {
@@ -16,13 +16,12 @@ export class GroupController {
    * @req     body: { name, description,topics }
    * @res     { group }
    */
-  createGroup = async (req: Request, res: Response) => {
+  createGroup = asyncHandler(async (req: Request, res: Response) => {
     const currentUser = req.user
     const body = req.body as CreateGroupDTO
-    // Fix: Ensure description is a string
     const createdGroup = await this._service.create(body.name, body.description || '', body.topics || [], currentUser?.sub as string, !!body.isPrivate)
     return ApiResponse.success(res, createdGroup, 'Group created', HttpStatus.CREATED)
-  }
+  })
 
   /**
    * @desc    Update a group
@@ -30,24 +29,16 @@ export class GroupController {
    * @req     params: { id }, body: { name, description }
    * @res     { group }
    */
-  updateGroup = async (req: Request, res: Response) => {
+  updateGroup = asyncHandler(async (req: Request, res: Response) => {
     const currentUser = req.user
     const body = req.body as UpdateGroupDTO
-    try {
-      const updated = await this._service.update(req.params.id, currentUser?.sub as string, {
-        name: body.name,
-        description: body.description
-      })
-      if (!updated) return ApiResponse.error(res, ResponseMessages.GROUP_NOT_FOUND, HttpStatus.NOT_FOUND)
-      return ApiResponse.success(res, updated)
-    } catch (error: unknown) {
-      const msg = getErrorMessage(error)
-      if (msg.includes('Forbidden')) {
-        return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
-      }
-      return ApiResponse.error(res, msg, HttpStatus.BAD_REQUEST)
-    }
-  }
+    const updated = await this._service.update(req.params.id, currentUser?.sub as string, {
+      name: body.name,
+      description: body.description
+    })
+    if (!updated) return ApiResponse.error(res, ResponseMessages.GROUP_NOT_FOUND, HttpStatus.NOT_FOUND)
+    return ApiResponse.success(res, updated)
+  })
 
   /**
    * @desc    List all groups
@@ -55,24 +46,18 @@ export class GroupController {
    * @req     -
    * @res     [Group]
    */
-  listGroups = async (req: Request, res: Response) => {
-    try {
-      const currentUser = req.user;
-      const { q, sort, isPrivate, page, limit } = req.query;
-      const result = await this._service.list(currentUser?.sub, {
-        query: q as string,
-        sort: sort as string,
-        isPrivate: isPrivate as string,
-        page: page ? parseInt(page as string) : undefined,
-        limit: limit ? parseInt(limit as string) : undefined
-      })
-
-      return ApiResponse.success(res, result)
-    } catch (err: unknown) {
-      console.error('GroupController: Error listing groups:', err);
-      return ApiResponse.error(res, ResponseMessages.INTERNAL_ERROR, HttpStatus.INTERNAL_SERVER_ERROR)
-    }
-  }
+  listGroups = asyncHandler(async (req: Request, res: Response) => {
+    const currentUser = req.user;
+    const { q, sort, isPrivate, page, limit } = req.query;
+    const result = await this._service.list(currentUser?.sub, {
+      query: q as string,
+      sort: sort as string,
+      isPrivate: isPrivate as string,
+      page: page ? parseInt(page as string) : undefined,
+      limit: limit ? parseInt(limit as string) : undefined
+    })
+    return ApiResponse.success(res, result)
+  })
 
   /**
    * @desc    Get group details
@@ -80,13 +65,13 @@ export class GroupController {
    * @req     params: { id }
    * @res     { group }
    */
-  groupDetail = async (req: Request, res: Response) => {
+  groupDetail = asyncHandler(async (req: Request, res: Response) => {
     const group = await this._service.detail(req.params.id)
     if (!group) {
       return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
     }
     return ApiResponse.success(res, group)
-  }
+  })
 
   /**
    * @desc    Join a group
@@ -94,17 +79,13 @@ export class GroupController {
    * @req     params: { id }, body: { userId }
    * @res     { ok: boolean }
    */
-  joinGroup = async (req: Request, res: Response) => {
-    try {
-      const currentUser = req.user
-      const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-      if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
-      const ok = await this._service.join(req.params.id, userId)
-      return ApiResponse.success(res, { ok })
-    } catch (e: unknown) {
-      return ApiResponse.error(res, getErrorMessage(e), HttpStatus.BAD_REQUEST)
-    }
-  }
+  joinGroup = asyncHandler(async (req: Request, res: Response) => {
+    const currentUser = req.user
+    const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
+    if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
+    const ok = await this._service.join(req.params.id, userId)
+    return ApiResponse.success(res, { ok })
+  })
 
   /**
    * @desc    Leave a group
@@ -112,14 +93,14 @@ export class GroupController {
    * @req     params: { id }, body: { userId }
    * @res     { ok: boolean }
    */
-  leaveGroup = async (req: Request, res: Response) => {
+  leaveGroup = asyncHandler(async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
     if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
 
     const ok = await this._service.leave(req.params.id, userId)
     return ApiResponse.success(res, { ok })
-  }
+  })
 
   /**
    * @desc    Approve a join request
@@ -127,14 +108,14 @@ export class GroupController {
    * @req     params: { id }, body: { userId }
    * @res     { ok: boolean }
    */
-  approveGroupJoin = async (req: Request, res: Response) => {
+  approveGroupJoin = asyncHandler(async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
     if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.approveJoin(req.params.id, body.userId, userId)
     return ApiResponse.success(res, { ok })
-  }
+  })
 
   /**
    * @desc    Reject a join request
@@ -142,14 +123,14 @@ export class GroupController {
    * @req     params: { id }, body: { userId }
    * @res     { ok: boolean }
    */
-  rejectGroupJoin = async (req: Request, res: Response) => {
+  rejectGroupJoin = asyncHandler(async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
     if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.rejectJoin(req.params.id, body.userId, userId)
     return ApiResponse.success(res, { ok })
-  }
+  })
 
   /**
    * @desc    Kick a member
@@ -157,14 +138,14 @@ export class GroupController {
    * @req     params: { id }, body: { userId }
    * @res     { ok: boolean }
    */
-  kickGroupMember = async (req: Request, res: Response) => {
+  kickGroupMember = asyncHandler(async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
     if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.kickMember(req.params.id, body.userId, userId)
     return ApiResponse.success(res, { ok })
-  }
+  })
 
   /**
    * @desc    Delete a group
@@ -172,13 +153,13 @@ export class GroupController {
    * @req     params: { id }
    * @res     { ok: boolean }
    */
-  deleteGroup = async (req: Request, res: Response) => {
+  deleteGroup = asyncHandler(async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
     if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const ok = await this._service.delete(req.params.id, userId)
     return ApiResponse.success(res, { ok })
-  }
+  })
 
   /**
    * @desc    Block a member
@@ -186,14 +167,14 @@ export class GroupController {
    * @req     params: { id }, body: { userId }
    * @res     { ok: boolean }
    */
-  blockGroupMember = async (req: Request, res: Response) => {
+  blockGroupMember = asyncHandler(async (req: Request, res: Response) => {
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
     if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
     const body = req.body as GroupMemberActionDTO
     const ok = await this._service.blockMember(req.params.id, body.userId, userId)
     return ApiResponse.success(res, { ok })
-  }
+  })
 
   /**
    * @desc    Add a member to a group (Private)
@@ -201,20 +182,12 @@ export class GroupController {
    * @req     params: { id }, body: { userId }
    * @res     { ok: boolean }
    */
-  addGroupMember = async (req: Request, res: Response) => {
-    try {
-      const currentUser = req.user
-      const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-      if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
-      const body = req.body as AddMemberDTO
-      const ok = await this._service.addMember(req.params.id, body.userId, userId)
-      return ApiResponse.success(res, { ok })
-    } catch (error: unknown) {
-      const msg = getErrorMessage(error)
-      if (msg.includes('Forbidden')) {
-        return ApiResponse.error(res, msg, HttpStatus.FORBIDDEN)
-      }
-      return ApiResponse.error(res, msg, HttpStatus.BAD_REQUEST)
-    }
-  }
+  addGroupMember = asyncHandler(async (req: Request, res: Response) => {
+    const currentUser = req.user
+    const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
+    if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED)
+    const body = req.body as AddMemberDTO
+    const ok = await this._service.addMember(req.params.id, body.userId, userId)
+    return ApiResponse.success(res, { ok })
+  })
 }

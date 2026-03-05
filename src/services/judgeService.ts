@@ -151,7 +151,7 @@ if (userFn) {
             } catch {
               // Not valid JSON — normalize as plain text
               // Strip trailing newlines and collapse whitespace per line
-              return trimmed.split('\n').map(l => l.trimEnd()).join('\n');
+              return trimmed.split('\n').map(line => line.trimEnd()).join('\n');
             }
           };
 
@@ -176,9 +176,9 @@ if (userFn) {
     let overall: SubmissionStatus;
     if (passed === testCases.length) {
       overall = SubmissionStatus.Accepted;
-    } else if (results.some(r => r.status === SubmissionStatus.TimeLimitExceeded)) {
+    } else if (results.some(result => result.status === SubmissionStatus.TimeLimitExceeded)) {
       overall = SubmissionStatus.TimeLimitExceeded;
-    } else if (results.some(r => r.status === SubmissionStatus.RuntimeError)) {
+    } else if (results.some(result => result.status === SubmissionStatus.RuntimeError)) {
       overall = SubmissionStatus.RuntimeError;
     } else {
       overall = SubmissionStatus.WrongAnswer;

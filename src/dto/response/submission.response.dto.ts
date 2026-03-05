@@ -1,8 +1,9 @@
-import { SubmissionStatus, TestCaseResult, Problem } from '../../types';
+import { SubmissionStatus, TestCaseResult } from '../../types';
+import { ProblemResponseDTO } from './problem.response.dto';
 
 export interface SubmissionResponseDTO {
     id: string;
-    problem: Partial<Problem> & { id: string };
+    problem: ProblemResponseDTO;
     userCode: string;
     result: {
         overallStatus: SubmissionStatus;

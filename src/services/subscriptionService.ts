@@ -2,6 +2,8 @@ import { singleton, inject } from 'tsyringe'
 import { ISubscriptionService } from '../interfaces/services'
 import { ISubscriptionRepository, IWalletRepository, IUserRepository } from '../interfaces/repositories'
 import { SubscriptionPlan, SubscriptionLog, User, TransactionType } from '../types'
+import { mapSubscriptionPlan, mapSubscriptionLog } from '../utils/mapper'
+import { SubscriptionPlanResponseDTO, SubscriptionLogResponseDTO } from '../dto/response/subscription.response.dto'
 
 /**
  * Determines the subscription action (new, renew, upgrade, downgrade)
@@ -73,8 +75,9 @@ export class SubscriptionService implements ISubscriptionService {
         @inject('IUserRepository') private _users: IUserRepository
     ) { }
 
-    async getPlans(): Promise<SubscriptionPlan[]> {
-        return this._subscriptions.getPlans()
+    async getPlans(): Promise<SubscriptionPlanResponseDTO[]> {
+        const plans = await this._subscriptions.getPlans();
+        return plans.map(plan => mapSubscriptionPlan(plan)).filter((plan): plan is SubscriptionPlanResponseDTO => plan !== null);
     }
 
     async subscribe(userId: string, planId: string): Promise<{ success: boolean, action?: string, expiry?: Date, message?: string }> {
@@ -184,11 +187,11 @@ export class SubscriptionService implements ISubscriptionService {
         return { success: true, message: 'Auto-renew enabled successfully.' }
     }
 
-    async history(userId: string, page: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc' }): Promise<{ logs: SubscriptionLog[], total: number, page: number, totalPages: number }> {
+    async history(userId: string, page: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc' }): Promise<{ logs: SubscriptionLogResponseDTO[], total: number, page: number, totalPages: number }> {
         const skip = (page - 1) * limit
         const { logs, total } = await this._subscriptions.getLogsByUser(userId, skip, limit, options)
         return {
-            logs,
+            logs: logs.map(log => mapSubscriptionLog(log)).filter((log): log is SubscriptionLogResponseDTO => log !== null),
             total,
             page,
             totalPages: Math.ceil(total / limit)

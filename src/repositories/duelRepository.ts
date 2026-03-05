@@ -4,6 +4,7 @@ import { DuelModel } from '../models/Duel'
 import { Duel, DuelStatus } from '../types'
 import { Model } from 'mongoose'
 import { BaseRepository } from './BaseRepository'
+import logger from '../utils/logger'
 
 @singleton()
 export class DuelRepository extends BaseRepository<Duel> implements IDuelRepository {
@@ -67,7 +68,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
       .populate('winner')
       .lean();
 
-    console.log('[DuelRepository] attemptJoin result:', updatedDuel ? 'Found' : 'Null', updatedDuel?.player2);
+    logger.debug('[DuelRepository] attemptJoin result:', updatedDuel ? 'Found' : 'Null');
 
     const result = updatedDuel ? this.mapDoc(updatedDuel) : null;
     return result || null;
@@ -249,12 +250,12 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
         const close = Math.abs((submission1.submittedAt || 0) - (submission2.submittedAt || 0)) <= 120000;
         const copied = submission1.codeHash && submission2.codeHash && submission1.codeHash === submission2.codeHash;
         if (copied && close) {
-          const u1 = submission1.user as { _id?: { toString(): string }, id?: string } | string;
-          const u2 = submission2.user as { _id?: { toString(): string }, id?: string } | string;
-          const uid1 = typeof u1 === 'object' && u1 ? (u1._id?.toString() || u1.id) : u1;
-          const uid2 = typeof u2 === 'object' && u2 ? (u2._id?.toString() || u2.id) : u2;
+          const submitter1 = submission1.user as { _id?: { toString(): string }, id?: string } | string;
+          const submitter2 = submission2.user as { _id?: { toString(): string }, id?: string } | string;
+          const uid1 = typeof submitter1 === 'object' && submitter1 ? (submitter1._id?.toString() || submitter1.id) : submitter1;
+          const uid2 = typeof submitter2 === 'object' && submitter2 ? (submitter2._id?.toString() || submitter2.id) : submitter2;
 
-          const uids = [{ id: uid1, obj: u1 }, { id: uid2, obj: u2 }].filter(u => u.id);
+          const uids = [{ id: uid1, obj: submitter1 }, { id: uid2, obj: submitter2 }].filter(entry => entry.id);
           for (const { id: uid, obj } of uids) {
             if (!uid) continue;
             const prev = flags.get(uid) || { count: 0, paste: 0, visibility: 0, last: 0, userObj: null };
@@ -266,8 +267,8 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
 
       const checkPlayer = (player: { user?: unknown, warnings?: number, warningsBreakdown?: { paste?: number, visibility?: number } }) => {
         if (player.user && player.warnings && player.warnings > 0) {
-          const u = player.user as { _id?: { toString(): string }, id?: string } | string | null;
-          const uid = typeof u === 'object' && u !== null ? (u._id?.toString() || u.id) : u;
+          const playerUser = player.user as { _id?: { toString(): string }, id?: string } | string | null;
+          const uid = typeof playerUser === 'object' && playerUser !== null ? (playerUser._id?.toString() || playerUser.id) : playerUser;
           if (uid) {
             const prev = flags.get(uid) || { count: 0, paste: 0, visibility: 0, last: 0, userObj: null };
             const duelTime = new Date(duel.updatedAt || duel.startTime || Date.now()).getTime();

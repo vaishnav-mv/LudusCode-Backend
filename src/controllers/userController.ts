@@ -1,14 +1,12 @@
 import { singleton, inject } from 'tsyringe'
 import { Request, Response } from 'express'
-import { getErrorMessage } from '../utils/errorUtils'
-
 import { HttpStatus, ResponseMessages } from '../constants'
 import { ApiResponse } from '../utils/ApiResponse'
 import { IUserService } from '../interfaces/services'
 import { ICloudinaryProvider } from '../interfaces/providers'
 import { UpdateProfileRequestDTO, ChangePasswordRequestDTO } from '../dto/request/user.request.dto'
-import { mapUser } from '../utils/mapper'
 import { User } from '../types'
+import { asyncHandler } from "../utils/asyncHandler";
 
 @singleton()
 export class UserController {
@@ -23,12 +21,12 @@ export class UserController {
      * @req     params: { id }
      * @res     { user, recentDuels, joinedGroups, submissionStats }
      */
-    profile = async (req: Request, res: Response) => {
+    profile = asyncHandler(async (req: Request, res: Response) => {
         const userId = req.params.id;
         const userProfile = await this._service.profile(userId);
         if (!userProfile) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
         return ApiResponse.success(res, userProfile);
-    }
+    })
 
     /**
      * @desc    Upgrade user to premium
@@ -36,7 +34,7 @@ export class UserController {
      * @req     params: { id }
      * @res     { user }
      */
-    setPremium = async (req: Request, res: Response) => {
+    setPremium = asyncHandler(async (req: Request, res: Response) => {
         const currentUser = req.user;
         if (!currentUser || !currentUser.isAdmin) {
             return ApiResponse.error(res, ResponseMessages.FORBIDDEN, HttpStatus.FORBIDDEN);
@@ -44,8 +42,8 @@ export class UserController {
         const userId = req.params.id;
         const updatedUser = await this._service.setPremium(userId);
         if (!updatedUser) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
-        return ApiResponse.success(res, updatedUser);
-    }
+        return ApiResponse.success(res, { user: updatedUser });
+    })
 
     /**
      * @desc    Get global leaderboard
@@ -53,15 +51,12 @@ export class UserController {
      * @req     -
      * @res     [User]
      */
-    leaderboard = async (req: Request, res: Response) => {
+    leaderboard = asyncHandler(async (req: Request, res: Response) => {
         const page = parseInt(req.query.page as string) || 1;
         const limit = parseInt(req.query.limit as string) || 100;
         const result = await this._service.leaderboard(page, limit);
-        return ApiResponse.success(res, {
-            ...result,
-            users: result.users.map(user => mapUser(user))
-        });
-    }
+        return ApiResponse.success(res, result);
+    })
 
     /**
      * @desc    Update user profile
@@ -69,7 +64,7 @@ export class UserController {
      * @req     params: { id }, body: { name }, file: avatar
      * @res     { user }
      */
-    updateProfile = async (req: Request, res: Response) => {
+    updateProfile = asyncHandler(async (req: Request, res: Response) => {
         const userId = req.params.id;
         const currentUser = req.user;
         if (!currentUser || (!currentUser.isAdmin && currentUser.sub !== userId)) return ApiResponse.error(res, ResponseMessages.FORBIDDEN, HttpStatus.FORBIDDEN);
@@ -91,8 +86,8 @@ export class UserController {
 
         const updatedUser = await this._service.updateProfile(userId, updateData);
         if (!updatedUser) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND);
-        return ApiResponse.success(res, { user: mapUser(updatedUser) });
-    }
+        return ApiResponse.success(res, { user: updatedUser });
+    })
 
     /**
      * @desc    Change user password
@@ -100,17 +95,13 @@ export class UserController {
      * @req     body: { oldPassword, newPassword }
      * @res     { message }
      */
-    changePassword = async (req: Request, res: Response) => {
+    changePassword = asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user?.sub;
         if (!userId) return ApiResponse.error(res, ResponseMessages.UNAUTHORIZED, HttpStatus.UNAUTHORIZED);
         const { oldPassword, newPassword } = req.body as ChangePasswordRequestDTO;
-        try {
-            await this._service.changePassword(userId, oldPassword, newPassword);
-            return ApiResponse.success(res, null, 'Password updated successfully');
-        } catch (error: unknown) {
-            return ApiResponse.error(res, getErrorMessage(error), HttpStatus.BAD_REQUEST);
-        }
-    }
+        await this._service.changePassword(userId, oldPassword, newPassword);
+        return ApiResponse.success(res, null, 'Password updated successfully');
+    })
 
     /**
      * @desc    Search users by username or email
@@ -118,12 +109,12 @@ export class UserController {
      * @req     query: { q }
      * @res     [User]
      */
-    searchUsers = async (req: Request, res: Response) => {
+    searchUsers = asyncHandler(async (req: Request, res: Response) => {
         const query = req.query.q as string;
         if (!query || query.length < 2) {
             return ApiResponse.success(res, []);
         }
         const users = await this._service.search(query);
-        return ApiResponse.success(res, users.map(user => mapUser(user)));
-    }
+        return ApiResponse.success(res, users);
+    })
 }

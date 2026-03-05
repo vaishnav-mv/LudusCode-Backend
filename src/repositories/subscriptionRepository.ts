@@ -98,7 +98,7 @@ export class SubscriptionRepository implements ISubscriptionRepository {
                 ]
             }
             const users = await UserModel.find(userFilter).select('_id').lean()
-            const userIds = users.map(u => u._id)
+            const userIds = users.map(user => user._id)
             match.userId = { $in: userIds }
         }
 

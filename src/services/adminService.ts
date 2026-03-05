@@ -1,10 +1,14 @@
-
 import { singleton, inject } from 'tsyringe'
 import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository, IWalletRepository, ISubscriptionRepository } from '../interfaces/repositories'
 import { broadcastDuel } from '../realtime/ws'
-import { mapDuel } from '../utils/mapper'
+import { mapDuel, mapProblem, mapSubscriptionPlan, mapSubscriptionLog, mapTransaction, mapUser } from '../utils/mapper'
 import { IAdminService } from '../interfaces/services'
 import { DuelStatus, ProblemStatus, SubscriptionPlan, TransactionType, User } from '../types'
+import { UserResponseDTO } from '../dto/response/user.response.dto'
+import { ProblemResponseDTO } from '../dto/response/problem.response.dto'
+import { SubscriptionPlanResponseDTO, SubscriptionLogResponseDTO } from '../dto/response/subscription.response.dto'
+import { TransactionResponseDTO } from '../dto/response/transaction.response.dto'
+import { DuelResponseDTO } from '../dto/response/duel.response.dto'
 import { computeSubscriptionAction } from './subscriptionService'
 
 @singleton()
@@ -81,8 +85,9 @@ export class AdminService implements IAdminService {
     }
   }
 
-  async pendingProblems() {
-    return this._problems.pending()
+  async pendingProblems(): Promise<ProblemResponseDTO[]> {
+    const problems = await this._problems.pending();
+    return problems.map(problem => mapProblem(problem)).filter((problem): problem is ProblemResponseDTO => problem !== null);
   }
 
   async approveProblem(id: string) {
@@ -99,21 +104,21 @@ export class AdminService implements IAdminService {
     return true
   }
 
-  async allProblems(page: number = 1, limit: number = 50) {
+  async allProblems(page: number = 1, limit: number = 50): Promise<{ problems: ProblemResponseDTO[], total: number, page: number, totalPages: number }> {
     const skip = (page - 1) * limit
     const [problems, total] = await Promise.all([
       this._problems.all(skip, limit),
       this._problems.count()
     ])
     return {
-      problems,
+      problems: problems.map(problem => mapProblem(problem)).filter((problem): problem is ProblemResponseDTO => problem !== null),
       total,
       page,
       totalPages: Math.ceil(total / limit)
     }
   }
 
-  async allUsers(page: number = 1, limit: number = 5, query?: string) {
+  async allUsers(page: number = 1, limit: number = 5, query?: string): Promise<{ users: UserResponseDTO[], total: number, page: number, totalPages: number }> {
     const skip = (page - 1) * limit
     const filter: Record<string, unknown> = { isAdmin: { $ne: true } }
 
@@ -139,7 +144,7 @@ export class AdminService implements IAdminService {
     )
 
     return {
-      users: usersWithRank,
+      users: usersWithRank.map(user => mapUser(user)).filter((user): user is UserResponseDTO => user !== null),
       total,
       page,
       totalPages: Math.ceil(total / limit)
@@ -160,29 +165,33 @@ export class AdminService implements IAdminService {
     return !!user
   }
 
-  async searchUsers(query: string) {
-    return this._users.search(query);
+  async searchUsers(query: string): Promise<UserResponseDTO[]> {
+    const users = await this._users.search(query);
+    return users.map(user => mapUser(user)).filter((user): user is UserResponseDTO => user !== null);
   }
 
-  async flaggedActivities(page: number = 1, limit: number = 50) {
+  async flaggedActivities(page: number = 1, limit: number = 50): Promise<{ data: { user: UserResponseDTO; totalWarnings: number; lastOffense: string; breakdown: { paste: number; visibility: number; }; }[]; total: number; page: number; totalPages: number; }> {
     const { data, total } = await this._duels.getFlaggedActivities(page, limit)
 
     return {
-      data: data as { _id?: string; user: User; totalWarnings: number; lastOffense: string; breakdown: { paste: number; visibility: number } }[],
+      data: data.map(flagged => ({
+        ...flagged,
+        user: mapUser(flagged.user as User)!
+      })) as { _id?: string; user: UserResponseDTO; totalWarnings: number; lastOffense: string; breakdown: { paste: number; visibility: number } }[],
       total,
       page,
       totalPages: Math.ceil(total / limit)
     }
   }
 
-  async monitoredDuels(page: number = 1, limit: number = 50) {
+  async monitoredDuels(page: number = 1, limit: number = 50): Promise<{ duels: DuelResponseDTO[], total: number, page: number, totalPages: number }> {
     const skip = (page - 1) * limit
     const [recentDuels, total] = await Promise.all([
       this._duels.all(skip, limit),
       this._duels.count()
     ])
     return {
-      duels: recentDuels,
+      duels: recentDuels.map(duel => mapDuel(duel)).filter((duel): duel is DuelResponseDTO => duel !== null),
       total,
       page,
       totalPages: Math.ceil(total / limit)
@@ -210,37 +219,30 @@ export class AdminService implements IAdminService {
     return true
   }
 
-  async subscriptionData(page: number = 1, limit: number = 50, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }) {
+  async subscriptionData(page: number = 1, limit: number = 50, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }): Promise<{ plans: SubscriptionPlanResponseDTO[], logs: SubscriptionLogResponseDTO[], total: number, page: number, totalPages: number }> {
     const skip = (page - 1) * limit
     const [plansInfo, { logs, total }] = await Promise.all([
       this._subscriptions.getPlans(),
       this._subscriptions.getLogsAll(skip, limit, options)
     ])
 
-    const formattedPlans = plansInfo.map((plan) => ({
-      id: (plan._id || plan.id || '').toString(),
-      name: plan.name,
-      price: plan.price,
-      period: plan.period,
-      maxDailyDuels: plan.maxDailyDuels,
-      features: plan.features
-    }))
-
     return {
-      plans: formattedPlans,
-      logs: logs as unknown as { id: string, user: { name: string, avatarUrl: string }, plan: { name: string }, action: string, timestamp: Date | string, amount: number, expiryDate?: Date | string }[],
+      plans: plansInfo.map(plan => mapSubscriptionPlan(plan)).filter((plan): plan is SubscriptionPlanResponseDTO => plan !== null),
+      logs: logs.map(log => mapSubscriptionLog(log)).filter((log): log is SubscriptionLogResponseDTO => log !== null),
       total,
       page,
       totalPages: Math.ceil(total / limit)
     }
   }
 
-  async createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan> {
-    return this._subscriptions.createPlan(data)
+  async createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlanResponseDTO> {
+    const created = await this._subscriptions.createPlan(data)
+    return mapSubscriptionPlan(created)!
   }
 
-  async updatePlan(id: string, data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | null> {
-    return this._subscriptions.updatePlan(id, data)
+  async updatePlan(id: string, data: Partial<SubscriptionPlan>): Promise<SubscriptionPlanResponseDTO | null> {
+    const updated = await this._subscriptions.updatePlan(id, data)
+    return updated ? mapSubscriptionPlan(updated) : null
   }
 
   async deletePlan(id: string) {
@@ -302,11 +304,11 @@ export class AdminService implements IAdminService {
     return { balance: wallet.balance, currency: wallet.currency }
   }
 
-  async getAllTransactions(page: number = 1, limit: number = 50, options?: { status?: string, type?: string, sort?: string, query?: string }) {
+  async getAllTransactions(page: number = 1, limit: number = 50, options?: { status?: string, type?: string, sort?: string, query?: string }): Promise<{ transactions: TransactionResponseDTO[], total: number, page: number, totalPages: number }> {
     const skip = (page - 1) * limit
     const { transactions, total } = await this._wallets.getAllTransactions(skip, limit, options)
     return {
-      transactions,
+      transactions: transactions.map(transaction => mapTransaction(transaction)).filter((transaction): transaction is TransactionResponseDTO => transaction !== null),
       total,
       page,
       totalPages: Math.ceil(total / limit)

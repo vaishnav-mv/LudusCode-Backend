@@ -1,9 +1,22 @@
 import { UserResponseDTO } from './user.response.dto'
-import { Problem, SubmissionStatus } from '../../types'
+import { ProblemResponseDTO } from './problem.response.dto'
+import { SubmissionStatus } from '../../types'
+
+export interface DuelSubmissionDTO {
+    id: string;
+    user: UserResponseDTO | string;
+    status: SubmissionStatus | string;
+    userCode: string;
+    executionTime: number;
+    memoryUsage: number;
+    attempts: number;
+    codeHash?: string;
+    submittedAt: number;
+}
 
 export interface DuelResponseDTO {
     id: string
-    problem: Problem
+    problem: ProblemResponseDTO
     player1: { user: UserResponseDTO | null; warnings: number }
     player2: { user: UserResponseDTO | null; warnings: number }
     status: string
@@ -12,6 +25,5 @@ export interface DuelResponseDTO {
     wager?: number
     finalOverallStatus?: SubmissionStatus
     finalUserCode?: string
-    submissions?: Submission[]
+    submissions?: DuelSubmissionDTO[]
 }
-import { Submission } from '../../types'

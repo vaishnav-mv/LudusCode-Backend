@@ -3,6 +3,8 @@ import { IAiService } from '../interfaces/services'
 import { IProblemRepository, IUserRepository, IGroupRepository } from '../interfaces/repositories'
 import { IAiProvider } from '../interfaces/providers'
 import { Problem, User, Group } from '../types'
+import { mapProblem } from '../utils/mapper'
+import { ProblemResponseDTO } from '../dto/response/problem.response.dto'
 
 @singleton()
 export class AiService implements IAiService {
@@ -44,8 +46,9 @@ export class AiService implements IAiService {
         return this._provider.performance({ user: profile, submissionStats, joinedGroups });
     }
 
-    async generateProblem(difficulty: string, topic: string): Promise<Problem> {
-        return this._provider.generateProblem(difficulty, topic);
+    async generateProblem(difficulty: string, topic: string): Promise<ProblemResponseDTO> {
+        const problem = await this._provider.generateProblem(difficulty, topic);
+        return mapProblem(problem)!;
     }
 
     async complexity(userCode: string): Promise<string> {

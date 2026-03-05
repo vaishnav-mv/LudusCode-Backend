@@ -5,6 +5,7 @@ import { IUserRepository } from '../interfaces/repositories'
 import { env } from '../config/env'
 import { ResponseMessages } from '../constants'
 import logger from '../utils/logger'
+import { mapUser } from '../utils/mapper'
 
 
 @singleton()
@@ -55,7 +56,7 @@ export class SocialAuthService implements ISocialAuthService {
             const refresh = this._jwtProvider.signRefresh({ sub: user._id?.toString() || user.id || '' })
 
             logger.info('Google Auth success');
-            return { user, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } }
+            return { user: mapUser(user)!, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } }
         } catch (error: unknown) {
             logger.error({ message: 'Error in handleGoogleCallback', error: error });
             throw error;
@@ -93,6 +94,6 @@ export class SocialAuthService implements ISocialAuthService {
         const access = this._jwtProvider.signAccess({ sub: user._id?.toString() || user.id || '', isAdmin: !!user.isAdmin })
         const refresh = this._jwtProvider.signRefresh({ sub: user._id?.toString() || user.id || '' })
 
-        return { user, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } }
+        return { user: mapUser(user)!, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } }
     }
 }

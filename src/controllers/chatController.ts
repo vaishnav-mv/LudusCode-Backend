@@ -1,12 +1,10 @@
 import { Request, Response } from 'express'
 import { singleton, inject } from 'tsyringe'
-
 import { broadcastChat } from '../realtime/ws'
 import { IChatService } from '../interfaces/services'
 import { SendMessageDTO } from '../dto/request/chat.request.dto'
-import { mapMessage } from '../utils/mapper'
 import { ApiResponse } from '../utils/ApiResponse'
-import { HttpStatus } from '../constants'
+import { asyncHandler } from "../utils/asyncHandler";
 
 @singleton()
 export class ChatController {
@@ -18,11 +16,11 @@ export class ChatController {
      * @req     params: { groupId }
      * @res     [Message]
      */
-    getMessages = async (req: Request, res: Response) => {
+    getMessages = asyncHandler(async (req: Request, res: Response) => {
         const groupId = req.params.groupId;
         const messages = await this._service.getMessages(groupId);
-        return ApiResponse.success(res, messages.map(mapMessage).filter(Boolean))
-    }
+        return ApiResponse.success(res, messages)
+    })
 
     /**
      * @desc    Send a message to a group
@@ -30,17 +28,12 @@ export class ChatController {
      * @req     params: { groupId }, body: { userId, text }
      * @res     { message }
      */
-    sendMessage = async (req: Request, res: Response) => {
+    sendMessage = asyncHandler(async (req: Request, res: Response) => {
         const groupId = req.params.groupId;
         const body = req.body as SendMessageDTO
         const userId = body.userId;
-        const sentMessage = await this._service.sendMessage(groupId, userId, body.text);
-        const dto = mapMessage(sentMessage);
-        if (dto) {
-            broadcastChat(groupId, dto);
-            return ApiResponse.success(res, dto)
-        } else {
-            return ApiResponse.error(res, 'Error mapping message', HttpStatus.INTERNAL_SERVER_ERROR)
-        }
-    }
+        const dto = await this._service.sendMessage(groupId, userId, body.text);
+        broadcastChat(groupId, dto);
+        return ApiResponse.success(res, dto)
+    })
 }

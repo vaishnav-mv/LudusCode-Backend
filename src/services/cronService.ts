@@ -2,10 +2,11 @@ import { singleton, inject } from 'tsyringe';
 import * as cron from 'node-cron';
 import { IUserRepository, IWalletRepository, ISubscriptionRepository } from '../interfaces/repositories';
 import { SubscriptionLog, User, TransactionType } from '../types';
+import logger from '../utils/logger';
 
 @singleton()
 export class CronService {
-    private cronJob: cron.ScheduledTask | null = null;
+    private _cronJob: cron.ScheduledTask | null = null;
 
     constructor(
         @inject('IUserRepository') private _users: IUserRepository,
@@ -15,12 +16,12 @@ export class CronService {
 
     startDailyCron() {
         // Run every day at midnight server time: '0 0 * * *'
-        this.cronJob = cron.schedule('0 0 * * *', async () => {
-            console.log('[CronService] Running daily subscription check at', new Date().toISOString());
+        this._cronJob = cron.schedule('0 0 * * *', async () => {
+            logger.info(`[CronService] Running daily subscription check at ${new Date().toISOString()}`);
             await this.processExpiredSubscriptions();
         });
 
-        console.log('[CronService] Daily subscription cron initialized.');
+        logger.info('[CronService] Daily subscription cron initialized.');
     }
 
     async processExpiredSubscriptions() {
@@ -32,7 +33,7 @@ export class CronService {
                 await this.processUserSubscription(user);
             }
         } catch (error) {
-            console.error('[CronService] Error processing expired subscriptions:', error);
+            logger.error('[CronService] Error processing expired subscriptions:', error);
         }
     }
 
@@ -94,9 +95,9 @@ export class CronService {
                 expiryDate: newExpiry
             } as Partial<SubscriptionLog>);
 
-            console.log(`[CronService] Successfully auto-renewed user ${userId} for plan ${planId}`);
+            logger.info(`[CronService] Successfully auto-renewed user ${userId} for plan ${planId}`);
         } catch (error) {
-            console.error(`[CronService] Failed to auto-renew user ${userId}:`, error);
+            logger.error(`[CronService] Failed to auto-renew user ${userId}:`, error);
             // Don't terminate here, let it retry tomorrow or attempt a secondary payment hook if implemented
         }
     }
@@ -118,6 +119,6 @@ export class CronService {
             } as Partial<SubscriptionLog>);
         }
 
-        console.log(`[CronService] Terminated subscription for user ${userId}. Reason: ${reason}`);
+        logger.info(`[CronService] Terminated subscription for user ${userId}. Reason: ${reason}`);
     }
 }

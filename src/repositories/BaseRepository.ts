@@ -41,8 +41,8 @@ export abstract class BaseRepository<T> implements IBaseRepository<T> {
 
   protected mapDoc(doc: unknown): T | undefined {
     if (!doc || typeof doc !== 'object') return undefined;
-    const d = doc as Record<string, unknown> & { _id?: unknown, id?: unknown };
-    return { ...d, id: d._id?.toString() || d.id } as unknown as T;
+    const docRecord = doc as Record<string, unknown> & { _id?: unknown, id?: unknown };
+    return { ...docRecord, id: docRecord._id?.toString() || docRecord.id } as unknown as T;
   }
 }
 

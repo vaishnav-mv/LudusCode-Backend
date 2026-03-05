@@ -2,6 +2,10 @@ import { singleton, inject } from 'tsyringe'
 import { IWalletRepository } from '../interfaces/repositories'
 import { IWalletService } from '../interfaces/services'
 import { IPaymentProvider } from '../interfaces/providers'
+import { mapWallet, mapTransaction } from '../utils/mapper'
+import { WalletResponseDTO } from '../dto/response/wallet.response.dto'
+import { TransactionResponseDTO } from '../dto/response/transaction.response.dto'
+import logger from '../utils/logger'
 
 @singleton()
 export class WalletService implements IWalletService {
@@ -11,8 +15,9 @@ export class WalletService implements IWalletService {
     ) { }
 
 
-    async get(userId: string) {
-        return this._wallets.get(userId);
+    async get(userId: string): Promise<WalletResponseDTO | null> {
+        const wallet = await this._wallets.get(userId);
+        return wallet ? mapWallet(wallet) : null;
     }
 
     async createDepositOrder(userId: string, amount: number) {
@@ -47,7 +52,7 @@ export class WalletService implements IWalletService {
             return true;
         } catch (error: unknown) {
             const msg = error instanceof Error ? error.message : 'Withdrawal failed';
-            console.error("Withdrawal Error:", msg);
+            logger.error('Withdrawal Error:', msg);
             throw new Error(msg);
         }
     }
@@ -60,11 +65,11 @@ export class WalletService implements IWalletService {
         await this._wallets.add(userId, amount, description);
     }
 
-    async getTransactions(userId: string, page: number, limit: number, type?: string, startDate?: string, endDate?: string) {
+    async getTransactions(userId: string, page: number, limit: number, type?: string, startDate?: string, endDate?: string): Promise<{ transactions: TransactionResponseDTO[], total: number, page: number, totalPages: number }> {
         const skip = (page - 1) * limit;
         const { transactions, total } = await this._wallets.getTransactions(userId, skip, limit, type, startDate, endDate);
         return {
-            transactions,
+            transactions: transactions.map(transaction => mapTransaction(transaction)).filter((transaction): transaction is TransactionResponseDTO => transaction !== null),
             total,
             page,
             totalPages: Math.ceil(total / limit)

@@ -1,7 +1,8 @@
+import { TransactionResponseDTO } from './transaction.response.dto'
+
 export interface WalletResponseDTO {
     userId: string
     balance: number
     currency: string
-    transactions: Transaction[]
+    transactions: TransactionResponseDTO[]
 }
-import { Transaction } from '../../types'

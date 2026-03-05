@@ -7,6 +7,8 @@ import { IAuthService } from '../interfaces/services'
 import { env } from '../config/env'
 import { ResponseMessages } from '../constants'
 import logger from '../utils/logger'
+import { mapUser } from '../utils/mapper'
+import { UserResponseDTO } from '../dto/response/user.response.dto'
 
 @singleton()
 export class AuthService implements IAuthService {
@@ -47,7 +49,7 @@ export class AuthService implements IAuthService {
     const access = this._jwtProvider.signAccess({ sub: user._id!.toString(), isAdmin: !!user.isAdmin });
     const refresh = this._jwtProvider.signRefresh({ sub: user._id!.toString() });
     const userWithFeatures = await this._attachFeatures(user);
-    return { user: userWithFeatures, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
+    return { user: mapUser(userWithFeatures)!, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
   }
 
   async adminLogin(email: string, password: string) {
@@ -63,7 +65,7 @@ export class AuthService implements IAuthService {
     const access = this._jwtProvider.signAccess({ sub: user._id!.toString(), isAdmin: !!user.isAdmin });
     const refresh = this._jwtProvider.signRefresh({ sub: user._id!.toString() });
     const userWithFeatures = await this._attachFeatures(user);
-    return { user: userWithFeatures, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
+    return { user: mapUser(userWithFeatures)!, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
   }
 
   async register(username: string, email: string, password: string) {
@@ -110,7 +112,7 @@ export class AuthService implements IAuthService {
       const access = this._jwtProvider.signAccess({ sub: user._id!.toString(), isAdmin: !!user.isAdmin });
       const refresh = this._jwtProvider.signRefresh({ sub: user._id!.toString() });
       const userWithFeatures = await this._attachFeatures(user);
-      return { ok: true, user: userWithFeatures, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
+      return { ok: true, user: mapUser(userWithFeatures)!, tokens: { access, refresh }, cookie: { domain: env.COOKIE_DOMAIN, secure: env.COOKIE_SECURE } };
     }
     return { ok: true };
   }
@@ -148,10 +150,11 @@ export class AuthService implements IAuthService {
     return { access };
   }
 
-  async getMe(userId: string): Promise<User> {
+  async getMe(userId: string): Promise<UserResponseDTO> {
     const user = await this._userRepo.getById(userId);
     if (!user) throw new Error(ResponseMessages.UNAUTHORIZED);
     if (user.isBanned) throw new Error(ResponseMessages.USER_BANNED);
-    return await this._attachFeatures(user);
+    const userWithFeatures = await this._attachFeatures(user);
+    return mapUser(userWithFeatures)!;
   }
 }

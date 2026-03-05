@@ -10,7 +10,7 @@ import { ChatMessageResponseDTO } from '../dto/response/chat.response.dto'
 import { DuelResponseDTO } from '../dto/response/duel.response.dto'
 import { DuelInviteDTO } from '../dto/response/duel.invite.dto'
 import { StudySession, TestCase } from '../types'
-import { mapDuel } from '../utils/mapper'
+import logger from '../utils/logger'
 
 interface SignalData {
   type: 'offer' | 'answer' | 'candidate';
@@ -79,7 +79,7 @@ export const initRealtime = (server: HttpServer) => {
         io.to(`session:${sessionId}`).emit('execution_result', { result, runBy: socket.id });
 
       } catch (e: unknown) {
-        console.error("Code Run Error", e);
+        logger.error('Code Run Error', e);
         const message = (e instanceof Error) ? e.message : 'Execution failed';
         socket.emit('execution_result', { error: message });
       }
@@ -101,14 +101,11 @@ export const initRealtime = (server: HttpServer) => {
         const { duel, disqualified } = await duelService.reportWarning(duelId, userId, reason);
         if (disqualified && duel) {
           // Broadcast finished duel to both players so they redirect to summary
-          const mapped = mapDuel(duel);
-          if (mapped) {
-            broadcastDuel(duelId, mapped);
-            broadcastDuelLobby(mapped);
-          }
+          broadcastDuel(duelId, duel);
+          broadcastDuelLobby(duel);
         }
       } catch (e) {
-        console.error('[ws] duel:warning error:', e);
+        logger.error('[ws] duel:warning error:', e);
       }
     });
 

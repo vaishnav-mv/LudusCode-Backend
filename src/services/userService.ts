@@ -1,11 +1,13 @@
 import { singleton, inject } from 'tsyringe'
 import { IUserService } from '../interfaces/services'
 import { IUserRepository, IGroupRepository, IDuelRepository, ISubscriptionRepository } from '../interfaces/repositories'
-import { mapUser, mapGroup } from '../utils/mapper'
+import { mapUser, mapGroup, mapDuel } from '../utils/mapper'
 import { ResponseMessages } from '../constants'
 import { User, Duel, Group } from '../types'
 import { UserResponseDTO } from '../dto/response/user.response.dto'
 import { GroupResponseDTO } from '../dto/response/group.response.dto'
+import logger from '../utils/logger'
+import { DuelResponseDTO } from '../dto/response/duel.response.dto'
 
 @singleton()
 export class UserService implements IUserService {
@@ -18,13 +20,13 @@ export class UserService implements IUserService {
 
   async profile(id: string): Promise<{
     user: UserResponseDTO | null;
-    recentDuels: Duel[];
+    recentDuels: DuelResponseDTO[];
     joinedGroups: GroupResponseDTO[];
     submissionStats: { total: number, accepted: number, acceptanceRate: number };
   } | null> {
     const userDoc = await this._userRepo.getById(id);
     if (!userDoc) {
-      console.error(`User profile not found for id: ${id}`);
+      logger.error(`User profile not found for id: ${id}`);
       return null;
     }
 
@@ -76,30 +78,30 @@ export class UserService implements IUserService {
 
     return {
       user: mapUser(userDoc, rank, features),
-      recentDuels: duels,
+      recentDuels: duels.map(duel => mapDuel(duel)).filter((duel): duel is DuelResponseDTO => duel !== null),
       joinedGroups: groupsDocs.map(group => mapGroup(group)).filter((group): group is GroupResponseDTO => group !== null),
       submissionStats
     };
   }
 
-  async setPremium(id: string): Promise<User | null> {
+  async setPremium(id: string): Promise<UserResponseDTO | null> {
     const updated = await this._userRepo.update(id, { isPremium: true });
-    return updated !== undefined ? updated : null;
+    return updated ? mapUser(updated) : null;
   }
 
-  async leaderboard(page: number = 1, limit: number = 100): Promise<{ users: User[], total: number, page: number, totalPages: number }> {
+  async leaderboard(page: number = 1, limit: number = 100): Promise<{ users: UserResponseDTO[], total: number, page: number, totalPages: number }> {
     const { users, total } = await this._userRepo.leaderboard((page - 1) * limit, limit);
     return {
-      users: users.map((user, index) => ({ ...user, leaderboardRank: (page - 1) * limit + index + 1 })),
+      users: users.map((user, index) => mapUser(user, (page - 1) * limit + index + 1)).filter((user): user is UserResponseDTO => user !== null),
       total,
       page,
       totalPages: Math.ceil(total / limit)
     };
   }
 
-  async updateProfile(id: string, data: Partial<User>): Promise<User | null> {
+  async updateProfile(id: string, data: Partial<User>): Promise<UserResponseDTO | null> {
     const updated = await this._userRepo.update(id, data);
-    return updated !== undefined ? updated : null;
+    return updated ? mapUser(updated) : null;
   }
 
   async changePassword(id: string, oldPass: string, newPass: string): Promise<void> {
@@ -113,7 +115,8 @@ export class UserService implements IUserService {
     await this._userRepo.update(id, { passwordHash: hash });
   }
 
-  async search(query: string): Promise<User[]> {
-    return this._userRepo.search(query);
+  async search(query: string): Promise<UserResponseDTO[]> {
+    const users = await this._userRepo.search(query);
+    return users.map(user => mapUser(user)).filter((user): user is UserResponseDTO => user !== null);
   }
 }

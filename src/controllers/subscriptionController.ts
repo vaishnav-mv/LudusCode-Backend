@@ -3,6 +3,7 @@ import { singleton, inject } from 'tsyringe'
 import { ISubscriptionService } from '../interfaces/services'
 import { ApiResponse } from '../utils/ApiResponse'
 import { HttpStatus } from '../constants'
+import { asyncHandler } from "../utils/asyncHandler";
 
 @singleton()
 export class SubscriptionController {
@@ -16,10 +17,10 @@ export class SubscriptionController {
      * @req     -
      * @res     [Plan]
      */
-    getPlans = async (req: Request, res: Response) => {
+    getPlans = asyncHandler(async (req: Request, res: Response) => {
         const plans = await this._service.getPlans()
         return ApiResponse.success(res, plans)
-    }
+    })
 
     /**
      * @desc    Subscribe to a plan
@@ -27,7 +28,7 @@ export class SubscriptionController {
      * @req     body: { planId }
      * @res     { ok, success, action, expiry }
      */
-    subscribe = async (req: Request, res: Response) => {
+    subscribe = asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user?.id || req.user?.sub
         const { planId } = req.body
 
@@ -39,7 +40,7 @@ export class SubscriptionController {
             return ApiResponse.error(res, result.message || 'Subscription failed', HttpStatus.BAD_REQUEST, { ok: false })
         }
         return ApiResponse.success(res, { ok: result.success, ...result })
-    }
+    })
 
     /**
      * @desc    Cancel current subscription
@@ -47,7 +48,7 @@ export class SubscriptionController {
      * @req     -
      * @res     { success, message }
      */
-    cancel = async (req: Request, res: Response) => {
+    cancel = asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user?.id || req.user?.sub
         if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
 
@@ -56,7 +57,7 @@ export class SubscriptionController {
             return ApiResponse.error(res, result.message || 'Cancel failed', HttpStatus.BAD_REQUEST)
         }
         return ApiResponse.success(res, result)
-    }
+    })
 
     /**
      * @desc    Resume pending cancellation
@@ -64,7 +65,7 @@ export class SubscriptionController {
      * @req     -
      * @res     { success, message }
      */
-    resume = async (req: Request, res: Response) => {
+    resume = asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user?.id || req.user?.sub
         if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
 
@@ -73,7 +74,7 @@ export class SubscriptionController {
             return ApiResponse.error(res, result.message || 'Resume failed', HttpStatus.BAD_REQUEST)
         }
         return ApiResponse.success(res, result)
-    }
+    })
 
     /**
      * @desc    Get user subscription history
@@ -81,7 +82,7 @@ export class SubscriptionController {
      * @req     query: { page, limit }
      * @res     { logs, total, page, totalPages }
      */
-    history = async (req: Request, res: Response) => {
+    history = asyncHandler(async (req: Request, res: Response) => {
         const userId = req.user?.id || req.user?.sub
         if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
 
@@ -93,6 +94,6 @@ export class SubscriptionController {
 
         const result = await this._service.history(userId, page, limit, { action, sortStr, sortOrder })
         return ApiResponse.success(res, result)
-    }
+    })
 }
 

@@ -3,6 +3,9 @@ import { IStudySessionRepository, IUserRepository, IGroupRepository } from '../i
 import { StudySessionMode, StudySessionStatus, StudySession } from '../types'
 import { broadcastSession } from '../realtime/ws'
 import { IStudySessionService } from '../interfaces/services'
+import { mapStudySession } from '../utils/mapper'
+import { StudySessionResponseDTO } from '../dto/response/studySession.response.dto'
+import logger from '../utils/logger'
 
 @singleton()
 export class StudySessionService implements IStudySessionService {
@@ -11,7 +14,7 @@ export class StudySessionService implements IStudySessionService {
         @inject("IGroupRepository") private _groups: IGroupRepository
     ) { }
 
-    async create(data: { groupId: string, userId: string, title: string, description: string, mode: string, startTime: string, durationMinutes: number }) {
+    async create(data: { groupId: string, userId: string, title: string, description: string, mode: string, startTime: string, durationMinutes: number }): Promise<StudySessionResponseDTO> {
         const userId = data.userId;
 
         const group = await this._groups.getById(data.groupId);
@@ -37,10 +40,10 @@ export class StudySessionService implements IStudySessionService {
         };
 
         const session = await this._sessions.create(sessionData);
-        return session;
+        return mapStudySession(session)!;
     }
 
-    async update(sessionId: string, userId: string, data: Partial<StudySession>) {
+    async update(sessionId: string, userId: string, data: Partial<StudySession>): Promise<StudySessionResponseDTO | null> {
         const resolvedUserId = userId;
         const session = await this._sessions.getById(sessionId);
         if (!session) throw new Error("Session not found");
@@ -58,10 +61,10 @@ export class StudySessionService implements IStudySessionService {
 
         const updated = await this._sessions.update(sessionId, data);
         if (updated) broadcastSession(sessionId, updated);
-        return updated || null;
+        return updated ? mapStudySession(updated) : null;
     }
 
-    async join(sessionId: string, userId: string) {
+    async join(sessionId: string, userId: string): Promise<StudySessionResponseDTO | null> {
         const resolvedUserId = userId;
         const session = await this._sessions.getById(sessionId);
         if (!session) throw new Error("Session not found");
@@ -85,7 +88,7 @@ export class StudySessionService implements IStudySessionService {
         });
 
         if (exists) {
-            return session; // Already joined
+            return mapStudySession(session)!; // Already joined
         }
 
         // Prepare new list, normalizing existing populated users back to IDs
@@ -102,10 +105,10 @@ export class StudySessionService implements IStudySessionService {
 
         const updated = await this._sessions.update(sessionId, { participants: newParticipants });
         if (updated) broadcastSession(sessionId, updated);
-        return updated || null;
+        return updated ? mapStudySession(updated) : null;
     }
 
-    async leave(sessionId: string, userId: string) {
+    async leave(sessionId: string, userId: string): Promise<StudySessionResponseDTO | null> {
         const resolvedUserId = userId;
         const session = await this._sessions.getById(sessionId);
         if (!session) return null;
@@ -124,10 +127,10 @@ export class StudySessionService implements IStudySessionService {
 
         const updated = await this._sessions.update(sessionId, { participants: saveParticipants });
         if (updated) broadcastSession(sessionId, updated);
-        return updated || null;
+        return updated ? mapStudySession(updated) : null;
     }
 
-    async passTurn(sessionId: string, userId: string) {
+    async passTurn(sessionId: string, userId: string): Promise<StudySessionResponseDTO | null> {
         const resolvedUserId = userId;
         const session = await this._sessions.getById(sessionId);
         if (!session) throw new Error("Session not found");
@@ -135,7 +138,7 @@ export class StudySessionService implements IStudySessionService {
         if (session.mode !== 'round_robin') throw new Error("Pass Turn is only available in Round Robin mode");
 
         const participants = session.participants.map(participant => typeof participant.user === 'string' ? participant.user : participant.user._id?.toString() || participant.user.id!);
-        if (participants.length === 0) return session;
+        if (participants.length === 0) return mapStudySession(session)!;
 
         let currentIndex = -1;
 
@@ -158,7 +161,7 @@ export class StudySessionService implements IStudySessionService {
             turnStartedAt: new Date()
         });
         if (updated) broadcastSession(sessionId, updated);
-        return updated || null;
+        return updated ? mapStudySession(updated) : null;
     }
 
     async checkRoundRobinTimers() {
@@ -181,13 +184,13 @@ export class StudySessionService implements IStudySessionService {
                 try {
                     await this.passTurn(session._id!, (session.currentTurnUserId || '').toString());
                 } catch (e) {
-                    console.error(`Failed to auto-pass turn for session ${session._id}`, e);
+                    logger.error(`Failed to auto-pass turn for session ${session._id}`, e);
                 }
             }
         }
     }
 
-    async list(groupId: string, page: number = 1, limit: number = 20, options: { status?: string, sort?: string, query?: string } = {}) {
+    async list(groupId: string, page: number = 1, limit: number = 20, options: { status?: string, sort?: string, query?: string } = {}): Promise<{ sessions: StudySessionResponseDTO[], total: number, page: number, totalPages: number }> {
         const skip = (page - 1) * limit;
         const { sessions, total } = await this._sessions.listByGroup(groupId, skip, limit, options);
 
@@ -213,19 +216,19 @@ export class StudySessionService implements IStudySessionService {
         }));
 
         return {
-            sessions: updatedSessions,
+            sessions: updatedSessions.map(session => mapStudySession(session)).filter((session): session is StudySessionResponseDTO => session !== null),
             total,
             page,
             totalPages: Math.ceil(total / limit)
         };
     }
 
-    async getById(id: string) {
+    async getById(id: string): Promise<StudySessionResponseDTO | null> {
         const session = await this._sessions.getById(id);
-        return session || null;
+        return session ? mapStudySession(session) : null;
     }
 
-    async getByIdSecure(id: string, userId: string) {
+    async getByIdSecure(id: string, userId: string): Promise<StudySessionResponseDTO | null> {
         const resolvedUserId = userId;
         const session = await this._sessions.getById(id);
         if (!session) return null;
@@ -243,6 +246,6 @@ export class StudySessionService implements IStudySessionService {
             throw new Error("You are not authorized to view this session");
         }
 
-        return session;
+        return mapStudySession(session);
     }
 }

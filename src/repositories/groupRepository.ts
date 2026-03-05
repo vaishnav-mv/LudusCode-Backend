@@ -81,7 +81,7 @@ export class GroupRepository extends BaseRepository<Group> implements IGroupRepo
     for (const group of ownedGroups) {
       if (group.members && group.members.length > 0) {
         // Filter out the owner if they are somehow still in the members array
-        const remainingMembers = group.members.filter(m => m.toString() !== userId)
+        const remainingMembers = group.members.filter(member => member.toString() !== userId)
         if (remainingMembers.length > 0) {
           const newOwnerId = remainingMembers[0]
           await this.model.updateOne({ _id: group._id }, { $set: { owner: newOwnerId } })

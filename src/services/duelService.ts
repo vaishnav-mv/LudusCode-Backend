@@ -3,7 +3,9 @@ import { IDuelRepository, IProblemRepository, IUserRepository, IWalletRepository
 import { IDuelService } from '../interfaces/services'
 import { Duel, DuelStatus, Difficulty, SubmissionStatus, User, SubmissionResult } from '../types'
 import { createHash } from 'crypto'
-
+import { mapDuel } from '../utils/mapper'
+import { DuelResponseDTO } from '../dto/response/duel.response.dto'
+import logger from '../utils/logger'
 import { ResponseMessages } from '../constants'
 
 @singleton()
@@ -84,14 +86,15 @@ export class DuelService implements IDuelService {
     };
 
     await this._duels.create(duel);
-    return duel;
+    return mapDuel(duel)!;
   }
 
-  async detail(id: string) {
-    return this._duels.getById(id);
+  async detail(id: string): Promise<DuelResponseDTO | null> {
+    const duel = await this._duels.getById(id);
+    return duel ? mapDuel(duel) : null;
   }
 
-  async updateState(id: string, status: DuelStatus, winnerId?: string) {
+  async updateState(id: string, status: DuelStatus, winnerId?: string): Promise<DuelResponseDTO | null> {
     const duel = await this._duels.getById(id);
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND);
 
@@ -108,13 +111,14 @@ export class DuelService implements IDuelService {
     }
 
     await this._duels.update(id, { status, winner });
-    return this._duels.getById(id);
+    const updated = await this._duels.getById(id);
+    return updated ? mapDuel(updated) : null;
   }
-  async listOpen() {
+  async listOpen(): Promise<DuelResponseDTO[]> {
     const all = await this._duels.all();
-    return all.filter(duel => duel.status === DuelStatus.Waiting);
+    return all.filter(duel => duel.status === DuelStatus.Waiting).map(duel => mapDuel(duel)).filter((duel): duel is DuelResponseDTO => duel !== null);
   }
-  async listActive(playerId: string) {
+  async listActive(playerId: string): Promise<DuelResponseDTO[]> {
     const all = await this._duels.all();
     const resolvedId = playerId;
 
@@ -124,19 +128,18 @@ export class DuelService implements IDuelService {
       return duel.status === DuelStatus.InProgress && isParticipant;
     });
 
-
-    return active;
+    return active.map(duel => mapDuel(duel)).filter((duel): duel is DuelResponseDTO => duel !== null);
   }
-  async listInvites(userId: string) {
+  async listInvites(userId: string): Promise<DuelResponseDTO[]> {
     const all = await this._duels.all();
     // Filter for duels where I am player2 AND status is Waiting
     const invites = all.filter(duel => {
       const { p2Id } = this._getPlayerIds(duel);
       return p2Id === userId && duel.status === DuelStatus.Waiting;
     });
-    return invites;
+    return invites.map(duel => mapDuel(duel)).filter((duel): duel is DuelResponseDTO => duel !== null);
   }
-  async createOpen(difficulty: Difficulty, wager: number, playerId: string) {
+  async createOpen(difficulty: Difficulty, wager: number, playerId: string): Promise<DuelResponseDTO> {
     const allProblems = await this._problems.all()
     // Filter out Custom problems
     const approvedProblems = allProblems.filter(problem => problem.status === 'Approved');
@@ -169,9 +172,9 @@ export class DuelService implements IDuelService {
       wager
     }
 
-    return await this._duels.create(duelPayload)
+    return mapDuel(await this._duels.create(duelPayload))!
   }
-  async join(id: string, playerId: string) {
+  async join(id: string, playerId: string): Promise<DuelResponseDTO | null> {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
     if (duel.status !== DuelStatus.Waiting) throw new Error(ResponseMessages.ALREADY_STARTED)
@@ -215,15 +218,16 @@ export class DuelService implements IDuelService {
     // Log the join
 
 
-    return updatedDuel
+    return mapDuel(updatedDuel);
   }
-  async setSummary(id: string, finalOverallStatus: string, finalUserCode: string) {
+  async setSummary(id: string, finalOverallStatus: string, finalUserCode: string): Promise<DuelResponseDTO | null> {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
     await this._duels.update(id, { finalOverallStatus: finalOverallStatus as SubmissionStatus, finalUserCode })
-    return this._duels.getById(id)
+    const updated = await this._duels.getById(id);
+    return updated ? mapDuel(updated) : null;
   }
-  async finish(id: string, winnerId?: string, finalOverallStatus?: string, finalUserCode?: string) {
+  async finish(id: string, winnerId?: string, finalOverallStatus?: string, finalUserCode?: string): Promise<DuelResponseDTO | null> {
     // 1. Determine the winner object
     let winner: User | null = null;
     if (winnerId) {
@@ -243,7 +247,8 @@ export class DuelService implements IDuelService {
       if (finalOverallStatus || finalUserCode) {
         await this._duels.update(id, { finalOverallStatus: finalOverallStatus as SubmissionStatus, finalUserCode });
       }
-      return this._duels.getById(id);
+      const fallback = await this._duels.getById(id);
+      return fallback ? mapDuel(fallback) : null;
     }
 
     // 3. Post-Finish Logic (Run only once because attemptFinish is atomic)
@@ -297,14 +302,15 @@ export class DuelService implements IDuelService {
       }
     } catch { /* empty */ }
 
-    return this._duels.getById(id); // Return fresh copy
+    const final = await this._duels.getById(id);
+    return final ? mapDuel(final) : null;
   }
 
   /**
    * Finish the duel as a draw (no winner). Refunds both players' wagers.
    */
 
-  async finishDraw(id: string) {
+  async finishDraw(id: string): Promise<DuelResponseDTO | null> {
     const duel = await this._duels.getById(id);
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND);
 
@@ -313,7 +319,7 @@ export class DuelService implements IDuelService {
 
     if (!finishedDuel) {
 
-      return this._duels.getById(id);
+      return this._duels.getById(id).then(d => d ? mapDuel(d) : null);
     }
 
     // Refund both players' wagers (no one wins, no commission)
@@ -325,7 +331,7 @@ export class DuelService implements IDuelService {
     }
 
 
-    return finishedDuel;
+    return mapDuel(finishedDuel);
   }
 
   // Helper to extract player IDs from a duel
@@ -341,14 +347,14 @@ export class DuelService implements IDuelService {
     };
   }
 
-  async processSubmission(id: string, userId: string, userCode: string, result: SubmissionResult) {
+  async processSubmission(id: string, userId: string, userCode: string, result: SubmissionResult): Promise<DuelResponseDTO | null> {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
 
     // --- GUARD: Duel must be in progress ---
     if (duel.status === DuelStatus.Finished) {
 
-      return duel; // Idempotent
+      return mapDuel(duel); // Idempotent
     }
     if (duel.status !== DuelStatus.InProgress) {
       throw new Error(ResponseMessages.DUEL_NOT_IN_PROGRESS);
@@ -398,7 +404,7 @@ export class DuelService implements IDuelService {
       const freshDuel = await this._duels.getById(id);
       if (freshDuel && freshDuel.status === DuelStatus.Finished) {
 
-        return freshDuel;
+        return mapDuel(freshDuel); // Idempotent
       }
 
 
@@ -417,9 +423,9 @@ export class DuelService implements IDuelService {
         results: result.results || []
       };
     }
-    return updatedDuel;
+    return updatedDuel ? mapDuel(updatedDuel) : null;
   }
-  async cancel(id: string, playerId: string) {
+  async cancel(id: string, playerId: string): Promise<DuelResponseDTO | null> {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
 
@@ -454,13 +460,13 @@ export class DuelService implements IDuelService {
         await this._wallets.add(requestUserId, duel.wager, 'Duel Refund');
       }
 
-      return cancelledDuel;
+      return mapDuel(cancelledDuel);
     } catch (error: unknown) {
-      console.error('[DuelService.cancel] Update Failed:', error);
+      logger.error('[DuelService.cancel] Update Failed:', error);
       throw error;
     }
   }
-  async forfeit(id: string, playerId: string) {
+  async forfeit(id: string, playerId: string): Promise<DuelResponseDTO | null> {
     const duel = await this._duels.getById(id)
     if (!duel) throw new Error(ResponseMessages.DUEL_NOT_FOUND)
     if (duel.status !== DuelStatus.InProgress) throw new Error(ResponseMessages.DUEL_NOT_IN_PROGRESS)
@@ -480,15 +486,15 @@ export class DuelService implements IDuelService {
     return this.finish(id, winnerId, SubmissionStatus.Forfeit)
   }
 
-  async reportWarning(duelId: string, userId: string, reason?: 'visibility' | 'paste'): Promise<{ duel: Duel | null, disqualified: boolean }> {
+  async reportWarning(duelId: string, userId: string, reason?: 'visibility' | 'paste'): Promise<{ duel: DuelResponseDTO | null, disqualified: boolean }> {
     const duel = await this._duels.getById(duelId)
     if (!duel) return { duel: null, disqualified: false }
-    if (duel.status !== DuelStatus.InProgress) return { duel, disqualified: false }
+    if (duel.status !== DuelStatus.InProgress) return { duel: mapDuel(duel), disqualified: false }
 
     const { p1Id, p2Id } = this._getPlayerIds(duel)
     const isPlayer1 = userId === p1Id
     const isPlayer2 = userId === p2Id
-    if (!isPlayer1 && !isPlayer2) return { duel, disqualified: false }
+    if (!isPlayer1 && !isPlayer2) return { duel: mapDuel(duel), disqualified: false }
 
     // Increment warnings on the correct player
     const currentWarnings = isPlayer1
@@ -524,6 +530,6 @@ export class DuelService implements IDuelService {
     }
 
     const updatedDuel = await this._duels.getById(duelId)
-    return { duel: updatedDuel || null, disqualified: false }
+    return { duel: updatedDuel ? mapDuel(updatedDuel) : null, disqualified: false }
   }
 }
