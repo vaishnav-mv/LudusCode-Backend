@@ -120,7 +120,9 @@ export class AdminController {
    * @res     [Problem]
    */
   pendingProblems = asyncHandler(async (req: Request, res: Response) => {
-    const pending = await this._service.pendingProblems()
+    const page = parseInt(req.query.page as string) || 1
+    const limit = parseInt(req.query.limit as string) || 50
+    const pending = await this._service.pendingProblems(page, limit)
     return ApiResponse.success(res, pending)
   })
 
@@ -144,6 +146,33 @@ export class AdminController {
   rejectProblem = asyncHandler(async (req: Request, res: Response) => {
     const ok = await this._service.rejectProblem(req.params.id)
     return ApiResponse.success(res, { ok })
+  })
+
+  /**
+   * @desc    Validate problem tests
+   * @route   POST /api/admin/problems/:id/validate-tests
+   * @req     params: { id }
+   * @res     { analysis: any }
+   */
+  validateProblemTests = asyncHandler(async (req: Request, res: Response) => {
+    const analysis = await this._service.validateProblemTests(req.params.id)
+    return ApiResponse.success(res, { analysis })
+  })
+
+  /**
+   * @desc    Add problem tests
+   * @route   POST /api/admin/problems/:id/test-cases
+   * @req     params: { id }, body: { testCases: any[] }
+   * @res     { ok: boolean }
+   */
+  addProblemTestCases = asyncHandler(async (req: Request, res: Response) => {
+    const { testCases } = req.body;
+    if (!Array.isArray(testCases) || testCases.length === 0) {
+      return ApiResponse.error(res, 'testCases array is required', HttpStatus.BAD_REQUEST);
+    }
+    const ok = await this._service.addProblemTestCases(req.params.id, testCases);
+    if (!ok) return ApiResponse.error(res, "Problem not found", HttpStatus.NOT_FOUND);
+    return ApiResponse.success(res, { ok });
   })
 
   /**

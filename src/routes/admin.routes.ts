@@ -31,6 +31,8 @@ export class AdminRoutes {
         this.router.post('/problems/:id/approve', auth, requireAdmin, validate(AdminNoBodySchema), this._controller.approveProblem)
         this.router.post('/problems/:id/reject', auth, requireAdmin, validate(AdminNoBodySchema), this._controller.rejectProblem)
         this.router.get('/problems', auth, requireAdmin, this._controller.allProblems)
+        this.router.post('/problems/:id/validate-tests', auth, requireAdmin, validate(AdminNoBodySchema), this._controller.validateProblemTests)
+        this.router.post('/problems/:id/test-cases', auth, requireAdmin, this._controller.addProblemTestCases)
         this.router.get('/users', auth, requireAdmin, this._controller.allUsers)
         this.router.post('/users/:id/ban', auth, requireAdmin, validate(AdminNoBodySchema), this._controller.banUser)
         this.router.post('/users/:id/unban', auth, requireAdmin, validate(AdminNoBodySchema), this._controller.unbanUser)

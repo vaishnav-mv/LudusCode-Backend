@@ -10,6 +10,7 @@ import { SubscriptionPlanResponseDTO, SubscriptionLogResponseDTO } from '../dto/
 import { TransactionResponseDTO } from '../dto/response/transaction.response.dto'
 import { DuelResponseDTO } from '../dto/response/duel.response.dto'
 import { computeSubscriptionAction } from './subscriptionService'
+import { IAiProvider } from '../interfaces/providers'
 
 @singleton()
 export class AdminService implements IAdminService {
@@ -19,7 +20,8 @@ export class AdminService implements IAdminService {
     @inject("IDuelRepository") private _duels: IDuelRepository,
     @inject("IGroupRepository") private _groups: IGroupRepository,
     @inject("IWalletRepository") private _wallets: IWalletRepository,
-    @inject("ISubscriptionRepository") private _subscriptions: ISubscriptionRepository
+    @inject("ISubscriptionRepository") private _subscriptions: ISubscriptionRepository,
+    @inject("IAiProvider") private _aiProvider: IAiProvider
   ) { }
 
   async dashboardStats() {
@@ -85,9 +87,21 @@ export class AdminService implements IAdminService {
     }
   }
 
-  async pendingProblems(): Promise<ProblemResponseDTO[]> {
-    const problems = await this._problems.pending();
-    return problems.map(problem => mapProblem(problem)).filter((problem): problem is ProblemResponseDTO => problem !== null);
+  async pendingProblems(page: number = 1, limit: number = 50): Promise<{ problems: ProblemResponseDTO[], total: number, page: number, totalPages: number }> {
+    const skip = (page - 1) * limit;
+    const filter = { status: ProblemStatus.Pending };
+
+    const [problems, total] = await Promise.all([
+      this._problems.all(skip, limit, filter),
+      this._problems.count(filter)
+    ]);
+
+    return {
+      problems: problems.map(problem => mapProblem(problem)).filter((problem): problem is ProblemResponseDTO => problem !== null),
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
   }
 
   async approveProblem(id: string) {
@@ -102,6 +116,34 @@ export class AdminService implements IAdminService {
     if (!problem) return false
     await this._problems.delete(id)
     return true
+  }
+
+  async validateProblemTests(id: string): Promise<any> {
+    const problem = await this._problems.getById(id)
+    if (!problem) throw new Error("Problem not found")
+
+    // We expect the problem to have at least one solution to test against
+    if (!problem.solutions || problem.solutions.length === 0) {
+      throw new Error("No solution provided to validate against.")
+    }
+
+    // Default to the first solution, or JS if possible
+    const solution = problem.solutions.find((s: any) => s.language.toLowerCase() === 'javascript') || problem.solutions[0];
+
+    // Call the edge case AI method which returns a JSON analysis of flaws/edge cases
+    const analysisStr = await this._aiProvider.validateTestCases(problem, solution.code);
+    return JSON.parse(analysisStr);
+  }
+
+  async addProblemTestCases(id: string, newTestCases: any[]): Promise<boolean> {
+    const problem = await this._problems.getById(id);
+    if (!problem) return false;
+
+    // Append new test cases to existing ones
+    const updatedTestCases = [...(problem.testCases || []), ...newTestCases];
+
+    await this._problems.update(id, { testCases: updatedTestCases });
+    return true;
   }
 
   async allProblems(page: number = 1, limit: number = 50): Promise<{ problems: ProblemResponseDTO[], total: number, page: number, totalPages: number }> {

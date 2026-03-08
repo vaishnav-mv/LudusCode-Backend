@@ -11,9 +11,4 @@ export class ProblemRepository extends BaseRepository<Problem> implements IProbl
     super(ProblemModel as unknown as Model<Problem>)
   }
 
-  async pending(): Promise<Problem[]> {
-    const list = await this.model.find({ status: 'Pending' }).lean();
-    return list.map((problem) => this.mapDoc(problem)!);
-  }
-
 }

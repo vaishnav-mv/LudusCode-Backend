@@ -404,4 +404,79 @@ CRITICAL REQUIREMENTS:
 
         return (result.text ?? '').trim();
     }
+
+    async validateTestCases(problem: Problem, solutionCode: string) {
+        if (!ai) throw new Error(ResponseMessages.AI_UNAVAILABLE);
+
+        const prompt = `
+            You are an expert Senior Software Engineer. Review the test suite for the problem "${problem.title}".
+
+            Problem Description:
+            ${problem.description || 'N/A'}
+            
+            Problem Constraints:
+            ${problem.constraints?.join('\n') || 'N/A'}
+
+            Input Schema (Parameters):
+            ${JSON.stringify(problem.inputSchema, null, 2)}
+
+            Output Schema (Return Type):
+            ${JSON.stringify(problem.outputSchema, null, 2)}
+
+            Current Test Cases:
+            ${JSON.stringify(problem.testCases, null, 2)}
+
+            Reference Solution Code:
+            ${solutionCode}
+
+            Task:
+            1. Analyze the "Current Test Cases" to see if there are any issues (e.g., incorrect expected outputs, bad formatting, redundant cases).
+            2. Identify edge cases (e.g., empty arrays, negative numbers, max constraints, off-by-one scenarios) that are completely missing from the Current Test Cases.
+            3. Propose at least 2-4 strict new "suggestedTestCases" that cover these missing edge cases.
+               - Ensure the 'input' string strictly follows the parameter order in Input Schema (as a JSON array if multiple args, or single raw value if one arg).
+               - Ensure the 'output' string strictly matches the Output Schema format.
+        `;
+
+        const schema = {
+            type: 'OBJECT' as const,
+            properties: {
+                overallAssessment: {
+                    type: 'STRING' as const,
+                    description: "A short paragraph describing the quality and coverage of the current test suite."
+                },
+                currentTestIssues: {
+                    type: 'ARRAY' as const,
+                    items: { type: 'STRING' as const },
+                    description: "An array of specific issues found with the existing test cases. Empty array if none."
+                },
+                suggestedTestCases: {
+                    type: 'ARRAY' as const,
+                    items: {
+                        type: 'OBJECT' as const,
+                        properties: {
+                            description: { type: 'STRING' as const, description: "Why this edge case is important." },
+                            input: { type: 'STRING' as const, description: "The stringified JSON input matching the strict input format." },
+                            output: { type: 'STRING' as const, description: "The stringified expected output." },
+                            isSample: { type: 'BOOLEAN' as const, description: "Always false for edge cases." }
+                        },
+                        required: ["description", "input", "output", "isSample"] as string[]
+                    },
+                    description: "An array of 2-4 new edge case test cases."
+                }
+            },
+            required: ["overallAssessment", "currentTestIssues", "suggestedTestCases"] as string[]
+        };
+
+        const result = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: schema,
+                temperature: 0.4
+            }
+        });
+
+        return (result.text ?? '').trim();
+    }
 }

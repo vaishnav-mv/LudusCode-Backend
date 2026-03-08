@@ -32,6 +32,7 @@ export interface IAiProvider {
     complexity(userCode: string): Promise<string>
     optimize(problem: Problem, userCode: string): Promise<string>
     edgeCases(problem: Problem, userCode: string): Promise<string>
+    validateTestCases(problem: Problem, solutionCode: string): Promise<string>
 }
 
 export interface IOtpProvider {

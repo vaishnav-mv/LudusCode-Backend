@@ -112,10 +112,12 @@ export interface IWalletService {
 export interface IAdminService {
   dashboardStats(): Promise<{ totalUsers: number, activeDuels: number, totalProblems: number, totalRevenue: number, pendingProblems: number, pendingPayouts: number, pendingAntiCheat: number }>
   financials(page?: number, limit?: number): Promise<{ totalDuelWagered: number, totalDuelCommissions: number, totalDuelsWithWagers: number, totalSubscriptionRevenue: number, totalPlatformRevenue: number, commissionsByDay: any[], recentCommissions: any[], total: number, page: number, totalPages: number }>
-  pendingProblems(): Promise<ProblemResponseDTO[]>
+  pendingProblems(page?: number, limit?: number): Promise<{ problems: ProblemResponseDTO[], total: number, page: number, totalPages: number }>
   approveProblem(id: string): Promise<boolean>
   rejectProblem(id: string): Promise<boolean>
   allProblems(page?: number, limit?: number): Promise<{ problems: ProblemResponseDTO[], total: number, page: number, totalPages: number }>
+  validateProblemTests(id: string): Promise<any>
+  addProblemTestCases(id: string, newTestCases: any[]): Promise<boolean>
   allUsers(page?: number, limit?: number, query?: string): Promise<{ users: UserResponseDTO[], total: number, page: number, totalPages: number }>
   banUser(id: string): Promise<boolean>
   unbanUser(id: string): Promise<boolean>
@@ -173,6 +175,7 @@ export interface IAiService {
   complexity(userCode: string): Promise<string>
   optimize(problemId: string, userCode: string): Promise<string>
   edgeCases(problemId: string, userCode: string): Promise<string>
+  validateTestCases(problem: Problem, solutionCode: string): Promise<string>
 }
 
 export interface IStudySessionService {

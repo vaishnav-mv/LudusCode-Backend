@@ -66,4 +66,8 @@ export class AiService implements IAiService {
         if (!problem) throw new Error("Problem not found");
         return this._provider.edgeCases(problem, userCode);
     }
+
+    async validateTestCases(problem: Problem, solutionCode: string): Promise<string> {
+        return this._provider.validateTestCases(problem, solutionCode);
+    }
 }

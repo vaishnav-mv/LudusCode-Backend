@@ -25,7 +25,6 @@ export interface IGroupRepository extends IBaseRepository<Group> {
 }
 
 export interface IProblemRepository extends IBaseRepository<Problem> {
-    pending(): Promise<Problem[]>;
 }
 
 export interface IDuelRepository extends IBaseRepository<Duel> {
