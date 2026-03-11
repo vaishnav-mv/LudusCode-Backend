@@ -46,6 +46,21 @@ export enum TransactionStatus {
     Failed = 'Failed',
 }
 
+export enum SubscriptionAction {
+    Subscribed = 'Subscribed',
+    Renewed = 'Renewed',
+    AutoRenewed = 'Auto-Renewed',
+    Cancelled = 'Cancelled',
+    Expired = 'Expired',
+    Grant = 'Grant',
+    Revoke = 'Revoke',
+    Upgraded = 'Upgraded',
+    Downgraded = 'Downgraded',
+    DowngradeScheduled = 'Downgrade Scheduled',
+    AutoRenewDisabled = 'Auto-Renew Disabled',
+    AutoRenewResumed = 'Auto-Renew Resumed'
+}
+
 
 
 
@@ -80,6 +95,8 @@ export interface User {
     sub?: string; // for auth context
     premiumFeatures?: string[];
     cancelAtPeriodEnd?: boolean;
+    pendingPlanId?: string | object;
+    failedRenewalPlanId?: string | object;
 }
 
 export interface SubscriptionPlan {
@@ -89,6 +106,7 @@ export interface SubscriptionPlan {
     period: string; // 'monthly'
     maxDailyDuels?: number;
     features: string[];
+    isActive?: boolean;
     createdAt?: Date | string;
     updatedAt?: Date | string;
     id?: string;
@@ -97,8 +115,10 @@ export interface SubscriptionPlan {
 export interface SubscriptionLog {
     _id?: string;
     userId: string | User;
+    user?: User;
     planId: string | SubscriptionPlan;
-    action: string;
+    plan?: SubscriptionPlan;
+    action: SubscriptionAction | string;
     amount: number;
     expiryDate?: Date | string;
     timestamp: Date | string;
@@ -315,7 +335,6 @@ export interface PaginatedResponse<T> {
     totalPages: number;
 }
 declare global {
-    // eslint-disable-next-line @typescript-eslint/no-namespace
     namespace Express {
         interface Request {
             user?: User;

@@ -3,13 +3,13 @@ import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository,
 import { broadcastDuel } from '../realtime/ws'
 import { mapDuel, mapProblem, mapSubscriptionPlan, mapSubscriptionLog, mapTransaction, mapUser } from '../utils/mapper'
 import { IAdminService } from '../interfaces/services'
-import { DuelStatus, ProblemStatus, SubscriptionPlan, TransactionType, User } from '../types'
+import { DuelStatus, ProblemStatus, SubscriptionPlan, TransactionType, User, SubscriptionAction } from '../types'
 import { UserResponseDTO } from '../dto/response/user.response.dto'
 import { ProblemResponseDTO } from '../dto/response/problem.response.dto'
 import { SubscriptionPlanResponseDTO, SubscriptionLogResponseDTO } from '../dto/response/subscription.response.dto'
 import { TransactionResponseDTO } from '../dto/response/transaction.response.dto'
 import { DuelResponseDTO } from '../dto/response/duel.response.dto'
-import { computeSubscriptionAction } from './subscriptionService'
+import { computeSubscriptionAction } from '../utils/subscriptionHelper'
 import { IAiProvider } from '../interfaces/providers'
 
 @singleton()
@@ -24,7 +24,26 @@ export class AdminService implements IAdminService {
     @inject("IAiProvider") private _aiProvider: IAiProvider
   ) { }
 
-  async dashboardStats() {
+  async dashboardStats(options?: { startDate?: Date, endDate?: Date }) {
+    const userMatch: any = { isAdmin: { $ne: true } };
+    const duelMatch: any = { status: DuelStatus.InProgress };
+    const problemMatch: any = {};
+    if (options?.startDate || options?.endDate) {
+      const dateFilter: any = {};
+      const numFilter: any = {};
+      if (options.startDate) {
+        dateFilter.$gte = options.startDate;
+        numFilter.$gte = options.startDate.getTime();
+      }
+      if (options.endDate) {
+        dateFilter.$lte = options.endDate;
+        numFilter.$lte = options.endDate.getTime();
+      }
+      userMatch.createdAt = dateFilter;
+      duelMatch.startTime = numFilter;
+      problemMatch.createdAt = dateFilter;
+    }
+
     const [
       totalUsers,
       activeDuels,
@@ -35,12 +54,12 @@ export class AdminService implements IAdminService {
       pendingPayoutsResponse,
       flaggedActivitiesResponse
     ] = await Promise.all([
-      this._users.count(),
-      this._duels.count({ status: DuelStatus.InProgress }),
-      this._problems.count(),
-      this._subscriptions.getTotalSubscriptionRevenue(),
-      this._duels.getCommissionStats(),
-      this._problems.count({ status: ProblemStatus.Pending }),
+      this._users.count(userMatch),
+      this._duels.count(duelMatch),
+      this._problems.count(problemMatch),
+      this._subscriptions.getTotalSubscriptionRevenue(options?.startDate, options?.endDate),
+      this._duels.getCommissionStats(options?.startDate, options?.endDate),
+      this._problems.count({ ...problemMatch, status: ProblemStatus.Pending }),
       this._wallets.getAllTransactions(0, 1, { status: 'Pending', type: TransactionType.Withdrawal }),
       this._duels.getFlaggedActivities(1, 1)
     ])
@@ -60,18 +79,83 @@ export class AdminService implements IAdminService {
     }
   }
 
-  async financials(page: number = 1, limit: number = 50) {
+  async financials(page: number = 1, limit: number = 50, filterType: string = 'all', options?: { query?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year' }) {
     const [
       commissionStats,
       commissionsByDay,
-      recentPagination,
-      subscriptionRevenue
+      subscriptionRevenue,
+      subscriptionsByDay
     ] = await Promise.all([
-      this._duels.getCommissionStats(),
-      this._duels.getCommissionsByDay(),
-      this._duels.getRecentCommissions(page, limit),
-      this._subscriptions.getTotalSubscriptionRevenue()
+      this._duels.getCommissionStats(options?.startDate, options?.endDate),
+      this._duels.getCommissionsByDay(options?.startDate, options?.endDate, options?.groupBy),
+      this._subscriptions.getTotalSubscriptionRevenue(options?.startDate, options?.endDate),
+      this._subscriptions.getRevenueByDay(options?.startDate, options?.endDate, options?.groupBy)
     ])
+
+    let recentTransactions: any[] = []
+    let totalTransactions = 0
+    const skip = (page - 1) * limit
+
+    if (filterType === 'commissions') {
+      const { recent, total } = await this._duels.getRecentCommissions(page, limit, options)
+      recentTransactions = recent.map(commission => ({
+        id: commission.duelId,
+        title: 'Duel: ' + commission.problemTitle,
+        user: commission.winnerName,
+        wager: commission.wager,
+        amount: commission.commission,
+        timestamp: commission.timestamp,
+        type: 'commission'
+      }))
+      totalTransactions = total
+    } else if (filterType === 'subscriptions') {
+      const { logs, total } = await this._subscriptions.getLogsAll(skip, limit, { ...options, isRevenue: true })
+      recentTransactions = logs.map(log => ({
+        id: log.id,
+        title: (log.plan?.name || 'Unknown Plan') + ' ' + log.action,
+        user: log.user?.username || 'Unknown User',
+        wager: null,
+        amount: log.amount,
+        timestamp: typeof log.timestamp === 'string' ? new Date(log.timestamp).getTime() : new Date(log.timestamp as Date).getTime(),
+        type: 'subscription'
+      }))
+      totalTransactions = total
+    } else { // 'all'
+      const fetchLimit = (options?.query || options?.sortStr) ? 5000 : page * limit
+      const [commissionsData, subsData] = await Promise.all([
+        this._duels.getRecentCommissions(1, fetchLimit, options),
+        this._subscriptions.getLogsAll(0, fetchLimit, { ...options, isRevenue: true })
+      ])
+      
+      const comms = commissionsData.recent.map(commission => ({
+        id: commission.duelId,
+        title: 'Duel: ' + commission.problemTitle,
+        user: commission.winnerName,
+        wager: commission.wager,
+        amount: commission.commission,
+        timestamp: commission.timestamp,
+        type: 'commission'
+      }))
+      const subs = subsData.logs.map(log => ({
+        id: log.id,
+        title: (log.plan?.name || 'Unknown Plan') + ' ' + log.action,
+        user: log.user?.username || 'Unknown User',
+        wager: null,
+        amount: log.amount,
+        timestamp: typeof log.timestamp === 'string' ? new Date(log.timestamp).getTime() : new Date(log.timestamp as Date).getTime(),
+        type: 'subscription'
+      }))
+      
+      const combined = [...comms, ...subs];
+      if (options?.sortStr === 'amount') {
+          combined.sort((a, b) => options.sortOrder === 'asc' ? a.amount - b.amount : b.amount - a.amount);
+      } else {
+          combined.sort((a, b) => options?.sortOrder === 'asc' ? a.timestamp - b.timestamp : b.timestamp - a.timestamp);
+      }
+      
+      recentTransactions = combined.slice(skip, skip + limit)
+      totalTransactions = commissionsData.total + subsData.total
+    }
 
     return {
       totalDuelWagered: commissionStats.totalWagered,
@@ -80,10 +164,11 @@ export class AdminService implements IAdminService {
       totalSubscriptionRevenue: subscriptionRevenue,
       totalPlatformRevenue: commissionStats.totalCommissions + subscriptionRevenue,
       commissionsByDay,
-      recentCommissions: recentPagination.recent,
-      total: recentPagination.total,
+      subscriptionsByDay,
+      recentTransactions,
+      total: totalTransactions,
       page,
-      totalPages: Math.ceil(recentPagination.total / limit)
+      totalPages: Math.ceil(totalTransactions / limit) || 1
     }
   }
 
@@ -264,13 +349,13 @@ export class AdminService implements IAdminService {
   async subscriptionData(page: number = 1, limit: number = 50, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }): Promise<{ plans: SubscriptionPlanResponseDTO[], logs: SubscriptionLogResponseDTO[], total: number, page: number, totalPages: number }> {
     const skip = (page - 1) * limit
     const [plansInfo, { logs, total }] = await Promise.all([
-      this._subscriptions.getPlans(),
+      this._subscriptions.getAllPlansAdmin(),
       this._subscriptions.getLogsAll(skip, limit, options)
     ])
 
     return {
       plans: plansInfo.map(plan => mapSubscriptionPlan(plan)).filter((plan): plan is SubscriptionPlanResponseDTO => plan !== null),
-      logs: logs.map(log => mapSubscriptionLog(log)).filter((log): log is SubscriptionLogResponseDTO => log !== null),
+      logs: logs as any,
       total,
       page,
       totalPages: Math.ceil(total / limit)
@@ -313,7 +398,7 @@ export class AdminService implements IAdminService {
     await this._subscriptions.createLog({
       userId,
       planId: (plan._id || plan.id || '').toString(),
-      action: action === 'Subscribed' ? 'Grant' : action,
+      action: action === SubscriptionAction.Subscribed ? SubscriptionAction.Grant : action,
       amount: plan.price,
       expiryDate: newExpiry
     })
@@ -335,7 +420,7 @@ export class AdminService implements IAdminService {
     await this._subscriptions.createLog({
       userId,
       planId: planId?.toString(),
-      action: 'Revoke',
+      action: SubscriptionAction.Revoke,
       amount: 0
     })
     return true

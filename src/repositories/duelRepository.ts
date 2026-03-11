@@ -126,10 +126,25 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
     });
   }
 
-  async getCommissionStats(): Promise<{ totalWagered: number, totalCommissions: number, totalDuelsWithWagers: number }> {
+  async getCommissionStats(startDate?: Date, endDate?: Date): Promise<{ totalWagered: number, totalCommissions: number, totalDuelsWithWagers: number }> {
+    const matchStage: any = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
+    if (startDate || endDate) {
+      matchStage.startTime = {};
+      if (startDate) matchStage.startTime.$gte = startDate.getTime();
+      if (endDate) matchStage.startTime.$lte = endDate.getTime();
+    }
     const result = await this.model.aggregate([
-      { $match: { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } } },
-      { $lookup: { from: 'users', localField: 'winner', foreignField: '_id', as: 'winnerDoc' } },
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'users',
+          let: { winnerId: '$winner' },
+          pipeline: [
+            { $match: { $expr: { $eq: [{ $toString: '$_id' }, { $toString: '$$winnerId' }] } } }
+          ],
+          as: 'winnerDoc'
+        }
+      },
       { $unwind: '$winnerDoc' },
       {
         $project: {
@@ -154,19 +169,71 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
     return result.length > 0 ? result[0] : { totalWagered: 0, totalCommissions: 0, totalDuelsWithWagers: 0 };
   }
 
-  async getRecentCommissions(page: number, limit: number): Promise<{ recent: { duelId: string, problemTitle: string, winnerName: string, wager: number, commission: number, timestamp: number }[], total: number }> {
+  async getRecentCommissions(page: number, limit: number, options?: { query?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', startDate?: Date, endDate?: Date }): Promise<{ recent: { duelId: string, problemTitle: string, winnerName: string, wager: number, commission: number, timestamp: number }[], total: number }> {
     const skip = (page - 1) * limit;
-    const matchStage = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
+    const matchStage: any = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
+
+    if (options?.startDate || options?.endDate) {
+      matchStage.startTime = {};
+      if (options.startDate) matchStage.startTime.$gte = options.startDate.getTime();
+      if (options.endDate) matchStage.startTime.$lte = options.endDate.getTime();
+    }
+
+    if (options?.query && options.query.trim() !== '') {
+      const queryRegex = new RegExp(options.query, 'i');
+      const users = await this.model.db.model('User').find({ $or: [{ username: queryRegex }, { email: queryRegex }] }).select('_id').lean();
+      const problems = await this.model.db.model('Problem').find({ title: queryRegex }).select('_id').lean();
+      const userIds = users.map(user => user._id);
+      const problemIds = problems.map(problem => problem._id);
+      matchStage.$or = [
+        { winner: { $in: userIds } },
+        { problem: { $in: problemIds } }
+      ];
+    }
+
+    const sortDir = options?.sortOrder === 'asc' ? 1 : -1;
+    let initialSort: Record<string, 1 | -1> = { startTime: -1 };
+    
+    // We only initial sort by date. If sorting by amount, we sort later
+    if (options?.sortStr === 'date') {
+        initialSort = { startTime: sortDir };
+    }
+
     const total = await this.model.countDocuments(matchStage);
 
-    const result = await this.model.aggregate([
+    let pipeline: any[] = [
       { $match: matchStage },
-      { $sort: { startTime: -1 } },
-      { $skip: skip },
-      { $limit: limit },
-      { $lookup: { from: 'users', localField: 'winner', foreignField: '_id', as: 'winnerDoc' } },
+      { $sort: initialSort }
+    ];
+
+    // If sorting by amount, we shouldn't skip/limit yet until after projection
+    if (options?.sortStr !== 'amount') {
+      pipeline.push({ $skip: skip });
+      pipeline.push({ $limit: limit });
+    }
+
+    pipeline = pipeline.concat([
+      {
+        $lookup: {
+          from: 'users',
+          let: { winnerId: '$winner' },
+          pipeline: [
+            { $match: { $expr: { $eq: [{ $toString: '$_id' }, { $toString: '$$winnerId' }] } } }
+          ],
+          as: 'winnerDoc'
+        }
+      },
       { $unwind: { path: '$winnerDoc', preserveNullAndEmptyArrays: true } },
-      { $lookup: { from: 'problems', localField: 'problem', foreignField: '_id', as: 'problemDoc' } },
+      {
+        $lookup: {
+          from: 'problems',
+          let: { probId: '$problem' },
+          pipeline: [
+            { $match: { $expr: { $eq: [{ $toString: '$_id' }, { $toString: '$$probId' }] } } }
+          ],
+          as: 'problemDoc'
+        }
+      },
       { $unwind: { path: '$problemDoc', preserveNullAndEmptyArrays: true } },
       {
         $project: {
@@ -184,18 +251,46 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
         }
       }
     ]);
+
+    if (options?.sortStr === 'amount') {
+        pipeline.push({ $sort: { commission: sortDir } });
+        pipeline.push({ $skip: skip });
+        pipeline.push({ $limit: limit });
+    }
+
+    const result = await this.model.aggregate(pipeline);
     return { recent: result, total };
   }
 
-  async getCommissionsByDay(): Promise<{ date: string, amount: number }[]> {
+  async getCommissionsByDay(startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year'): Promise<{ date: string, amount: number }[]> {
+    const matchStage: any = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
+    if (startDate || endDate) {
+      matchStage.startTime = {};
+      if (startDate) matchStage.startTime.$gte = startDate.getTime();
+      if (endDate) matchStage.startTime.$lte = endDate.getTime();
+    }
+
+    let formatStr = '%Y-%m-%d';
+    if (groupBy === 'month') formatStr = '%Y-%m';
+    if (groupBy === 'year') formatStr = '%Y';
+
     const result = await this.model.aggregate([
-      { $match: { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } } },
-      { $lookup: { from: 'users', localField: 'winner', foreignField: '_id', as: 'winnerDoc' } },
+      { $match: matchStage },
+      {
+        $lookup: {
+          from: 'users',
+          let: { winnerId: '$winner' },
+          pipeline: [
+            { $match: { $expr: { $eq: [{ $toString: '$_id' }, { $toString: '$$winnerId' }] } } }
+          ],
+          as: 'winnerDoc'
+        }
+      },
       { $unwind: '$winnerDoc' },
       {
         $project: {
           dateString: {
-            $dateToString: { format: '%Y-%m-%d', date: { $toDate: '$startTime' } }
+            $dateToString: { format: formatStr, date: { $toDate: '$startTime' } }
           },
           commission: {
             $multiply: [

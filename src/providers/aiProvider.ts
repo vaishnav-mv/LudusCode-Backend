@@ -127,13 +127,6 @@ export class AiProvider implements IAiProvider {
                 temperature: 0.5
             }
         });
-
-        // The frontend expects the analysis to be the JSON string which it then parses.
-        // Wait, AiController.performance wraps it: { analysis: string }
-        // Frontend getAIPerformanceAnalysis:
-        // const text = (res.data.data.analysis as unknown as string);
-        // Then it does JSON.parse or acts on it.
-        // Let's return the generated JSON text.
         return (result.text ?? '').trim();
     }
 

@@ -5,6 +5,7 @@ export interface SubscriptionPlanResponseDTO {
     period: string;
     maxDailyDuels?: number;
     features: string[];
+    isActive?: boolean;
 }
 
 export interface SubscriptionLogResponseDTO {

@@ -20,7 +20,9 @@ export const mapTransaction = (t: Partial<Transaction> | null | undefined): Tran
     if (!t) return null;
     return {
         id: t._id?.toString() || t.id || '',
-        userId: (typeof t.userId === 'object' && t.userId && '_id' in t.userId) ? (t.userId as { _id: { toString: () => string } })._id?.toString() : (t.userId as string) || '',
+        userId: (typeof t.userId === 'object' && t.userId !== null && 'username' in t.userId)
+            ? { id: (t.userId as any)._id?.toString() || (t.userId as any).id, username: (t.userId as any).username, email: (t.userId as any).email }
+            : ((typeof t.userId === 'object' && t.userId && '_id' in t.userId) ? (t.userId as { _id: { toString: () => string } })._id?.toString() : (t.userId as string) || ''),
         type: t.type as TransactionType,
         status: t.status as TransactionStatus,
         amount: t.amount || 0,
@@ -62,7 +64,8 @@ export const mapSubscriptionPlan = (plan: Partial<SubscriptionPlan> | null | und
         price: plan.price || 0,
         period: plan.period || 'monthly',
         maxDailyDuels: plan.maxDailyDuels,
-        features: plan.features || []
+        features: plan.features || [],
+        isActive: plan.isActive !== undefined ? plan.isActive : true
     };
 };
 
@@ -96,7 +99,9 @@ export const mapUser = (user: Partial<User> | null | undefined, leaderboardRank?
         premiumFeatures: premiumFeatures || user.premiumFeatures || [],
         currentPlanId: user.currentPlanId ? user.currentPlanId.toString() : undefined,
         subscriptionExpiry: user.subscriptionExpiry,
-        cancelAtPeriodEnd: !!user.cancelAtPeriodEnd
+        cancelAtPeriodEnd: !!user.cancelAtPeriodEnd,
+        pendingPlanId: user.pendingPlanId ? user.pendingPlanId.toString() : undefined,
+        failedRenewalPlanId: user.failedRenewalPlanId ? user.failedRenewalPlanId.toString() : undefined
     };
 };
 

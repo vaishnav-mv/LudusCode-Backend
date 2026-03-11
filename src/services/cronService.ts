@@ -1,7 +1,7 @@
 import { singleton, inject } from 'tsyringe';
 import * as cron from 'node-cron';
 import { IUserRepository, IWalletRepository, ISubscriptionRepository } from '../interfaces/repositories';
-import { SubscriptionLog, User, TransactionType } from '../types';
+import { SubscriptionLog, User, TransactionType, SubscriptionAction } from '../types';
 import logger from '../utils/logger';
 import { env } from '../config/env';
 
@@ -43,23 +43,23 @@ export class CronService {
         const userId = (user.id || user._id)!.toString();
         const planId = user.currentPlanId ? user.currentPlanId.toString() : null;
 
-        // 1. If user pending cancellation OR no plan found
         if (user.cancelAtPeriodEnd || !planId) {
-            await this.terminateSubscription(userId, planId, 'Expired (Cancellation Pending)');
+            await this.terminateSubscription(userId, planId, SubscriptionAction.Expired);
             return;
         }
 
-        // 2. Fetch the plan details to get price
-        const plan = await this._subscriptions.getPlanById(planId);
+        // 2. Fetch the plan details to get price (check for pending downgrade first)
+        const targetPlanId = user.pendingPlanId ? user.pendingPlanId.toString() : planId;
+        const plan = await this._subscriptions.getPlanById(targetPlanId);
         if (!plan) {
-            await this.terminateSubscription(userId, planId, 'Expired (Plan Not Found)');
+            await this.terminateSubscription(userId, planId, SubscriptionAction.Expired);
             return;
         }
 
         // 3. Auto-Renew Logic
         const wallet = await this._wallet.get(userId);
         if (wallet.balance < plan.price) {
-            await this.terminateSubscription(userId, planId, 'Expired (Insufficient Balance)');
+            await this.terminateSubscription(userId, planId, SubscriptionAction.Expired, planId);
             return;
         }
 
@@ -67,7 +67,7 @@ export class CronService {
             // Deduct funds
             const success = await this._wallet.withdraw(userId, plan.price, `Auto-Renew Subscription: ${plan.name}`, TransactionType.Subscription, 'Completed');
             if (!success) {
-                await this.terminateSubscription(userId, planId, 'Expired (Payment Failed)');
+                await this.terminateSubscription(userId, planId, SubscriptionAction.Expired);
                 return;
             }
 
@@ -84,14 +84,18 @@ export class CronService {
 
             // Update User
             await this._users.update(userId, {
-                subscriptionExpiry: newExpiry
+                subscriptionExpiry: newExpiry,
+                currentPlanId: targetPlanId,
+                pendingPlanId: null, // Clear pending after successful transition
+                failedRenewalPlanId: null
             });
 
-            // Log the renewal
+            // Log the renewal or transition
+            const actionString = user.pendingPlanId ? SubscriptionAction.Downgraded : SubscriptionAction.AutoRenewed;
             await this._subscriptions.createLog({
                 userId,
-                planId: planId.toString(),
-                action: 'Auto-Renewed',
+                planId: targetPlanId,
+                action: actionString,
                 amount: plan.price,
                 expiryDate: newExpiry
             } as Partial<SubscriptionLog>);
@@ -103,12 +107,14 @@ export class CronService {
         }
     }
 
-    private async terminateSubscription(userId: string, planId: string | null, reason: string) {
+    private async terminateSubscription(userId: string, planId: string | null, reason: string, failedPlanId?: string | null) {
         await this._users.update(userId, {
             isPremium: false,
             currentPlanId: undefined,
             subscriptionExpiry: undefined,
-            cancelAtPeriodEnd: false
+            cancelAtPeriodEnd: false,
+            pendingPlanId: null,
+            failedRenewalPlanId: failedPlanId || null
         });
 
         if (planId) {

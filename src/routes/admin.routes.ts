@@ -42,7 +42,7 @@ export class AdminRoutes {
         this.router.post('/duels/:id/cancel', auth, requireAdmin, this._controller.cancelDuel)
         this.router.post('/duels/:id/force-result', auth, requireAdmin, validate(ForceDuelResultSchema), this._controller.forceDuelResult)
 
-        // Admin Wallet Management (Gap 10)
+        // Admin Wallet Management
         this.router.get('/wallet/:userId', auth, requireAdmin, this._controller.getUserWallet)
         this.router.get('/transactions', auth, requireAdmin, this._controller.getAllTransactions)
         this.router.post('/wallet/:userId/adjust', auth, requireAdmin, this._controller.adjustBalance)

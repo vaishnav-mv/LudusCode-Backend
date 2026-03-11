@@ -14,6 +14,8 @@ export interface UserResponseDTO {
     currentPlanId?: string;
     subscriptionExpiry?: Date | string;
     cancelAtPeriodEnd?: boolean;
+    pendingPlanId?: string;
+    failedRenewalPlanId?: string;
 }
 
 export interface AuthResponseDTO {

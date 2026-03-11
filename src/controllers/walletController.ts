@@ -84,7 +84,7 @@ export class WalletController {
   withdraw = asyncHandler(async (req: Request, res: Response) => {
     const body = req.body as WithdrawDTO
     const userId = body.userId
-    const ok = await this._service.withdraw(userId, body.amount, body.vpa, "Test User", "test@ludus.com", "9000090000")
+    const ok = await this._service.withdraw(userId, body.amount, body.vpa)
     if (!ok) {
       return ApiResponse.error(res, "Insufficient funds", HttpStatus.BAD_REQUEST)
     }

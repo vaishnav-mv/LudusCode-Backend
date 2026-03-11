@@ -20,7 +20,9 @@ export class AdminController {
    * @res     { totalUsers, activeDuels, totalProblems, totalRevenue }
    */
   dashboardStats = asyncHandler(async (req: Request, res: Response) => {
-    const stats = await this._service.dashboardStats()
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+    const stats = await this._service.dashboardStats({ startDate, endDate })
     return ApiResponse.success(res, stats)
   })
 
@@ -33,7 +35,14 @@ export class AdminController {
   financials = asyncHandler(async (req: Request, res: Response) => {
     const page = parseInt(req.query.page as string) || 1
     const limit = parseInt(req.query.limit as string) || 50
-    const financialData = await this._service.financials(page, limit)
+    const type = (req.query.type as string) || 'all'
+    const query = req.query.query as string | undefined
+    const sortStr = req.query.sortStr as string | undefined
+    const sortOrder = req.query.sortOrder as 'asc' | 'desc' | undefined
+    const startDate = req.query.startDate ? new Date(req.query.startDate as string) : undefined;
+    const endDate = req.query.endDate ? new Date(req.query.endDate as string) : undefined;
+    const groupBy = req.query.groupBy as 'day' | 'month' | 'year' | undefined;
+    const financialData = await this._service.financials(page, limit, type, { query, sortStr, sortOrder, startDate, endDate, groupBy })
     return ApiResponse.success(res, financialData)
   })
 

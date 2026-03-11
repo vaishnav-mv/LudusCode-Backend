@@ -1,6 +1,6 @@
 import { singleton, inject } from 'tsyringe'
-import { IWalletRepository } from '../interfaces/repositories'
-import { IWalletService } from '../interfaces/services'
+import { IWalletRepository, IUserRepository } from '../interfaces/repositories'
+import { IWalletService, ISubscriptionService } from '../interfaces/services'
 import { IPaymentProvider } from '../interfaces/providers'
 import { mapWallet, mapTransaction } from '../utils/mapper'
 import { WalletResponseDTO } from '../dto/response/wallet.response.dto'
@@ -11,7 +11,9 @@ import logger from '../utils/logger'
 export class WalletService implements IWalletService {
     constructor(
         @inject("IWalletRepository") private _wallets: IWalletRepository,
-        @inject("IPaymentProvider") private _paymentProvider: IPaymentProvider
+        @inject("IPaymentProvider") private _paymentProvider: IPaymentProvider,
+        @inject("IUserRepository") private _users: IUserRepository,
+        @inject("ISubscriptionService") private _subscriptionService: ISubscriptionService
     ) { }
 
 
@@ -32,6 +34,23 @@ export class WalletService implements IWalletService {
             const amountInRupees = payment.amount / 100;
 
             await this._wallets.deposit(userId, amountInRupees, `Deposit via Razorpay (Tx: ${paymentId})`);
+            
+            // Hook: Check if user missed an auto-renewal and retry
+            try {
+                const user = await this._users.getById(userId);
+                if (user && user.failedRenewalPlanId && !user.isPremium) {
+                    const planIdStr = typeof user.failedRenewalPlanId === 'object' && 'toString' in user.failedRenewalPlanId 
+                        ? user.failedRenewalPlanId.toString() 
+                        : user.failedRenewalPlanId as string;
+                    
+                    logger.info(`[WalletService] Triggering missed auto-renewal for user ${userId}`);
+                    await this._subscriptionService.subscribe(userId, planIdStr);
+                    // Subscription service handles clearing the failed state upon success
+                }
+            } catch (err) {
+                logger.error('[WalletService] Failed to process auto-renewal hook after deposit', err);
+            }
+
             return true;
         }
         return false;
@@ -39,7 +58,7 @@ export class WalletService implements IWalletService {
 
 
 
-    async withdraw(userId: string, amount: number, vpa: string, _name?: string, _email?: string, _phone?: string) {
+    async withdraw(userId: string, amount: number, vpa: string) {
         try {
 
             const deducted = await this._wallets.withdraw(userId, amount, `Withdrawal to ${vpa}`);

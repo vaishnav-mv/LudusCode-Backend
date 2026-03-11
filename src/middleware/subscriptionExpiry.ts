@@ -18,8 +18,11 @@ export const subscriptionExpiryMiddleware = async (req: Request, _res: Response,
         const expiry = new Date(user.subscriptionExpiry)
         const now = new Date()
 
-        if (expiry <= now) {
-            // Subscription has expired — auto-revoke premium status
+        // 24-hour grace period to allow CronService to process auto-renewals
+        const gracePeriodEnd = new Date(expiry.getTime() + 24 * 60 * 60 * 1000)
+
+        if (gracePeriodEnd <= now) {
+            // Subscription has expired (and grace period ended) — auto-revoke premium status
             const userRepo = container.resolve<IUserRepository>('IUserRepository')
             await userRepo.update(user._id!, {
                 isPremium: false,

@@ -103,15 +103,15 @@ export interface IWalletService {
   createDepositOrder(userId: string, amount: number): Promise<any>
   verifyDeposit(userId: string, orderId: string, paymentId: string, signature: string): Promise<boolean>
 
-  withdraw(userId: string, amount: number, vpa: string, name?: string, email?: string, phone?: string): Promise<boolean>
+  withdraw(userId: string, amount: number, vpa: string): Promise<boolean>
   wager(userId: string, amount: number, description: string): Promise<void>
   win(userId: string, amount: number, description: string): Promise<void>
   getTransactions(userId: string, page: number, limit: number, type?: string, startDate?: string, endDate?: string): Promise<{ transactions: TransactionResponseDTO[], total: number, page: number, totalPages: number }>
 }
 
 export interface IAdminService {
-  dashboardStats(): Promise<{ totalUsers: number, activeDuels: number, totalProblems: number, totalRevenue: number, pendingProblems: number, pendingPayouts: number, pendingAntiCheat: number }>
-  financials(page?: number, limit?: number): Promise<{ totalDuelWagered: number, totalDuelCommissions: number, totalDuelsWithWagers: number, totalSubscriptionRevenue: number, totalPlatformRevenue: number, commissionsByDay: any[], recentCommissions: any[], total: number, page: number, totalPages: number }>
+  dashboardStats(options?: { startDate?: Date, endDate?: Date }): Promise<{ totalUsers: number, activeDuels: number, totalProblems: number, totalRevenue: number, pendingProblems: number, pendingPayouts: number, pendingAntiCheat: number }>
+  financials(page?: number, limit?: number, filterType?: string, options?: { query?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year' }): Promise<{ totalDuelWagered: number, totalDuelCommissions: number, totalDuelsWithWagers: number, totalSubscriptionRevenue: number, totalPlatformRevenue: number, commissionsByDay: any[], recentTransactions: any[], total: number, page: number, totalPages: number }>
   pendingProblems(page?: number, limit?: number): Promise<{ problems: ProblemResponseDTO[], total: number, page: number, totalPages: number }>
   approveProblem(id: string): Promise<boolean>
   rejectProblem(id: string): Promise<boolean>

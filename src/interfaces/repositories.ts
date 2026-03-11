@@ -32,9 +32,9 @@ export interface IDuelRepository extends IBaseRepository<Duel> {
     attemptFinish(id: string, winner: User | string | null, finalStatus: string): Promise<Duel | null>;
     attemptCancel(id: string): Promise<Duel | null>;
     countRecentDuels(userId: string, since: Date): Promise<number>;
-    getCommissionStats(): Promise<{ totalWagered: number, totalCommissions: number, totalDuelsWithWagers: number }>;
-    getRecentCommissions(page: number, limit: number): Promise<{ recent: { duelId: string, problemTitle: string, winnerName: string, wager: number, commission: number, timestamp: number }[], total: number }>;
-    getCommissionsByDay(): Promise<{ date: string, amount: number }[]>;
+    getCommissionStats(startDate?: Date, endDate?: Date): Promise<{ totalWagered: number, totalCommissions: number, totalDuelsWithWagers: number }>;
+    getRecentCommissions(page: number, limit: number, options?: { query?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', startDate?: Date, endDate?: Date }): Promise<{ recent: { duelId: string, problemTitle: string, winnerName: string, wager: number, commission: number, timestamp: number }[], total: number }>;
+    getCommissionsByDay(startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year'): Promise<{ date: string, amount: number }[]>;
     getFlaggedActivities(page: number, limit: number): Promise<{ data: { user: unknown, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[], total: number }>;
 }
 
@@ -62,14 +62,16 @@ export interface IWalletRepository {
 
 export interface ISubscriptionRepository {
     getPlans(): Promise<SubscriptionPlan[]>;
+    getAllPlansAdmin(): Promise<SubscriptionPlan[]>;
     getPlanById(id: string): Promise<SubscriptionPlan | null>;
     createPlan(data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan>;
     updatePlan(id: string, data: Partial<SubscriptionPlan>): Promise<SubscriptionPlan | null>;
     deletePlan(id: string): Promise<boolean>;
     createLog(data: Partial<SubscriptionLog>): Promise<SubscriptionLog>;
     getLogsByUser(userId: string, skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc' }): Promise<{ logs: SubscriptionLog[], total: number }>;
-    getLogsAll(skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }): Promise<{ logs: SubscriptionLog[], total: number }>;
-    getTotalSubscriptionRevenue(): Promise<number>;
+    getLogsAll(skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string, isRevenue?: boolean, startDate?: Date, endDate?: Date }): Promise<{ logs: SubscriptionLog[], total: number }>;
+    getTotalSubscriptionRevenue(startDate?: Date, endDate?: Date): Promise<number>;
+    getRevenueByDay(startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year'): Promise<{ date: string, amount: number }[]>;
 }
 
 

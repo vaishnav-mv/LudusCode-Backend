@@ -3,13 +3,14 @@ import { ISubscriptionRepository } from '../interfaces/repositories'
 import { SubscriptionPlanModel } from '../models/SubscriptionPlan'
 import { SubscriptionLogModel } from '../models/SubscriptionLog'
 import { UserModel } from '../models/User'
-import { SubscriptionPlan, SubscriptionLog } from '../types'
+import { SubscriptionPlan, SubscriptionLog, SubscriptionAction } from '../types'
 
 @singleton()
 export class SubscriptionRepository implements ISubscriptionRepository {
 
     async getPlans(): Promise<SubscriptionPlan[]> {
-        const plans = await SubscriptionPlanModel.find().lean()
+        // Find plans that are not explicitly marked as inactive (handles older docs without the field)
+        const plans = await SubscriptionPlanModel.find({ isActive: { $ne: false } }).lean()
         return plans.map((plan) => ({
             ...plan,
             id: plan._id.toString(),
@@ -36,8 +37,18 @@ export class SubscriptionRepository implements ISubscriptionRepository {
     }
 
     async deletePlan(id: string): Promise<boolean> {
-        const result = await SubscriptionPlanModel.findByIdAndDelete(id)
+        const result = await SubscriptionPlanModel.findByIdAndUpdate(id, { isActive: false })
         return !!result
+    }
+
+    // For admin UI, get ALL plans including archived
+    async getAllPlansAdmin(): Promise<SubscriptionPlan[]> {
+        const plans = await SubscriptionPlanModel.find().lean()
+        return plans.map((plan) => ({
+            ...plan,
+            id: plan._id.toString(),
+            _id: plan._id.toString()
+        })) as unknown as SubscriptionPlan[]
     }
 
     async createLog(data: Partial<SubscriptionLog>): Promise<SubscriptionLog> {
@@ -83,23 +94,38 @@ export class SubscriptionRepository implements ISubscriptionRepository {
         return { logs: formattedLogs, total }
     }
 
-    async getLogsAll(skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string }): Promise<{ logs: SubscriptionLog[], total: number }> {
-        const match: Record<string, unknown> = {}
+    async getLogsAll(skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string, isRevenue?: boolean, startDate?: Date, endDate?: Date }): Promise<{ logs: SubscriptionLog[], total: number }> {
+        const match: Record<string, any> = {}
 
         if (options?.action && options.action !== 'All') {
             match.action = options.action
         }
 
+        if (options?.isRevenue) {
+            match.action = { $in: [SubscriptionAction.Subscribed, SubscriptionAction.Renewed, SubscriptionAction.Upgraded, SubscriptionAction.Grant] }
+            match.amount = { $gt: 0 }
+        }
+
+        if (options?.startDate || options?.endDate) {
+            match.timestamp = {};
+            if (options.startDate) match.timestamp.$gte = options.startDate;
+            if (options.endDate) match.timestamp.$lte = options.endDate;
+        }
+
         if (options?.query && options.query.trim() !== '') {
-            const userFilter = {
-                $or: [
-                    { username: { $regex: options.query, $options: 'i' } },
-                    { email: { $regex: options.query, $options: 'i' } }
-                ]
-            }
-            const users = await UserModel.find(userFilter).select('_id').lean()
-            const userIds = users.map(user => user._id)
-            match.userId = { $in: userIds }
+            const queryRegex = new RegExp(options.query, 'i');
+            const users = await UserModel.find({
+                $or: [{ username: queryRegex }, { email: queryRegex }]
+            }).select('_id').lean();
+            const plans = await SubscriptionPlanModel.find({ name: queryRegex }).select('_id').lean();
+            
+            const userIds = users.map(user => user._id);
+            const planIds = plans.map(plan => plan._id);
+            
+            match.$or = [
+                { userId: { $in: userIds } },
+                { planId: { $in: planIds } }
+            ];
         }
 
         const sortDir = options?.sortOrder === 'asc' ? 1 : -1
@@ -156,11 +182,57 @@ export class SubscriptionRepository implements ISubscriptionRepository {
         return { logs: formattedLogs, total }
     }
 
-    async getTotalSubscriptionRevenue(): Promise<number> {
+    async getTotalSubscriptionRevenue(startDate?: Date, endDate?: Date): Promise<number> {
+        const matchStage: any = { action: { $in: [SubscriptionAction.Subscribed, SubscriptionAction.Renewed, SubscriptionAction.Upgraded, SubscriptionAction.Grant] } };
+        if (startDate || endDate) {
+            matchStage.timestamp = {};
+            if (startDate) matchStage.timestamp.$gte = startDate;
+            if (endDate) matchStage.timestamp.$lte = endDate;
+        }
         const result = await SubscriptionLogModel.aggregate([
-            { $match: { action: { $in: ['Subscribed', 'Renewed', 'Upgraded', 'Grant'] } } },
+            { $match: matchStage },
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ])
         return result.length > 0 ? result[0].total : 0
+    }
+
+    async getRevenueByDay(startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year'): Promise<{ date: string, amount: number }[]> {
+        const matchStage: any = { action: { $in: [SubscriptionAction.Subscribed, SubscriptionAction.Renewed, SubscriptionAction.Upgraded, SubscriptionAction.Grant] }, amount: { $gt: 0 } };
+        if (startDate || endDate) {
+            matchStage.timestamp = {};
+            if (startDate) matchStage.timestamp.$gte = startDate;
+            if (endDate) matchStage.timestamp.$lte = endDate;
+        }
+
+        let formatStr = '%Y-%m-%d';
+        if (groupBy === 'month') formatStr = '%Y-%m';
+        if (groupBy === 'year') formatStr = '%Y';
+
+        const result = await SubscriptionLogModel.aggregate([
+            { $match: matchStage },
+            {
+                $project: {
+                    dateString: {
+                        $dateToString: { format: formatStr, date: '$timestamp' }
+                    },
+                    amount: 1
+                }
+            },
+            {
+                $group: {
+                    _id: '$dateString',
+                    amount: { $sum: '$amount' }
+                }
+            },
+            { $sort: { _id: 1 } },
+            {
+                $project: {
+                    _id: 0,
+                    date: '$_id',
+                    amount: 1
+                }
+            }
+        ]);
+        return result;
     }
 }

@@ -181,8 +181,8 @@ export class DuelController {
     if (!duel) return ApiResponse.error(res, ResponseMessages.NOT_FOUND, HttpStatus.NOT_FOUND)
     const currentUser = req.user
     const userId = currentUser?.sub || currentUser?.id || currentUser?._id?.toString() || '';
-    const userSubmission = duel.submissions?.slice().reverse().find(s => {
-      const sUserId = typeof s.user === 'string' ? s.user : (s.user?.id || '');
+    const userSubmission = duel.submissions?.slice().reverse().find(param => {
+      const sUserId = typeof param.user === 'string' ? param.user : (param.user?.id || '');
       return sUserId === userId?.toString();
     });
     const debugLog = `

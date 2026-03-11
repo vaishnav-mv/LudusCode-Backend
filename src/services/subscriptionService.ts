@@ -1,70 +1,11 @@
 import { singleton, inject } from 'tsyringe'
 import { ISubscriptionService } from '../interfaces/services'
 import { ISubscriptionRepository, IWalletRepository, IUserRepository } from '../interfaces/repositories'
-import { SubscriptionPlan, SubscriptionLog, User, TransactionType } from '../types'
+import { SubscriptionPlan, SubscriptionLog, User, TransactionType, SubscriptionAction } from '../types'
 import { mapSubscriptionPlan, mapSubscriptionLog } from '../utils/mapper'
 import { SubscriptionPlanResponseDTO, SubscriptionLogResponseDTO } from '../dto/response/subscription.response.dto'
+import { computeSubscriptionAction } from '../utils/subscriptionHelper';
 
-/**
- * Determines the subscription action (new, renew, upgrade, downgrade)
- * and calculates the new expiry date and proration credit.
- * Shared logic used by both user subscribe and admin grantSubscription.
- */
-export function computeSubscriptionAction(
-    user: User,
-    plan: SubscriptionPlan,
-    oldPlan: SubscriptionPlan | null
-): { action: string, newExpiry: Date, proratedCredit: number } {
-    const now = new Date()
-    // eslint-disable-next-line prefer-const
-    let expiry = new Date(now)
-    let action = 'Subscribed'
-    let proratedCredit = 0
-
-    if (user.isPremium && user.currentPlanId) {
-        if (user.currentPlanId.toString() === (plan._id || plan.id || '').toString()) {
-            // Same plan
-            if (user.subscriptionExpiry && new Date(user.subscriptionExpiry) > now) {
-                // Active → extend from current expiry
-                expiry = new Date(user.subscriptionExpiry)
-                action = 'Renewed'
-            } else {
-                action = 'Subscribed' // expired → fresh start
-            }
-        } else {
-            // Different plan
-            if (oldPlan) {
-                if (oldPlan.price > plan.price) {
-                    action = 'Downgraded'
-                } else {
-                    action = 'Upgraded'
-                }
-
-                // Proration: calculate remaining value of old plan (Gap 14)
-                if (user.subscriptionExpiry && new Date(user.subscriptionExpiry) > now) {
-                    const totalDuration = oldPlan.period === 'yearly'
-                        ? 365 * 24 * 60 * 60 * 1000
-                        : 30 * 24 * 60 * 60 * 1000
-                    const remaining = new Date(user.subscriptionExpiry).getTime() - now.getTime()
-                    const fractionRemaining = remaining / totalDuration
-                    proratedCredit = Math.round(oldPlan.price * fractionRemaining * 100) / 100
-                }
-            } else {
-                action = 'Subscribed'
-            }
-        }
-    }
-
-    // Calculate new expiry
-    if (plan.period === 'yearly') {
-        expiry.setFullYear(expiry.getFullYear() + 1)
-    } else {
-        // default to monthly
-        expiry.setMonth(expiry.getMonth() + 1)
-    }
-
-    return { action, newExpiry: expiry, proratedCredit }
-}
 
 @singleton()
 export class SubscriptionService implements ISubscriptionService {
@@ -87,25 +28,49 @@ export class SubscriptionService implements ISubscriptionService {
         const plan = await this._subscriptions.getPlanById(planId)
         if (!plan) return { success: false, message: 'Plan not found' }
 
+        const oldPlanIdStr = user.currentPlanId ? user.currentPlanId.toString() : null;
+        const newPlanIdStr = (plan._id || plan.id || '').toString();
+
         // Fetch old plan if switching
         let oldPlan: SubscriptionPlan | null = null
-        if (user.currentPlanId && user.currentPlanId.toString() !== (plan._id || plan.id || '').toString()) {
-            oldPlan = await this._subscriptions.getPlanById(user.currentPlanId.toString())
+        if (oldPlanIdStr && oldPlanIdStr !== newPlanIdStr) {
+            oldPlan = await this._subscriptions.getPlanById(oldPlanIdStr)
         }
 
         // Prevent double-charging for identical plans if they have auto-renew on
-        if (user.isPremium && user.currentPlanId && user.currentPlanId.toString() === (plan._id || plan.id || '').toString() && !user.cancelAtPeriodEnd) {
+        if (user.isPremium && oldPlanIdStr === newPlanIdStr && !user.cancelAtPeriodEnd) {
             const expiryStr = user.subscriptionExpiry ? new Date(user.subscriptionExpiry).toLocaleDateString() : 'unknown date';
             return { success: false, message: `You are already subscribed to this plan. It will auto-renew on ${expiryStr}.` }
         }
 
         const { action, newExpiry, proratedCredit } = computeSubscriptionAction(user, plan, oldPlan)
 
-        // Calculate actual cost after proration credit (Gap 1 + Gap 14)
+        // Queue Downgrade Logic (Option 1)
+        if (action === 'Downgraded' && user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
+            await this._users.update(userId, {
+                pendingPlanId: newPlanIdStr,
+                cancelAtPeriodEnd: false // Ensure it auto-renews into the new plan
+            });
+            await this._subscriptions.createLog({
+                userId,
+                planId: newPlanIdStr,
+                action: SubscriptionAction.DowngradeScheduled,
+                amount: 0,
+                expiryDate: user.subscriptionExpiry
+            } as Partial<SubscriptionLog>);
+            
+            return { 
+                success: true, 
+                action: SubscriptionAction.DowngradeScheduled, 
+                message: `Your plan will downgrade to ${plan.name} at the end of your current billing cycle.` 
+            };
+        }
+
+        // Calculate actual cost after proration credit
         const effectiveCost = Math.max(0, plan.price - proratedCredit)
 
         if (effectiveCost > 0) {
-            // Deduct from wallet (Gap 1)
+            // Deduct from wallet
             const wallet = await this._wallet.get(userId)
             if (wallet.balance < effectiveCost) {
                 return {
@@ -122,15 +87,17 @@ export class SubscriptionService implements ISubscriptionService {
         // Update user premium status
         await this._users.update(userId, {
             isPremium: true,
-            currentPlanId: (plan._id || plan.id || '').toString(),
+            currentPlanId: newPlanIdStr,
             subscriptionExpiry: newExpiry,
-            cancelAtPeriodEnd: false
+            cancelAtPeriodEnd: false,
+            pendingPlanId: null, // Clear any pending plans if they forcefully switch/upgrade
+            failedRenewalPlanId: null // Clear any failed states
         })
 
         // Log the subscription action
         await this._subscriptions.createLog({
             userId,
-            planId: (plan._id || plan.id || '').toString(),
+            planId: newPlanIdStr,
             action,
             amount: effectiveCost,
             expiryDate: newExpiry
@@ -148,14 +115,15 @@ export class SubscriptionService implements ISubscriptionService {
         const planId = user.currentPlanId
 
         await this._users.update(userId, {
-            cancelAtPeriodEnd: true
+            cancelAtPeriodEnd: true,
+            pendingPlanId: null // Clear any pending downgrades when cancelling fully
         })
 
         if (planId) {
             await this._subscriptions.createLog({
                 userId,
                 planId: planId.toString(),
-                action: 'Auto-Renew Disabled',
+                action: SubscriptionAction.AutoRenewDisabled,
                 amount: 0
             } as Partial<SubscriptionLog>)
         }
@@ -179,7 +147,7 @@ export class SubscriptionService implements ISubscriptionService {
             await this._subscriptions.createLog({
                 userId,
                 planId: planId.toString(),
-                action: 'Auto-Renew Resumed',
+                action: SubscriptionAction.AutoRenewResumed,
                 amount: 0
             } as Partial<SubscriptionLog>)
         }

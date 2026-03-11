@@ -13,6 +13,8 @@ const UserSchema = new Schema({
   isVerified: { type: Boolean, default: false },
   currentPlanId: { type: Schema.Types.ObjectId, ref: 'SubscriptionPlan' },
   subscriptionExpiry: { type: Date },
-  cancelAtPeriodEnd: { type: Boolean, default: false }
+  cancelAtPeriodEnd: { type: Boolean, default: false },
+  pendingPlanId: { type: Schema.Types.ObjectId, ref: 'SubscriptionPlan' },
+  failedRenewalPlanId: { type: Schema.Types.ObjectId, ref: 'SubscriptionPlan' }
 }, { timestamps: true })
 export const UserModel = mongoose.model('User', UserSchema)
