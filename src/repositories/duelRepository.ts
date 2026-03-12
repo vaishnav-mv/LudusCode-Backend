@@ -127,7 +127,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
   }
 
   async getCommissionStats(startDate?: Date, endDate?: Date): Promise<{ totalWagered: number, totalCommissions: number, totalDuelsWithWagers: number }> {
-    const matchStage: any = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
+    const matchStage: Record<string, unknown> = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
     if (startDate || endDate) {
       matchStage.startTime = {};
       if (startDate) matchStage.startTime.$gte = startDate.getTime();
@@ -171,7 +171,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
 
   async getRecentCommissions(page: number, limit: number, options?: { query?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', startDate?: Date, endDate?: Date }): Promise<{ recent: { duelId: string, problemTitle: string, winnerName: string, wager: number, commission: number, timestamp: number }[], total: number }> {
     const skip = (page - 1) * limit;
-    const matchStage: any = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
+    const matchStage: Record<string, unknown> = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
 
     if (options?.startDate || options?.endDate) {
       matchStage.startTime = {};
@@ -201,7 +201,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
 
     const total = await this.model.countDocuments(matchStage);
 
-    let pipeline: any[] = [
+    let pipeline: Record<string, unknown>[] = [
       { $match: matchStage },
       { $sort: initialSort }
     ];
@@ -263,7 +263,7 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
   }
 
   async getCommissionsByDay(startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year'): Promise<{ date: string, amount: number }[]> {
-    const matchStage: any = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
+    const matchStage: Record<string, unknown> = { status: DuelStatus.Finished, wager: { $gt: 0 }, winner: { $ne: null } };
     if (startDate || endDate) {
       matchStage.startTime = {};
       if (startDate) matchStage.startTime.$gte = startDate.getTime();
@@ -321,7 +321,9 @@ export class DuelRepository extends BaseRepository<Duel> implements IDuelReposit
   async getFlaggedActivities(page: number, limit: number): Promise<{ data: { user: unknown, totalWarnings: number, lastOffense: string, breakdown: { paste: number, visibility: number } }[], total: number }> {
     const suspectDuels = await this.model.find({
       $or: [
+        /* eslint-disable-next-line @typescript-eslint/naming-convention */
         { 'player1.warnings': { $gt: 0 } },
+        /* eslint-disable-next-line @typescript-eslint/naming-convention */
         { 'player2.warnings': { $gt: 0 } },
         {
           $expr: {

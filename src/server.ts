@@ -2,7 +2,6 @@ import 'reflect-metadata'
 import './di/container' // Must be imported before app
 import app from './app'
 import { container } from 'tsyringe'
-import { StudySessionService } from './services/studySessionService'
 import { CronService } from './services/cronService'
 import { env } from './config/env'
 import mongoose from 'mongoose'
@@ -28,16 +27,6 @@ async function bootstrap() {
     // Start Daily Subscription Expiry/Renew Cron
     const cronService = container.resolve(CronService);
     cronService.startDailyCron();
-
-    // Start Round Robin Timer Loop
-    setInterval(async () => {
-      try {
-        const service = container.resolve(StudySessionService);
-        await service.checkRoundRobinTimers();
-      } catch (e) {
-        logger.error('Timer Helper Error:', e);
-      }
-    }, env.ROUND_ROBIN_INTERVAL_MS);
   } catch (e) {
     logger.error('Failed to start server:', e);
     process.exit(1)

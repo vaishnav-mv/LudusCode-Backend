@@ -1,5 +1,5 @@
 import { UserResponseDTO } from './user.response.dto';
-import { StudySessionMode, StudySessionStatus } from '../../types';
+import { StudySessionStatus } from '../../types';
 
 export interface StudySessionParticipantDTO {
     user: UserResponseDTO | string;
@@ -12,7 +12,6 @@ export interface StudySessionResponseDTO {
     groupId: string;
     title: string;
     description: string;
-    mode: StudySessionMode;
     status: StudySessionStatus;
     startTime: string;
     durationMinutes: number;
@@ -20,7 +19,4 @@ export interface StudySessionResponseDTO {
     participants: StudySessionParticipantDTO[];
     chatEnabled: boolean;
     voiceEnabled: boolean;
-    currentTurnUserId?: string;
-    turnStartedAt?: string;
-    turnDurationSeconds?: number;
 }

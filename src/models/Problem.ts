@@ -46,6 +46,7 @@ const ProblemSchema = new Schema({
   functionName: { type: String, required: false },
   editorial: { type: String, required: false },
   timeLimitMs: { type: Number, default: 5000 },
+  solveTimeLimit: { type: Number, default: 300 },
   tags: { type: [String], default: [] },
   status: {
     type: String,

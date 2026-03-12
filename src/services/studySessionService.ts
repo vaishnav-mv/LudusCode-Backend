@@ -1,11 +1,10 @@
 import { singleton, inject } from 'tsyringe'
-import { IStudySessionRepository, IUserRepository, IGroupRepository } from '../interfaces/repositories'
-import { StudySessionMode, StudySessionStatus, StudySession } from '../types'
+import { IStudySessionRepository, IGroupRepository } from '../interfaces/repositories'
+import { StudySessionStatus, StudySession } from '../types'
 import { broadcastSession } from '../realtime/ws'
 import { IStudySessionService } from '../interfaces/services'
 import { mapStudySession } from '../utils/mapper'
 import { StudySessionResponseDTO } from '../dto/response/studySession.response.dto'
-import logger from '../utils/logger'
 
 @singleton()
 export class StudySessionService implements IStudySessionService {
@@ -14,7 +13,7 @@ export class StudySessionService implements IStudySessionService {
         @inject("IGroupRepository") private _groups: IGroupRepository
     ) { }
 
-    async create(data: { groupId: string, userId: string, title: string, description: string, mode: string, startTime: string, durationMinutes: number }): Promise<StudySessionResponseDTO> {
+    async create(data: { groupId: string, userId: string, title: string, description: string, startTime: string, durationMinutes: number }): Promise<StudySessionResponseDTO> {
         const userId = data.userId;
 
         const group = await this._groups.getById(data.groupId);
@@ -32,7 +31,6 @@ export class StudySessionService implements IStudySessionService {
             createdBy: userId,
             title: data.title,
             description: data.description,
-            mode: data.mode as StudySessionMode,
             startTime: data.startTime,
             durationMinutes: data.durationMinutes,
             problems: [],
@@ -128,66 +126,6 @@ export class StudySessionService implements IStudySessionService {
         const updated = await this._sessions.update(sessionId, { participants: saveParticipants });
         if (updated) broadcastSession(sessionId, updated);
         return updated ? mapStudySession(updated) : null;
-    }
-
-    async passTurn(sessionId: string, userId: string): Promise<StudySessionResponseDTO | null> {
-        const resolvedUserId = userId;
-        const session = await this._sessions.getById(sessionId);
-        if (!session) throw new Error("Session not found");
-
-        if (session.mode !== 'round_robin') throw new Error("Pass Turn is only available in Round Robin mode");
-
-        const participants = session.participants.map(participant => typeof participant.user === 'string' ? participant.user : participant.user._id?.toString() || participant.user.id!);
-        if (participants.length === 0) return mapStudySession(session)!;
-
-        let currentIndex = -1;
-
-        // If no turn is set, or the turn user is not in participants anymore
-        if (!session.currentTurnUserId || !participants.includes(session.currentTurnUserId.toString())) {
-            // Default to next should be 0 (first user)
-            currentIndex = -1; // so next will be 0
-        } else {
-            if (session.currentTurnUserId.toString() !== resolvedUserId) {
-                if (session.currentTurnUserId) throw new Error("It is not your turn");
-            }
-            currentIndex = participants.indexOf(resolvedUserId);
-        }
-
-        const nextIndex = (currentIndex + 1) % participants.length;
-        const nextUserId = participants[nextIndex];
-
-        const updated = await this._sessions.update(sessionId, {
-            currentTurnUserId: nextUserId,
-            turnStartedAt: new Date()
-        });
-        if (updated) broadcastSession(sessionId, updated);
-        return updated ? mapStudySession(updated) : null;
-    }
-
-    async checkRoundRobinTimers() {
-        const sessions = await this._sessions.findActiveRoundRobin();
-        const now = Date.now();
-
-        for (const session of sessions) {
-            // Default turn duration 5 minutes if not set
-            const turnDurationMs = (session.turnDurationSeconds || 300) * 1000;
-
-            if (!session.turnStartedAt) {
-                // Initialize turn start if missing
-                await this._sessions.update(session._id!, { turnStartedAt: new Date() });
-                continue;
-            }
-
-            const elapsed = now - new Date(session.turnStartedAt).getTime();
-            if (elapsed >= turnDurationMs) {
-                // Time's up -> Pass Turn
-                try {
-                    await this.passTurn(session._id!, (session.currentTurnUserId || '').toString());
-                } catch (e) {
-                    logger.error(`Failed to auto-pass turn for session ${session._id}`, e);
-                }
-            }
-        }
     }
 
     async list(groupId: string, page: number = 1, limit: number = 20, options: { status?: string, sort?: string, query?: string } = {}): Promise<{ sessions: StudySessionResponseDTO[], total: number, page: number, totalPages: number }> {

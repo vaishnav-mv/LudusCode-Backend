@@ -15,7 +15,7 @@ export class StudySessionController {
     /**
      * @desc    Create a new study session
      * @route   POST /api/study-sessions
-     * @req     body: { groupId, title, description, mode, startTime, durationMinutes }
+     * @req     body: { groupId, title, description, startTime, durationMinutes }
      * @res     { session }
      */
     create = asyncHandler(async (req: Request, res: Response) => {
@@ -99,20 +99,6 @@ export class StudySessionController {
         if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
         const session = await this._service.getByIdSecure(id, userId);
         if (!session) return ApiResponse.error(res, 'Session not found', HttpStatus.NOT_FOUND)
-        return ApiResponse.success(res, session)
-    })
-
-    /**
-     * @desc    Pass turn in round-robin mode
-     * @route   POST /api/study-sessions/:id/pass-turn
-     * @req     params: { id }
-     * @res     { session }
-     */
-    passTurn = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params
-        const userId = req.user?.sub
-        if (!userId) return ApiResponse.error(res, 'Unauthorized', HttpStatus.UNAUTHORIZED)
-        const session = await this._service.passTurn(id, userId)
         return ApiResponse.success(res, session)
     })
 }

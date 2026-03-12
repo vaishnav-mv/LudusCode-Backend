@@ -21,11 +21,6 @@ export enum SubmissionStatus {
     Forfeit = 'Forfeit'
 }
 
-export enum StudySessionMode {
-    Collaborative = 'collaborative',
-    RoundRobin = 'round_robin'
-}
-
 export enum StudySessionStatus {
     Upcoming = 'upcoming',
     Active = 'active',
@@ -60,12 +55,6 @@ export enum SubscriptionAction {
     AutoRenewDisabled = 'Auto-Renew Disabled',
     AutoRenewResumed = 'Auto-Renew Resumed'
 }
-
-
-
-
-
-
 
 export enum ProblemStatus {
     Pending = 'Pending',
@@ -180,6 +169,7 @@ export interface Problem {
     functionName?: string;
     editorial?: string;
     timeLimitMs?: number;
+    solveTimeLimit?: number;
     status: 'Pending' | 'Approved' | 'Custom';
     createdAt?: Date | string;
     updatedAt?: Date | string;
@@ -305,7 +295,6 @@ export interface StudySession {
     createdBy: string | User;
     title: string;
     description?: string;
-    mode: StudySessionMode;
     status: StudySessionStatus;
     startTime: Date | string;
     durationMinutes: number;
@@ -318,9 +307,6 @@ export interface StudySession {
     }[];
     chatEnabled?: boolean;
     voiceEnabled?: boolean;
-    currentTurnUserId?: string | User;
-    turnStartedAt?: Date | string;
-    turnDurationSeconds?: number;
     createdAt?: Date | string;
     updatedAt?: Date | string;
     id?: string;
@@ -334,7 +320,10 @@ export interface PaginatedResponse<T> {
     page: number;
     totalPages: number;
 }
+// Express augmentation is handled through separate `express.d.ts` or globally.
+// However, in type definition files, extending global namespace is allowed if it does not use `export {}` directly in the block above `declare global`.
 declare global {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
     namespace Express {
         interface Request {
             user?: User;

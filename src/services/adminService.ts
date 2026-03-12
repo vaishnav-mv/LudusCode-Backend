@@ -1,7 +1,7 @@
 import { singleton, inject } from 'tsyringe'
 import { IUserRepository, IProblemRepository, IDuelRepository, IGroupRepository, IWalletRepository, ISubscriptionRepository } from '../interfaces/repositories'
 import { broadcastDuel } from '../realtime/ws'
-import { mapDuel, mapProblem, mapSubscriptionPlan, mapSubscriptionLog, mapTransaction, mapUser } from '../utils/mapper'
+import { mapDuel, mapProblem, mapSubscriptionPlan, mapTransaction, mapUser } from '../utils/mapper'
 import { IAdminService } from '../interfaces/services'
 import { DuelStatus, ProblemStatus, SubscriptionPlan, TransactionType, User, SubscriptionAction } from '../types'
 import { UserResponseDTO } from '../dto/response/user.response.dto'
@@ -25,12 +25,12 @@ export class AdminService implements IAdminService {
   ) { }
 
   async dashboardStats(options?: { startDate?: Date, endDate?: Date }) {
-    const userMatch: any = { isAdmin: { $ne: true } };
-    const duelMatch: any = { status: DuelStatus.InProgress };
-    const problemMatch: any = {};
+    const userMatch: Record<string, unknown> = { isAdmin: { $ne: true } };
+    const duelMatch: Record<string, unknown> = { status: DuelStatus.InProgress };
+    const problemMatch: Record<string, unknown> = {};
     if (options?.startDate || options?.endDate) {
-      const dateFilter: any = {};
-      const numFilter: any = {};
+      const dateFilter: Record<string, unknown> = {};
+      const numFilter: Record<string, unknown> = {};
       if (options.startDate) {
         dateFilter.$gte = options.startDate;
         numFilter.$gte = options.startDate.getTime();
@@ -92,7 +92,7 @@ export class AdminService implements IAdminService {
       this._subscriptions.getRevenueByDay(options?.startDate, options?.endDate, options?.groupBy)
     ])
 
-    let recentTransactions: any[] = []
+    let recentTransactions: Record<string, unknown>[] = []
     let totalTransactions = 0
     const skip = (page - 1) * limit
 
@@ -203,7 +203,7 @@ export class AdminService implements IAdminService {
     return true
   }
 
-  async validateProblemTests(id: string): Promise<any> {
+  async validateProblemTests(id: string): Promise<Record<string, unknown>> {
     const problem = await this._problems.getById(id)
     if (!problem) throw new Error("Problem not found")
 
@@ -212,15 +212,14 @@ export class AdminService implements IAdminService {
       throw new Error("No solution provided to validate against.")
     }
 
-    // Default to the first solution, or JS if possible
-    const solution = problem.solutions.find((s: any) => s.language.toLowerCase() === 'javascript') || problem.solutions[0];
+    const solution = problem.solutions.find((s) => typeof s.language === 'string' && s.language.toLowerCase() === 'javascript') || problem.solutions[0];
 
     // Call the edge case AI method which returns a JSON analysis of flaws/edge cases
     const analysisStr = await this._aiProvider.validateTestCases(problem, solution.code);
     return JSON.parse(analysisStr);
   }
 
-  async addProblemTestCases(id: string, newTestCases: any[]): Promise<boolean> {
+  async addProblemTestCases(id: string, newTestCases: Record<string, unknown>[]): Promise<boolean> {
     const problem = await this._problems.getById(id);
     if (!problem) return false;
 
@@ -355,7 +354,7 @@ export class AdminService implements IAdminService {
 
     return {
       plans: plansInfo.map(plan => mapSubscriptionPlan(plan)).filter((plan): plan is SubscriptionPlanResponseDTO => plan !== null),
-      logs: logs as any,
+      logs: logs as unknown as SubscriptionLogResponseDTO[],
       total,
       page,
       totalPages: Math.ceil(total / limit)

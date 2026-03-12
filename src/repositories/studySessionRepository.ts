@@ -1,6 +1,6 @@
 import { singleton } from 'tsyringe'
 import { StudySessionModel } from '../models/StudySession'
-import { StudySession, StudySessionStatus } from '../types'
+import { StudySession } from '../types'
 import { Model } from 'mongoose'
 import { IStudySessionRepository } from '../interfaces/repositories'
 import { BaseRepository } from './BaseRepository'
@@ -61,16 +61,5 @@ export class StudySessionRepository extends BaseRepository<StudySession> impleme
             sessions: sessions.map((session) => this.mapDoc(session)!),
             total
         };
-    }
-
-    // Delete inherited
-
-    async findActiveRoundRobin() {
-        // Find sessions that are Active, Mode=RoundRobin
-        const sessions = await this.model.find({
-            status: StudySessionStatus.Active,
-            mode: 'round_robin'
-        }).lean();
-        return sessions.map((session) => this.mapDoc(session)!);
     }
 }

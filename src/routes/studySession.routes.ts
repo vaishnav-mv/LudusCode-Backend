@@ -21,6 +21,5 @@ export class StudySessionRoutes {
         this.router.put('/:id', auth, this._controller.update)
         this.router.post('/:id/join', auth, this._controller.join)
         this.router.post('/:id/leave', auth, this._controller.leave)
-        this.router.post('/:id/pass-turn', auth, this._controller.passTurn)
     }
 }

@@ -24,8 +24,7 @@ export interface IGroupRepository extends IBaseRepository<Group> {
     transferOrDeleteOwnedGroups(userId: string): Promise<void>;
 }
 
-export interface IProblemRepository extends IBaseRepository<Problem> {
-}
+export type IProblemRepository = IBaseRepository<Problem>;
 
 export interface IDuelRepository extends IBaseRepository<Duel> {
     attemptJoin(id: string, player2Data: Partial<DuelPlayer>): Promise<Duel | null>;
@@ -46,7 +45,6 @@ export interface ISubmissionRepository {
 
 export interface IStudySessionRepository extends IBaseRepository<StudySession> {
     listByGroup(groupId: string, skip: number, limit: number, options: { status?: string, sort?: string, query?: string }): Promise<{ sessions: StudySession[], total: number }>;
-    findActiveRoundRobin(): Promise<StudySession[]>;
 }
 
 export interface IWalletRepository {

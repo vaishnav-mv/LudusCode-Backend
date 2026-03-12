@@ -151,8 +151,9 @@ CRITICAL REQUIREMENTS:
 6. Provide at least 5 diverse test cases including edge cases. At least 2 must be sample cases (isSample: true).
 7. Provide relevant tags (e.g. "Array", "Hash Table", "Dynamic Programming", "String", "Math", etc.).
 8. Provide an editorial explaining the approach, time complexity, and space complexity.
-9. Suggest a timeLimitMs value (2000 for easy, 3000 for medium, 5000 for hard).
-10. The solution should be optimal and correct for ALL test cases.`;
+9. Suggest a timeLimitMs value (2000 for easy, 3000 for medium, 5000 for hard) which dictates the execution timeout of the code in milliseconds.
+10. Determine a fair solveTimeLimit in seconds representing how much time a human developer is given to crack and submit this problem (e.g., 300 for Easy, 600 for Medium, 900 for Hard).
+11. The solution should be optimal and correct for ALL test cases.`;
 
         const paramSchemaObj = {
             type: 'OBJECT' as const,
@@ -179,6 +180,7 @@ CRITICAL REQUIREMENTS:
                 tags: { type: 'ARRAY' as const, items: { type: 'STRING' as const } },
                 editorial: { type: 'STRING' as const },
                 timeLimitMs: { type: 'NUMBER' as const },
+                solveTimeLimit: { type: 'NUMBER' as const },
                 testCases: {
                     type: 'ARRAY' as const,
                     items: {
@@ -203,7 +205,7 @@ CRITICAL REQUIREMENTS:
                     }
                 }
             },
-            required: ['title', 'description', 'difficulty', 'constraints', 'inputFormat', 'outputFormat', 'functionName', 'inputSchema', 'outputSchema', 'testCases', 'solutions'] as string[]
+            required: ['title', 'description', 'difficulty', 'constraints', 'inputFormat', 'outputFormat', 'functionName', 'inputSchema', 'outputSchema', 'testCases', 'solutions', 'solveTimeLimit'] as string[]
         };
 
         const result = await ai.models.generateContent({

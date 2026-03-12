@@ -1,7 +1,7 @@
 import { singleton, inject } from 'tsyringe'
 import { ISubscriptionService } from '../interfaces/services'
 import { ISubscriptionRepository, IWalletRepository, IUserRepository } from '../interfaces/repositories'
-import { SubscriptionPlan, SubscriptionLog, User, TransactionType, SubscriptionAction } from '../types'
+import { SubscriptionPlan, SubscriptionLog, TransactionType, SubscriptionAction } from '../types'
 import { mapSubscriptionPlan, mapSubscriptionLog } from '../utils/mapper'
 import { SubscriptionPlanResponseDTO, SubscriptionLogResponseDTO } from '../dto/response/subscription.response.dto'
 import { computeSubscriptionAction } from '../utils/subscriptionHelper';

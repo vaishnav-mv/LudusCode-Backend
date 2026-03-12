@@ -1,4 +1,4 @@
-import { User, SubmissionResult, Duel, Wallet, Problem, PaginatedResponse, ChatMessage, StudySession, RazorpayOrder, JwtPayload, SubscriptionPlan, SubscriptionLog, Transaction } from '../types'
+import { User, SubmissionResult, Problem, PaginatedResponse, StudySession, JwtPayload, SubscriptionPlan} from '../types'
 import { SubmissionResponseDTO } from '../dto/response/submission.response.dto'
 import { UserResponseDTO } from '../dto/response/user.response.dto'
 import { GroupResponseDTO } from '../dto/response/group.response.dto'
@@ -100,7 +100,7 @@ export interface IDuelService {
 
 export interface IWalletService {
   get(userId: string): Promise<WalletResponseDTO | null>
-  createDepositOrder(userId: string, amount: number): Promise<any>
+  createDepositOrder(userId: string, amount: number): Promise<Record<string, unknown>>
   verifyDeposit(userId: string, orderId: string, paymentId: string, signature: string): Promise<boolean>
 
   withdraw(userId: string, amount: number, vpa: string): Promise<boolean>
@@ -111,13 +111,13 @@ export interface IWalletService {
 
 export interface IAdminService {
   dashboardStats(options?: { startDate?: Date, endDate?: Date }): Promise<{ totalUsers: number, activeDuels: number, totalProblems: number, totalRevenue: number, pendingProblems: number, pendingPayouts: number, pendingAntiCheat: number }>
-  financials(page?: number, limit?: number, filterType?: string, options?: { query?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year' }): Promise<{ totalDuelWagered: number, totalDuelCommissions: number, totalDuelsWithWagers: number, totalSubscriptionRevenue: number, totalPlatformRevenue: number, commissionsByDay: any[], recentTransactions: any[], total: number, page: number, totalPages: number }>
+  financials(page?: number, limit?: number, filterType?: string, options?: { query?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year' }): Promise<{ totalDuelWagered: number, totalDuelCommissions: number, totalDuelsWithWagers: number, totalSubscriptionRevenue: number, totalPlatformRevenue: number, commissionsByDay: Array<Record<string, unknown>>, recentTransactions: Array<Record<string, unknown>>, total: number, page: number, totalPages: number }>
   pendingProblems(page?: number, limit?: number): Promise<{ problems: ProblemResponseDTO[], total: number, page: number, totalPages: number }>
   approveProblem(id: string): Promise<boolean>
   rejectProblem(id: string): Promise<boolean>
   allProblems(page?: number, limit?: number): Promise<{ problems: ProblemResponseDTO[], total: number, page: number, totalPages: number }>
-  validateProblemTests(id: string): Promise<any>
-  addProblemTestCases(id: string, newTestCases: any[]): Promise<boolean>
+  validateProblemTests(id: string): Promise<Record<string, unknown>>
+  addProblemTestCases(id: string, newTestCases: Record<string, unknown>[]): Promise<boolean>
   allUsers(page?: number, limit?: number, query?: string): Promise<{ users: UserResponseDTO[], total: number, page: number, totalPages: number }>
   banUser(id: string): Promise<boolean>
   unbanUser(id: string): Promise<boolean>
@@ -183,7 +183,6 @@ export interface IStudySessionService {
   update(sessionId: string, userId: string, data: Partial<StudySession>): Promise<StudySessionResponseDTO | null>
   join(sessionId: string, userId: string): Promise<StudySessionResponseDTO | null>
   leave(sessionId: string, userId: string): Promise<StudySessionResponseDTO | null>
-  passTurn(sessionId: string, userId: string): Promise<StudySessionResponseDTO | null>
   list(groupId: string, page?: number, limit?: number, options?: { status?: string, sort?: string, query?: string }): Promise<{ sessions: StudySessionResponseDTO[], total: number, page: number, totalPages: number }>
   getById(id: string): Promise<StudySessionResponseDTO | null>
   getByIdSecure(id: string, userId: string): Promise<StudySessionResponseDTO | null>

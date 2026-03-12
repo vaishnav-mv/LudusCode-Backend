@@ -17,5 +17,6 @@ export interface ProblemResponseDTO {
     functionName?: string;
     editorial?: string;
     timeLimitMs: number;
+    solveTimeLimit: number;
     status: ProblemStatus | string;
 }

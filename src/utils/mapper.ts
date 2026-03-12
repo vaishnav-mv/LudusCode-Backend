@@ -14,14 +14,14 @@ import { ProblemResponseDTO } from '../dto/response/problem.response.dto';
 import { TransactionResponseDTO } from '../dto/response/transaction.response.dto';
 import { SubscriptionPlanResponseDTO, SubscriptionLogResponseDTO } from '../dto/response/subscription.response.dto';
 import { StudySessionResponseDTO } from '../dto/response/studySession.response.dto';
-import { User, Problem, Group, Wallet, ChatMessage, Duel, ProblemSubmission, Difficulty, SubmissionStatus, ProblemStatus, StudySession, StudySessionMode, StudySessionStatus, SubscriptionPlan, SubscriptionLog, Transaction, TransactionType, TransactionStatus } from '../types';
+import { User, Problem, Group, Wallet, ChatMessage, Duel, ProblemSubmission, Difficulty, SubmissionStatus, ProblemStatus, StudySession, StudySessionStatus, SubscriptionPlan, SubscriptionLog, Transaction, TransactionType, TransactionStatus } from '../types';
 
 export const mapTransaction = (t: Partial<Transaction> | null | undefined): TransactionResponseDTO | null => {
     if (!t) return null;
     return {
         id: t._id?.toString() || t.id || '',
         userId: (typeof t.userId === 'object' && t.userId !== null && 'username' in t.userId)
-            ? { id: (t.userId as any)._id?.toString() || (t.userId as any).id, username: (t.userId as any).username, email: (t.userId as any).email }
+            ? { id: ((t.userId as unknown as { _id?: { toString: () => string }, id?: string })._id?.toString() || (t.userId as unknown as { id: string }).id) as string, username: (t.userId as unknown as { username: string }).username, email: (t.userId as unknown as { email: string }).email }
             : ((typeof t.userId === 'object' && t.userId && '_id' in t.userId) ? (t.userId as { _id: { toString: () => string } })._id?.toString() : (t.userId as string) || ''),
         type: t.type as TransactionType,
         status: t.status as TransactionStatus,
@@ -38,7 +38,6 @@ export const mapStudySession = (session: Partial<StudySession> | null | undefine
         groupId: (typeof session.groupId === 'object' && session.groupId && '_id' in session.groupId) ? (session.groupId as { _id: { toString: () => string } })._id?.toString() : (session.groupId as string) || '',
         title: session.title || '',
         description: session.description || '',
-        mode: session.mode as StudySessionMode,
         status: session.status as StudySessionStatus,
         startTime: session.startTime instanceof Date ? session.startTime.toISOString() : (session.startTime || ''),
         durationMinutes: session.durationMinutes || 0,
@@ -49,10 +48,7 @@ export const mapStudySession = (session: Partial<StudySession> | null | undefine
             role: participant.role || 'participant'
         })),
         chatEnabled: !!session.chatEnabled,
-        voiceEnabled: !!session.voiceEnabled,
-        currentTurnUserId: (typeof session.currentTurnUserId === 'object' && session.currentTurnUserId && '_id' in session.currentTurnUserId) ? (session.currentTurnUserId as { _id: { toString: () => string } })._id?.toString() : (session.currentTurnUserId as string) || undefined,
-        turnStartedAt: session.turnStartedAt instanceof Date ? session.turnStartedAt.toISOString() : session.turnStartedAt,
-        turnDurationSeconds: session.turnDurationSeconds
+        voiceEnabled: !!session.voiceEnabled
     };
 };
 
@@ -124,6 +120,7 @@ export const mapProblem = (problem: Partial<Problem> | null | undefined): Proble
         functionName: problem.functionName,
         editorial: problem.editorial,
         timeLimitMs: problem.timeLimitMs || 5000,
+        solveTimeLimit: problem.solveTimeLimit || 300,
         status: problem.status || ProblemStatus.Pending
     };
 };
@@ -147,7 +144,8 @@ export const mapDuelProblem = (problem: Partial<Problem> | null | undefined, sho
         starterCode: problem.starterCode,
         functionName: problem.functionName,
         status: problem.status || ProblemStatus.Pending,
-        timeLimitMs: problem.timeLimitMs || 5000
+        timeLimitMs: problem.timeLimitMs || 5000,
+        solveTimeLimit: problem.solveTimeLimit || 300
     };
 };
 

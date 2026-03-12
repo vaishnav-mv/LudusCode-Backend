@@ -62,6 +62,7 @@ import { JudgeService } from '../services/judgeService'
 import { SocialAuthService } from '../services/socialAuthService'
 import { SubmissionService } from '../services/submissionService'
 import { SubscriptionService } from '../services/subscriptionService'
+import { CronService } from '../services/cronService'
 
 // Register Repositories
 container.registerSingleton<IUserRepository>("IUserRepository", UserRepository)
@@ -101,6 +102,7 @@ container.registerSingleton<IAdminService>("IAdminService", AdminService)
 container.registerSingleton<IJudgeService>("IJudgeService", JudgeService)
 container.registerSingleton<ISubmissionService>("ISubmissionService", SubmissionService)
 container.registerSingleton<ISubscriptionService>("ISubscriptionService", SubscriptionService)
+container.registerSingleton<CronService>("CronService", CronService)
 
 
 export default container

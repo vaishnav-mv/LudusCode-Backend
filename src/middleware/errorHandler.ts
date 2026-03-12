@@ -14,7 +14,7 @@ export class ErrorMiddleware {
 
     // Fallback default
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
-    let message = getErrorMessage(err);
+    const message = getErrorMessage(err);
 
     // Some specific messages map exactly to 401/403/400/404 throughout the controllers
     if (message === ResponseMessages.USER_BANNED || message.includes('Forbidden') || message.includes('block')) {

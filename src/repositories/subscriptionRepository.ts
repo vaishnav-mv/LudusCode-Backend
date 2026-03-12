@@ -95,7 +95,7 @@ export class SubscriptionRepository implements ISubscriptionRepository {
     }
 
     async getLogsAll(skip: number, limit: number, options?: { action?: string, sortStr?: string, sortOrder?: 'asc' | 'desc', query?: string, isRevenue?: boolean, startDate?: Date, endDate?: Date }): Promise<{ logs: SubscriptionLog[], total: number }> {
-        const match: Record<string, any> = {}
+        const match: Record<string, unknown> = {}
 
         if (options?.action && options.action !== 'All') {
             match.action = options.action
@@ -107,9 +107,10 @@ export class SubscriptionRepository implements ISubscriptionRepository {
         }
 
         if (options?.startDate || options?.endDate) {
-            match.timestamp = {};
-            if (options.startDate) match.timestamp.$gte = options.startDate;
-            if (options.endDate) match.timestamp.$lte = options.endDate;
+            const timestampFilter: Record<string, Date> = {};
+            if (options.startDate) timestampFilter.$gte = options.startDate;
+            if (options.endDate) timestampFilter.$lte = options.endDate;
+            match.timestamp = timestampFilter;
         }
 
         if (options?.query && options.query.trim() !== '') {
@@ -183,11 +184,12 @@ export class SubscriptionRepository implements ISubscriptionRepository {
     }
 
     async getTotalSubscriptionRevenue(startDate?: Date, endDate?: Date): Promise<number> {
-        const matchStage: any = { action: { $in: [SubscriptionAction.Subscribed, SubscriptionAction.Renewed, SubscriptionAction.Upgraded, SubscriptionAction.Grant] } };
+        const matchStage: Record<string, unknown> = { action: { $in: [SubscriptionAction.Subscribed, SubscriptionAction.Renewed, SubscriptionAction.Upgraded, SubscriptionAction.Grant] } };
         if (startDate || endDate) {
-            matchStage.timestamp = {};
-            if (startDate) matchStage.timestamp.$gte = startDate;
-            if (endDate) matchStage.timestamp.$lte = endDate;
+            const timestampFilter: Record<string, Date> = {};
+            if (startDate) timestampFilter.$gte = startDate;
+            if (endDate) timestampFilter.$lte = endDate;
+            matchStage.timestamp = timestampFilter;
         }
         const result = await SubscriptionLogModel.aggregate([
             { $match: matchStage },
@@ -197,11 +199,12 @@ export class SubscriptionRepository implements ISubscriptionRepository {
     }
 
     async getRevenueByDay(startDate?: Date, endDate?: Date, groupBy?: 'day' | 'month' | 'year'): Promise<{ date: string, amount: number }[]> {
-        const matchStage: any = { action: { $in: [SubscriptionAction.Subscribed, SubscriptionAction.Renewed, SubscriptionAction.Upgraded, SubscriptionAction.Grant] }, amount: { $gt: 0 } };
+        const matchStage: Record<string, unknown> = { action: { $in: [SubscriptionAction.Subscribed, SubscriptionAction.Renewed, SubscriptionAction.Upgraded, SubscriptionAction.Grant] }, amount: { $gt: 0 } };
         if (startDate || endDate) {
-            matchStage.timestamp = {};
-            if (startDate) matchStage.timestamp.$gte = startDate;
-            if (endDate) matchStage.timestamp.$lte = endDate;
+            const timestampFilter: Record<string, Date> = {};
+            if (startDate) timestampFilter.$gte = startDate;
+            if (endDate) timestampFilter.$lte = endDate;
+            matchStage.timestamp = timestampFilter;
         }
 
         let formatStr = '%Y-%m-%d';
