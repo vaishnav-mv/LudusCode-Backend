@@ -45,7 +45,7 @@ export class SubscriptionService implements ISubscriptionService {
 
         const { action, newExpiry, proratedCredit } = computeSubscriptionAction(user, plan, oldPlan)
 
-        // Queue Downgrade Logic (Option 1)
+        // Queue Downgrade Logic
         if (action === 'Downgraded' && user.subscriptionExpiry && new Date(user.subscriptionExpiry) > new Date()) {
             await this._users.update(userId, {
                 pendingPlanId: newPlanIdStr,

@@ -1,4 +1,4 @@
-import { User, SubmissionResult, Problem, PaginatedResponse, StudySession, JwtPayload, SubscriptionPlan} from '../types'
+import { User, SubmissionResult, Problem, PaginatedResponse, StudySession, JwtPayload, SubscriptionPlan, RazorpayOrder} from '../types'
 import { SubmissionResponseDTO } from '../dto/response/submission.response.dto'
 import { UserResponseDTO } from '../dto/response/user.response.dto'
 import { GroupResponseDTO } from '../dto/response/group.response.dto'
@@ -100,7 +100,7 @@ export interface IDuelService {
 
 export interface IWalletService {
   get(userId: string): Promise<WalletResponseDTO | null>
-  createDepositOrder(userId: string, amount: number): Promise<Record<string, unknown>>
+  createDepositOrder(userId: string, amount: number): Promise<RazorpayOrder>
   verifyDeposit(userId: string, orderId: string, paymentId: string, signature: string): Promise<boolean>
 
   withdraw(userId: string, amount: number, vpa: string): Promise<boolean>
